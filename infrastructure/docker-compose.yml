@@ -1,0 +1,90 @@
+version: '3.8'
+
+# OPYNX Local Development Stack
+# Usage: docker compose up -d
+# All data is persisted in named volumes.
+
+services:
+  # ─── PostgreSQL 16 ───
+  postgres:
+    image: postgres:16-alpine
+    container_name: opynx-postgres
+    restart: unless-stopped
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: opynx
+      POSTGRES_PASSWORD: opynx_dev
+      POSTGRES_DB: opynx
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U opynx']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Redis 7 ───
+  redis:
+    image: redis:7-alpine
+    container_name: opynx-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    command: redis-server --save 60 1 --loglevel warning --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Meilisearch 1.9 ───
+  meilisearch:
+    image: getmeili/meilisearch:v1.9
+    container_name: opynx-meilisearch
+    restart: unless-stopped
+    ports:
+      - '7700:7700'
+    environment:
+      MEILI_ENV: development
+      MEILI_MASTER_KEY: opynx_meili_dev_key
+      MEILI_NO_ANALYTICS: 'true'
+    volumes:
+      - meilisearch_data:/meili_data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:7700/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── MinIO (S3-compatible storage) ───
+  minio:
+    image: minio/minio:latest
+    container_name: opynx-minio
+    restart: unless-stopped
+    ports:
+      - '9000:9000'  # API
+      - '9001:9001'  # Console UI
+    environment:
+      MINIO_ROOT_USER: opynx_minio
+      MINIO_ROOT_PASSWORD: opynx_minio_secret
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  meilisearch_data:
+    driver: local
+  minio_data:
+    driver: local

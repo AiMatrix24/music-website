@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["dom", "dom.iterable", "ES2022"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [{ "name": "next" }],
+    "paths": {
+      "@/*": ["./apps/web/*"],
+      "@opynx/db": ["./packages/db"],
+      "@opynx/db/*": ["./packages/db/*"],
+      "@opynx/api": ["./packages/api"],
+      "@opynx/api/*": ["./packages/api/*"],
+      "@opynx/auth": ["./packages/auth"],
+      "@opynx/auth/*": ["./packages/auth/*"],
+      "@opynx/queue": ["./packages/queue"],
+      "@opynx/queue/*": ["./packages/queue/*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", "packages/contracts"]
+}

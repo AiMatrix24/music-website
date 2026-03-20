@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "plugins": [{ "name": "next" }],
+    "paths": {
+      "@/*": ["./*"],
+      "@opynx/db": ["../../packages/db"],
+      "@opynx/db/*": ["../../packages/db/*"],
+      "@opynx/api": ["../../packages/api"],
+      "@opynx/api/*": ["../../packages/api/*"],
+      "@opynx/auth": ["../../packages/auth"],
+      "@opynx/auth/*": ["../../packages/auth/*"],
+      "@opynx/queue": ["../../packages/queue"],
+      "@opynx/queue/*": ["../../packages/queue/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}

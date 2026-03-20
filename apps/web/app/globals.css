@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-primary: #7c3aed;
+  --brand-dark: #1a1a2e;
+  --brand-surface: #15151f;
+  --brand-border: #2a2a3a;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-brand-950 text-gray-200 antialiased;
+}
+
+/* Global audio player - persists across navigation */
+#global-player {
+  @apply fixed bottom-0 left-0 right-0 z-50;
+}
+
+/* Waveform canvas */
+.waveform-canvas {
+  @apply w-full cursor-pointer;
+  image-rendering: crisp-edges;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  @apply w-2;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-brand-950;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-brand-700 rounded-full;
+}
