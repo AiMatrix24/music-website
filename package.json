@@ -26,6 +26,7 @@
     "node": ">=20.0.0"
   },
   "devDependencies": {
+    "@next/swc-win32-x64-msvc": "^16.2.1",
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.1"
   }
