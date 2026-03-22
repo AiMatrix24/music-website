@@ -1,9 +1,7 @@
 'use client';
 
-/**
- * Login Page — P0 Priority
- * Discord, Twitter/X, Twitch OAuth + SIWE wallet auth.
- */
+import { signIn } from 'next-auth/react';
+
 export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
@@ -14,10 +12,21 @@ export default function LoginPage() {
         </div>
 
         <div className="space-y-3">
-          {/* OAuth Providers */}
-          <OAuthButton provider="Discord" color="bg-[#5865F2]" />
-          <OAuthButton provider="Twitter / X" color="bg-[#1DA1F2]" />
-          <OAuthButton provider="Twitch" color="bg-[#9146FF]" />
+          <OAuthButton
+            provider="discord"
+            label="Continue with Discord"
+            color="bg-[#5865F2]"
+          />
+          <OAuthButton
+            provider="twitter"
+            label="Continue with Twitter / X"
+            color="bg-[#1DA1F2]"
+          />
+          <OAuthButton
+            provider="twitch"
+            label="Continue with Twitch"
+            color="bg-[#9146FF]"
+          />
 
           <div className="flex items-center gap-4 py-4">
             <div className="flex-1 h-px bg-brand-800/30" />
@@ -27,7 +36,6 @@ export default function LoginPage() {
             <div className="flex-1 h-px bg-brand-800/30" />
           </div>
 
-          {/* SIWE Wallet Auth */}
           <button className="w-full rounded-xl bg-[#15151f] border border-brand-700/30 py-4 font-semibold text-white transition hover:border-brand-500 flex items-center justify-center gap-3">
             <span className="text-xl">🦊</span>
             Connect Wallet (SIWE)
@@ -45,12 +53,21 @@ export default function LoginPage() {
   );
 }
 
-function OAuthButton({ provider, color }: { provider: string; color: string }) {
+function OAuthButton({
+  provider,
+  label,
+  color,
+}: {
+  provider: string;
+  label: string;
+  color: string;
+}) {
   return (
     <button
+      onClick={() => signIn(provider, { callbackUrl: '/dashboard' })}
       className={`w-full rounded-xl ${color} py-4 font-semibold text-white transition hover:opacity-90`}
     >
-      Continue with {provider}
+      {label}
     </button>
   );
 }
