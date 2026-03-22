@@ -35,7 +35,7 @@ export function Providers({ children }: { children: ReactNode }) {
 
   const inner = (
     <QueryClientProvider client={queryClient}>
-      <SessionProvider>
+      <SessionProvider refetchInterval={0} refetchOnWindowFocus={false}>
         <TRPCProvider>{children}</TRPCProvider>
       </SessionProvider>
     </QueryClientProvider>
