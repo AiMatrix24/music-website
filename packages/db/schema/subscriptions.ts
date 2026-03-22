@@ -47,15 +47,15 @@ export const subscriptions = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => ({
-    userIdx: index('subs_user_idx').on(t.userId),
-    statusIdx: index('subs_status_idx').on(t.status),
-    helioIdx: index('subs_helio_idx').on(t.helioSubId),
-    samiteonIdx: index('subs_samiteon_idx').on(t.samiteonSubId),
+  (t) => [
+    index('subs_user_idx').on(t.userId),
+    index('subs_status_idx').on(t.status),
+    index('subs_helio_idx').on(t.helioSubId),
+    index('subs_samiteon_idx').on(t.samiteonSubId),
     // Partial index for payout queries
-    activeIdx: index('subs_active_idx')
+    index('subs_active_idx')
       .on(t.userId, t.status),
-  })
+  ]
 );
 
 export const subEventEnum = pgEnum('sub_event_type', [
@@ -80,9 +80,9 @@ export const subEvents = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => ({
-    subIdx: index('sub_events_sub_idx').on(t.subscriptionId),
-  })
+  (t) => [
+    index('sub_events_sub_idx').on(t.subscriptionId),
+  ]
 );
 
 export const subscriptionsRelations = relations(

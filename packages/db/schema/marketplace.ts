@@ -41,11 +41,11 @@ export const listings = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => ({
-    sellerIdx: index('listings_seller_idx').on(t.sellerId),
-    categoryIdx: index('listings_category_idx').on(t.category),
-    statusIdx: index('listings_status_idx').on(t.status),
-  })
+  (t) => [
+    index('listings_seller_idx').on(t.sellerId),
+    index('listings_category_idx').on(t.category),
+    index('listings_status_idx').on(t.status),
+  ]
 );
 
 export const orders = pgTable(
@@ -71,10 +71,10 @@ export const orders = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => ({
-    buyerIdx: index('orders_buyer_idx').on(t.buyerId),
-    sellerIdx: index('orders_seller_idx').on(t.sellerId),
-  })
+  (t) => [
+    index('orders_buyer_idx').on(t.buyerId),
+    index('orders_seller_idx').on(t.sellerId),
+  ]
 );
 
 export const orderItems = pgTable('order_items', {

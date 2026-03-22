@@ -30,11 +30,11 @@ export const scanLogs = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => ({
-    userIdx: index('scan_logs_user_idx').on(t.userId),
-    eventIdx: index('scan_logs_event_idx').on(t.eventId),
-    createdAtIdx: index('scan_logs_created_idx').on(t.createdAt),
-  })
+  (t) => [
+    index('scan_logs_user_idx').on(t.userId),
+    index('scan_logs_event_idx').on(t.eventId),
+    index('scan_logs_created_idx').on(t.createdAt),
+  ]
 );
 
 export const attributions = pgTable(
@@ -62,13 +62,13 @@ export const attributions = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => ({
-    subscriberIdx: index('attr_subscriber_idx').on(t.subscriberId),
-    creatorIdx: index('attr_creator_idx').on(t.creatorId),
-    facilitatorIdx: index('attr_facilitator_idx').on(t.facilitatorId),
-    outlierIdx: index('attr_outlier_idx').on(t.outlierId),
-    eventIdx: index('attr_event_idx').on(t.eventId),
-  })
+  (t) => [
+    index('attr_subscriber_idx').on(t.subscriberId),
+    index('attr_creator_idx').on(t.creatorId),
+    index('attr_facilitator_idx').on(t.facilitatorId),
+    index('attr_outlier_idx').on(t.outlierId),
+    index('attr_event_idx').on(t.eventId),
+  ]
 );
 
 export const attributionsRelations = relations(attributions, ({ one }) => ({

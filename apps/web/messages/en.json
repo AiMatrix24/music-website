@@ -1,0 +1,40 @@
+{
+  "common": {
+    "appName": "OPYNX",
+    "tagline": "Direct-to-Fan Music & Events",
+    "login": "Log In",
+    "signup": "Sign Up",
+    "logout": "Log Out",
+    "dashboard": "Dashboard",
+    "home": "Home",
+    "explore": "Explore",
+    "upload": "Upload",
+    "settings": "Settings"
+  },
+  "auth": {
+    "loginTitle": "Welcome to OPYNX",
+    "loginSubtitle": "Sign in to access your music",
+    "continueWith": "Continue with {provider}",
+    "connectWallet": "Connect Wallet",
+    "termsNotice": "By signing in, you agree to our Terms and Privacy Policy"
+  },
+  "subscription": {
+    "premium": "Premium",
+    "bundle": "Superfan Bundle",
+    "studio": "Studio",
+    "subscribe": "Subscribe Now",
+    "perMonth": "/mo"
+  },
+  "tracks": {
+    "upload": "Upload Track",
+    "published": "Published",
+    "draft": "Draft",
+    "processing": "Processing"
+  },
+  "events": {
+    "upcoming": "Upcoming Events",
+    "past": "Past Events",
+    "create": "Create Event",
+    "tickets": "Get Tickets"
+  }
+}

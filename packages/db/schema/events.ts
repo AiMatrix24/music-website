@@ -54,9 +54,9 @@ export const eventSeries = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => ({
-    creatorIdx: index('series_creator_idx').on(t.creatorId),
-  })
+  (t) => [
+    index('series_creator_idx').on(t.creatorId),
+  ]
 );
 
 export const venues = pgTable('venues', {
@@ -104,12 +104,12 @@ export const events = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => ({
-    hostIdx: index('events_host_idx').on(t.hostId),
-    seriesIdx: index('events_series_idx').on(t.seriesId),
-    statusIdx: index('events_status_idx').on(t.status),
-    dateIdx: index('events_date_idx').on(t.startDate),
-  })
+  (t) => [
+    index('events_host_idx').on(t.hostId),
+    index('events_series_idx').on(t.seriesId),
+    index('events_status_idx').on(t.status),
+    index('events_date_idx').on(t.startDate),
+  ]
 );
 
 export const eventFacilitators = pgTable(
@@ -128,10 +128,10 @@ export const eventFacilitators = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => ({
-    eventIdx: index('ef_event_idx').on(t.eventId),
-    facilitatorIdx: index('ef_facilitator_idx').on(t.facilitatorId),
-  })
+  (t) => [
+    index('ef_event_idx').on(t.eventId),
+    index('ef_facilitator_idx').on(t.facilitatorId),
+  ]
 );
 
 export const ticketTierEnum = pgEnum('ticket_tier', [
@@ -176,10 +176,10 @@ export const tickets = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => ({
-    attendeeIdx: index('tickets_attendee_idx').on(t.attendeeId),
-    eventIdx: index('tickets_event_idx').on(t.eventId),
-  })
+  (t) => [
+    index('tickets_attendee_idx').on(t.attendeeId),
+    index('tickets_event_idx').on(t.eventId),
+  ]
 );
 
 export const eventsRelations = relations(events, ({ one, many }) => ({

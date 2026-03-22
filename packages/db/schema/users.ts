@@ -38,11 +38,11 @@ export const users = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => ({
-    emailIdx: uniqueIndex('users_email_idx').on(t.email),
-    walletIdx: index('users_wallet_idx').on(t.walletAddress),
-    roleIdx: index('users_role_idx').on(t.role),
-  })
+  (t) => [
+    uniqueIndex('users_email_idx').on(t.email),
+    index('users_wallet_idx').on(t.walletAddress),
+    index('users_role_idx').on(t.role),
+  ]
 );
 
 export const oauthConnections = pgTable(
@@ -61,13 +61,13 @@ export const oauthConnections = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => ({
-    providerIdx: uniqueIndex('oauth_provider_account_idx').on(
+  (t) => [
+    uniqueIndex('oauth_provider_account_idx').on(
       t.provider,
       t.providerAccountId
     ),
-    userIdx: index('oauth_user_idx').on(t.userId),
-  })
+    index('oauth_user_idx').on(t.userId),
+  ]
 );
 
 export const sessions = pgTable('sessions', {
@@ -97,10 +97,10 @@ export const follows = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => ({
-    followerIdx: index('follows_follower_idx').on(t.followerId),
-    followeeIdx: index('follows_followee_idx').on(t.followeeId),
-  })
+  (t) => [
+    index('follows_follower_idx').on(t.followerId),
+    index('follows_followee_idx').on(t.followeeId),
+  ]
 );
 
 export const tags = pgTable(
@@ -124,10 +124,10 @@ export const taggables = pgTable(
     taggableId: uuid('taggable_id').notNull(),
     taggableType: text('taggable_type').notNull(), // track, album, event, article, listing
   },
-  (t) => ({
-    tagIdx: index('taggables_tag_idx').on(t.tagId),
-    targetIdx: index('taggables_target_idx').on(t.taggableId, t.taggableType),
-  })
+  (t) => [
+    index('taggables_tag_idx').on(t.tagId),
+    index('taggables_target_idx').on(t.taggableId, t.taggableType),
+  ]
 );
 
 // Relations

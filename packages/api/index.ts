@@ -1,3 +1,5 @@
+import { z } from 'zod';
+import { eq, desc, and, sql, ilike } from 'drizzle-orm';
 import {
   createRouter,
   createCallerFactory,
@@ -5,64 +7,957 @@ import {
   protectedProcedure,
   adminProcedure,
 } from '../../apps/web/lib/trpc/server';
+import { db } from '@opynx/db';
+import {
+  users,
+  oauthConnections,
+  follows,
+  subscriptions,
+  subEvents,
+  scanLogs,
+  attributions,
+  commissions,
+  payoutBatches,
+  tracks,
+  albums,
+  albumTracks,
+  playlists,
+  playlistTracks,
+  comments,
+  likes,
+  reposts,
+  events,
+  eventSeries,
+  venues,
+  eventFacilitators,
+  ticketTypes,
+  tickets,
+  listings,
+  orders,
+  orderItems,
+  articles,
+  categories,
+  articleCategories,
+} from '@opynx/db';
 
-// ─── Sub-router stubs ───
-// Each sub-router will be implemented in its own file under packages/api/routers/
-
+// ─── Auth Router ───
 const authRouter = createRouter({
-  // placeholder: login, logout, session, register, verifyEmail
+  session: publicProcedure.query(async ({ ctx }) => {
+    return ctx.session;
+  }),
 });
 
+// ─── Users Router ───
 const usersRouter = createRouter({
-  // placeholder: getProfile, updateProfile, getByWallet, searchUsers
+  getProfile: protectedProcedure.query(async ({ ctx }) => {
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, ctx.session.user.id),
+    });
+    return user ?? null;
+  }),
+
+  updateProfile: protectedProcedure
+    .input(
+      z.object({
+        name: z.string().min(1).max(100).optional(),
+        avatar: z.string().url().optional(),
+        locale: z.string().max(10).optional(),
+        walletAddress: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [updated] = await db
+        .update(users)
+        .set({ ...input, updatedAt: new Date() })
+        .where(eq(users.id, ctx.session.user.id))
+        .returning();
+      return updated;
+    }),
+
+  getByWallet: publicProcedure
+    .input(z.object({ walletAddress: z.string() }))
+    .query(async ({ input }) => {
+      const user = await db.query.users.findFirst({
+        where: eq(users.walletAddress, input.walletAddress),
+      });
+      return user ?? null;
+    }),
+
+  searchUsers: publicProcedure
+    .input(
+      z.object({
+        query: z.string().min(1),
+        limit: z.number().min(1).max(50).default(20),
+      })
+    )
+    .query(async ({ input }) => {
+      return db
+        .select()
+        .from(users)
+        .where(ilike(users.name, `%${input.query}%`))
+        .limit(input.limit);
+    }),
 });
 
+// ─── Subscriptions Router ───
 const subscriptionsRouter = createRouter({
-  // placeholder: getMySubscription, subscribe, cancel, upgrade, getStatus
+  getMySubscription: protectedProcedure.query(async ({ ctx }) => {
+    const sub = await db.query.subscriptions.findFirst({
+      where: and(
+        eq(subscriptions.userId, ctx.session.user.id),
+        eq(subscriptions.status, 'active')
+      ),
+    });
+    return sub ?? null;
+  }),
+
+  getStatus: protectedProcedure.query(async ({ ctx }) => {
+    const allSubs = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.userId, ctx.session.user.id))
+      .orderBy(desc(subscriptions.createdAt));
+    return allSubs;
+  }),
+
+  cancel: protectedProcedure
+    .input(z.object({ subscriptionId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const [updated] = await db
+        .update(subscriptions)
+        .set({ status: 'cancelled', updatedAt: new Date() })
+        .where(
+          and(
+            eq(subscriptions.id, input.subscriptionId),
+            eq(subscriptions.userId, ctx.session.user.id)
+          )
+        )
+        .returning();
+
+      if (updated) {
+        await db.insert(subEvents).values({
+          subscriptionId: updated.id,
+          event: 'cancelled',
+        });
+      }
+
+      return updated ?? null;
+    }),
 });
 
+// ─── Attribution Router ───
 const attributionRouter = createRouter({
-  // placeholder: recordScan, getAttributionChain, getMyReferrals
+  recordScan: protectedProcedure
+    .input(
+      z.object({
+        qrCodeId: z.string(),
+        eventId: z.string().uuid().optional(),
+        facilitatorId: z.string().uuid().optional(),
+        scanType: z.enum(['ACQUISITION_SCAN', 'RETENTION_SCAN']).default('ACQUISITION_SCAN'),
+        latitude: z.string().optional(),
+        longitude: z.string().optional(),
+        accuracy: z.string().optional(),
+        geoMatch: z.boolean().default(false),
+        geoConfidence: z.enum(['EXACT', 'BUFFER']).optional(),
+        totpFallback: z.boolean().default(false),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [scanLog] = await db
+        .insert(scanLogs)
+        .values({
+          qrCodeId: input.qrCodeId,
+          userId: ctx.session.user.id,
+          eventId: input.eventId ?? null,
+          facilitatorId: input.facilitatorId ?? null,
+          scanType: input.scanType,
+          geoMatch: input.geoMatch,
+          geoConfidence: input.geoConfidence ?? null,
+          totpFallback: input.totpFallback,
+          latitude: input.latitude ?? null,
+          longitude: input.longitude ?? null,
+          accuracy: input.accuracy ?? null,
+        })
+        .returning();
+      return scanLog;
+    }),
+
+  getAttributionChain: protectedProcedure
+    .input(z.object({ subscriptionId: z.string().uuid() }))
+    .query(async ({ input }) => {
+      return db
+        .select()
+        .from(attributions)
+        .where(eq(attributions.subscriptionId, input.subscriptionId));
+    }),
+
+  getMyReferrals: protectedProcedure.query(async ({ ctx }) => {
+    return db
+      .select()
+      .from(attributions)
+      .where(eq(attributions.facilitatorId, ctx.session.user.id))
+      .orderBy(desc(attributions.createdAt));
+  }),
 });
 
+// ─── Tracks Router ───
 const tracksRouter = createRouter({
-  // placeholder: list, getById, upload, update, delete, stream, search
+  list: publicProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(20),
+        offset: z.number().min(0).default(0),
+        userId: z.string().uuid().optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      const conditions = [eq(tracks.status, 'published')];
+      if (input.userId) conditions.push(eq(tracks.userId, input.userId));
+
+      return db
+        .select()
+        .from(tracks)
+        .where(and(...conditions))
+        .orderBy(desc(tracks.createdAt))
+        .limit(input.limit)
+        .offset(input.offset);
+    }),
+
+  getById: publicProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ input }) => {
+      const track = await db.query.tracks.findFirst({
+        where: eq(tracks.id, input.id),
+      });
+      return track ?? null;
+    }),
+
+  upload: protectedProcedure
+    .input(
+      z.object({
+        title: z.string().min(1).max(200),
+        slug: z.string().min(1).max(200),
+        genre: z.string().optional(),
+        bpm: z.number().int().min(1).max(999).optional(),
+        license: z.string().optional(),
+        visibility: z.enum(['public', 'private', 'unlisted', 'subscribers_only']).default('public'),
+        originalFileKey: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [track] = await db
+        .insert(tracks)
+        .values({
+          userId: ctx.session.user.id,
+          title: input.title,
+          slug: input.slug,
+          genre: input.genre ?? null,
+          bpm: input.bpm ?? null,
+          license: input.license ?? null,
+          visibility: input.visibility,
+          status: 'uploading',
+          originalFileKey: input.originalFileKey,
+        })
+        .returning();
+      return track;
+    }),
+
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        title: z.string().min(1).max(200).optional(),
+        genre: z.string().optional(),
+        visibility: z.enum(['public', 'private', 'unlisted', 'subscribers_only']).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+      const [updated] = await db
+        .update(tracks)
+        .set({ ...data, updatedAt: new Date() })
+        .where(and(eq(tracks.id, id), eq(tracks.userId, ctx.session.user.id)))
+        .returning();
+      return updated ?? null;
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const [deleted] = await db
+        .delete(tracks)
+        .where(and(eq(tracks.id, input.id), eq(tracks.userId, ctx.session.user.id)))
+        .returning();
+      return deleted ?? null;
+    }),
 });
 
+// ─── Albums Router ───
 const albumsRouter = createRouter({
-  // placeholder: list, getById, create, update, delete, getTracks
+  list: publicProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(50).default(20),
+        offset: z.number().min(0).default(0),
+        userId: z.string().uuid().optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      const conditions = [];
+      if (input.userId) conditions.push(eq(albums.userId, input.userId));
+
+      return db
+        .select()
+        .from(albums)
+        .where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(desc(albums.createdAt))
+        .limit(input.limit)
+        .offset(input.offset);
+    }),
+
+  getById: publicProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ input }) => {
+      const album = await db.query.albums.findFirst({
+        where: eq(albums.id, input.id),
+      });
+      return album ?? null;
+    }),
+
+  create: protectedProcedure
+    .input(
+      z.object({
+        title: z.string().min(1).max(200),
+        slug: z.string().min(1).max(200),
+        coverUrl: z.string().url().optional(),
+        releaseDate: z.string().datetime().optional(),
+        price: z.number().int().min(0).optional(),
+        visibility: z.enum(['public', 'private', 'unlisted', 'subscribers_only']).default('public'),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [album] = await db
+        .insert(albums)
+        .values({
+          userId: ctx.session.user.id,
+          title: input.title,
+          slug: input.slug,
+          coverUrl: input.coverUrl ?? null,
+          releaseDate: input.releaseDate ? new Date(input.releaseDate) : null,
+          price: input.price ?? null,
+          visibility: input.visibility,
+        })
+        .returning();
+      return album;
+    }),
+
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        title: z.string().min(1).max(200).optional(),
+        coverUrl: z.string().url().optional(),
+        visibility: z.enum(['public', 'private', 'unlisted', 'subscribers_only']).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+      const [updated] = await db
+        .update(albums)
+        .set(data)
+        .where(and(eq(albums.id, id), eq(albums.userId, ctx.session.user.id)))
+        .returning();
+      return updated ?? null;
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const [deleted] = await db
+        .delete(albums)
+        .where(and(eq(albums.id, input.id), eq(albums.userId, ctx.session.user.id)))
+        .returning();
+      return deleted ?? null;
+    }),
+
+  getTracks: publicProcedure
+    .input(z.object({ albumId: z.string().uuid() }))
+    .query(async ({ input }) => {
+      return db
+        .select({ track: tracks, position: albumTracks.position })
+        .from(albumTracks)
+        .innerJoin(tracks, eq(albumTracks.trackId, tracks.id))
+        .where(eq(albumTracks.albumId, input.albumId))
+        .orderBy(albumTracks.position);
+    }),
 });
 
+// ─── Playlists Router ───
 const playlistsRouter = createRouter({
-  // placeholder: list, getById, create, update, delete, addTrack, removeTrack
+  list: publicProcedure
+    .input(
+      z.object({
+        userId: z.string().uuid().optional(),
+        limit: z.number().min(1).max(50).default(20),
+      })
+    )
+    .query(async ({ input }) => {
+      const conditions = [];
+      if (input.userId) conditions.push(eq(playlists.userId, input.userId));
+
+      return db
+        .select()
+        .from(playlists)
+        .where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(desc(playlists.createdAt))
+        .limit(input.limit);
+    }),
+
+  getById: publicProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ input }) => {
+      const playlist = await db.query.playlists.findFirst({
+        where: eq(playlists.id, input.id),
+      });
+      return playlist ?? null;
+    }),
+
+  create: protectedProcedure
+    .input(
+      z.object({
+        title: z.string().min(1).max(200),
+        description: z.string().max(1000).optional(),
+        visibility: z.enum(['public', 'private', 'unlisted', 'subscribers_only']).default('public'),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [playlist] = await db
+        .insert(playlists)
+        .values({
+          userId: ctx.session.user.id,
+          title: input.title,
+          description: input.description ?? null,
+          visibility: input.visibility,
+        })
+        .returning();
+      return playlist;
+    }),
+
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        title: z.string().min(1).max(200).optional(),
+        description: z.string().max(1000).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+      const [updated] = await db
+        .update(playlists)
+        .set(data)
+        .where(and(eq(playlists.id, id), eq(playlists.userId, ctx.session.user.id)))
+        .returning();
+      return updated ?? null;
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const [deleted] = await db
+        .delete(playlists)
+        .where(and(eq(playlists.id, input.id), eq(playlists.userId, ctx.session.user.id)))
+        .returning();
+      return deleted ?? null;
+    }),
+
+  addTrack: protectedProcedure
+    .input(
+      z.object({
+        playlistId: z.string().uuid(),
+        trackId: z.string().uuid(),
+        position: z.number().int().min(0),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const [entry] = await db
+        .insert(playlistTracks)
+        .values({
+          playlistId: input.playlistId,
+          trackId: input.trackId,
+          position: input.position,
+        })
+        .returning();
+      return entry;
+    }),
+
+  removeTrack: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ input }) => {
+      const [deleted] = await db
+        .delete(playlistTracks)
+        .where(eq(playlistTracks.id, input.id))
+        .returning();
+      return deleted ?? null;
+    }),
 });
 
+// ─── Events Router ───
 const eventsRouter = createRouter({
-  // placeholder: list, getById, create, update, delete, getTickets
+  list: publicProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(50).default(20),
+        offset: z.number().min(0).default(0),
+        status: z.enum(['draft', 'published', 'active', 'completed', 'cancelled']).optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      const conditions = [];
+      if (input.status) conditions.push(eq(events.status, input.status));
+
+      return db
+        .select()
+        .from(events)
+        .where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(desc(events.startDate))
+        .limit(input.limit)
+        .offset(input.offset);
+    }),
+
+  getById: publicProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ input }) => {
+      const event = await db.query.events.findFirst({
+        where: eq(events.id, input.id),
+      });
+      return event ?? null;
+    }),
+
+  create: protectedProcedure
+    .input(
+      z.object({
+        title: z.string().min(1).max(200),
+        startDate: z.string().datetime(),
+        endDate: z.string().datetime(),
+        venueId: z.string().uuid().optional(),
+        countryCode: z.string().max(2).optional(),
+        timezone: z.string().optional(),
+        capacity: z.number().int().min(1).optional(),
+        coverUrl: z.string().url().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [event] = await db
+        .insert(events)
+        .values({
+          hostId: ctx.session.user.id,
+          title: input.title,
+          startDate: new Date(input.startDate),
+          endDate: new Date(input.endDate),
+          venueId: input.venueId ?? null,
+          countryCode: input.countryCode ?? null,
+          timezone: input.timezone ?? null,
+          capacity: input.capacity ?? null,
+          coverUrl: input.coverUrl ?? null,
+          status: 'draft',
+        })
+        .returning();
+      return event;
+    }),
+
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        title: z.string().min(1).max(200).optional(),
+        status: z.enum(['draft', 'published', 'active', 'completed', 'cancelled']).optional(),
+        capacity: z.number().int().min(1).optional(),
+        coverUrl: z.string().url().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+      const [updated] = await db
+        .update(events)
+        .set({ ...data, updatedAt: new Date() })
+        .where(and(eq(events.id, id), eq(events.hostId, ctx.session.user.id)))
+        .returning();
+      return updated ?? null;
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const [deleted] = await db
+        .delete(events)
+        .where(and(eq(events.id, input.id), eq(events.hostId, ctx.session.user.id)))
+        .returning();
+      return deleted ?? null;
+    }),
+
+  getTickets: publicProcedure
+    .input(z.object({ eventId: z.string().uuid() }))
+    .query(async ({ input }) => {
+      return db
+        .select()
+        .from(ticketTypes)
+        .where(eq(ticketTypes.eventId, input.eventId));
+    }),
 });
 
+// ─── Tickets Router ───
 const ticketsRouter = createRouter({
-  // placeholder: purchase, getMyTickets, validate, transfer
+  purchase: protectedProcedure
+    .input(
+      z.object({
+        ticketTypeId: z.string().uuid(),
+        eventId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const qrToken = `opynx_ticket_${Date.now()}_${ctx.session.user.id}`;
+      const [ticket] = await db
+        .insert(tickets)
+        .values({
+          ticketTypeId: input.ticketTypeId,
+          attendeeId: ctx.session.user.id,
+          eventId: input.eventId,
+          qrToken,
+          status: 'valid',
+        })
+        .returning();
+
+      // Increment sold count
+      await db
+        .update(ticketTypes)
+        .set({ sold: sql`${ticketTypes.sold} + 1` })
+        .where(eq(ticketTypes.id, input.ticketTypeId));
+
+      return ticket;
+    }),
+
+  getMyTickets: protectedProcedure.query(async ({ ctx }) => {
+    return db
+      .select({ ticket: tickets, event: events })
+      .from(tickets)
+      .innerJoin(events, eq(tickets.eventId, events.id))
+      .where(eq(tickets.attendeeId, ctx.session.user.id))
+      .orderBy(desc(events.startDate));
+  }),
+
+  validate: publicProcedure
+    .input(z.object({ qrToken: z.string() }))
+    .query(async ({ input }) => {
+      const ticket = await db.query.tickets.findFirst({
+        where: eq(tickets.qrToken, input.qrToken),
+      });
+      if (!ticket) return { valid: false, ticket: null };
+      return { valid: ticket.status === 'valid', ticket };
+    }),
 });
 
+// ─── Marketplace Router ───
 const marketplaceRouter = createRouter({
-  // placeholder: listItems, getItem, createListing, purchase, getMyListings
+  listItems: publicProcedure
+    .input(
+      z.object({
+        category: z.enum(['physical_music', 'used_gear', 'services', 'merch']).optional(),
+        limit: z.number().min(1).max(50).default(20),
+        offset: z.number().min(0).default(0),
+      })
+    )
+    .query(async ({ input }) => {
+      const conditions = [sql`${listings.status} = 'active'`];
+      if (input.category) conditions.push(eq(listings.category, input.category));
+
+      return db
+        .select()
+        .from(listings)
+        .where(and(...conditions))
+        .orderBy(desc(listings.createdAt))
+        .limit(input.limit)
+        .offset(input.offset);
+    }),
+
+  getItem: publicProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ input }) => {
+      const listing = await db.query.listings.findFirst({
+        where: eq(listings.id, input.id),
+      });
+      return listing ?? null;
+    }),
+
+  createListing: protectedProcedure
+    .input(
+      z.object({
+        title: z.string().min(1).max(200),
+        description: z.string().max(2000).optional(),
+        category: z.enum(['physical_music', 'used_gear', 'services', 'merch']),
+        price: z.number().int().min(0),
+        currency: z.string().max(3).default('USD'),
+        imageUrls: z.array(z.string().url()).max(10).optional(),
+        stock: z.number().int().min(1).default(1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [listing] = await db
+        .insert(listings)
+        .values({
+          sellerId: ctx.session.user.id,
+          title: input.title,
+          description: input.description ?? null,
+          category: input.category,
+          price: input.price,
+          currency: input.currency,
+          imageUrls: input.imageUrls ?? null,
+          stock: input.stock,
+          status: 'active',
+        })
+        .returning();
+      return listing;
+    }),
+
+  getMyListings: protectedProcedure.query(async ({ ctx }) => {
+    return db
+      .select()
+      .from(listings)
+      .where(eq(listings.sellerId, ctx.session.user.id))
+      .orderBy(desc(listings.createdAt));
+  }),
 });
 
+// ─── Articles Router ───
 const articlesRouter = createRouter({
-  // placeholder: list, getById, create, update, delete, publish
+  list: publicProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(50).default(20),
+        offset: z.number().min(0).default(0),
+        status: z.enum(['draft', 'private', 'listed', 'public']).optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      const conditions = [];
+      if (input.status) {
+        conditions.push(eq(articles.status, input.status));
+      } else {
+        conditions.push(eq(articles.status, 'public'));
+      }
+
+      return db
+        .select()
+        .from(articles)
+        .where(and(...conditions))
+        .orderBy(desc(articles.publishedAt))
+        .limit(input.limit)
+        .offset(input.offset);
+    }),
+
+  getById: publicProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ input }) => {
+      const article = await db.query.articles.findFirst({
+        where: eq(articles.id, input.id),
+      });
+      return article ?? null;
+    }),
+
+  create: protectedProcedure
+    .input(
+      z.object({
+        title: z.string().min(1).max(200),
+        slug: z.string().min(1).max(200),
+        body: z.any().optional(),
+        excerpt: z.string().max(500).optional(),
+        coverUrl: z.string().url().optional(),
+        contentLocale: z.string().max(10).default('en'),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [article] = await db
+        .insert(articles)
+        .values({
+          authorId: ctx.session.user.id,
+          title: input.title,
+          slug: input.slug,
+          body: input.body ?? null,
+          excerpt: input.excerpt ?? null,
+          coverUrl: input.coverUrl ?? null,
+          contentLocale: input.contentLocale,
+          status: 'draft',
+        })
+        .returning();
+      return article;
+    }),
+
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        title: z.string().min(1).max(200).optional(),
+        body: z.any().optional(),
+        excerpt: z.string().max(500).optional(),
+        coverUrl: z.string().url().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+      const [updated] = await db
+        .update(articles)
+        .set({ ...data, updatedAt: new Date() })
+        .where(and(eq(articles.id, id), eq(articles.authorId, ctx.session.user.id)))
+        .returning();
+      return updated ?? null;
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const [deleted] = await db
+        .delete(articles)
+        .where(and(eq(articles.id, input.id), eq(articles.authorId, ctx.session.user.id)))
+        .returning();
+      return deleted ?? null;
+    }),
+
+  publish: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const [published] = await db
+        .update(articles)
+        .set({
+          status: 'public',
+          publishedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(and(eq(articles.id, input.id), eq(articles.authorId, ctx.session.user.id)))
+        .returning();
+      return published ?? null;
+    }),
 });
 
+// ─── Bookings Router ───
 const bookingsRouter = createRouter({
-  // placeholder: request, approve, reject, getMyBookings, getAvailability
+  getMyBookings: protectedProcedure.query(async ({ ctx }) => {
+    // Bookings are derived from events where the user is host or facilitator
+    const hostedEvents = await db
+      .select()
+      .from(events)
+      .where(eq(events.hostId, ctx.session.user.id))
+      .orderBy(desc(events.startDate));
+    return hostedEvents;
+  }),
 });
 
+// ─── Upload Router ───
 const uploadRouter = createRouter({
-  // placeholder: getPresignedUrl, confirmUpload, getUploadStatus
+  getPresignedUrl: protectedProcedure
+    .input(
+      z.object({
+        filename: z.string().min(1),
+        contentType: z.string().min(1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const key = `uploads/${ctx.session.user.id}/${Date.now()}-${input.filename}`;
+      // In production, generate a real presigned URL via S3/MinIO SDK
+      // For now, return the key for local dev
+      return {
+        url: `${process.env.AWS_S3_ENDPOINT ?? 'http://localhost:9000'}/${process.env.AWS_S3_BUCKET ?? 'opynx-media'}/${key}`,
+        key,
+        fields: {},
+      };
+    }),
+
+  getUploadStatus: protectedProcedure
+    .input(z.object({ trackId: z.string().uuid() }))
+    .query(async ({ input }) => {
+      const track = await db.query.tracks.findFirst({
+        where: eq(tracks.id, input.trackId),
+      });
+      return { status: track?.status ?? 'unknown' };
+    }),
 });
 
+// ─── Admin Router ───
 const adminRouter = createRouter({
-  // placeholder: getDashboard, getUsers, getPayouts, getCommissions, runPayout
+  getDashboard: adminProcedure.query(async () => {
+    const [userCount] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(users);
+    const [subCount] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(subscriptions)
+      .where(eq(subscriptions.status, 'active'));
+    const [trackCount] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(tracks);
+    const [eventCount] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(events);
+
+    return {
+      totalUsers: Number(userCount.count),
+      activeSubscriptions: Number(subCount.count),
+      totalTracks: Number(trackCount.count),
+      totalEvents: Number(eventCount.count),
+    };
+  }),
+
+  getUsers: adminProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(50),
+        offset: z.number().min(0).default(0),
+        role: z.string().optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      const conditions = [];
+      if (input.role) conditions.push(sql`${users.role} = ${input.role}`);
+
+      return db
+        .select()
+        .from(users)
+        .where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(desc(users.createdAt))
+        .limit(input.limit)
+        .offset(input.offset);
+    }),
+
+  getPayouts: adminProcedure
+    .input(z.object({ month: z.string().optional() }))
+    .query(async ({ input }) => {
+      const conditions = [];
+      if (input.month) conditions.push(eq(payoutBatches.month, input.month));
+
+      return db
+        .select()
+        .from(payoutBatches)
+        .where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(desc(payoutBatches.createdAt));
+    }),
+
+  getCommissions: adminProcedure
+    .input(
+      z.object({
+        status: z.enum(['pending', 'approved', 'processing', 'paid', 'held', 'clawed_back']).optional(),
+        limit: z.number().min(1).max(100).default(50),
+      })
+    )
+    .query(async ({ input }) => {
+      const conditions = [];
+      if (input.status) conditions.push(eq(commissions.status, input.status));
+
+      return db
+        .select()
+        .from(commissions)
+        .where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(desc(commissions.createdAt))
+        .limit(input.limit);
+    }),
 });
 
 // ─── App Router ───

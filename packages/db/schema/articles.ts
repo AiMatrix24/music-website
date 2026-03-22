@@ -41,12 +41,12 @@ export const articles = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => ({
-    authorIdx: index('articles_author_idx').on(t.authorId),
-    slugIdx: index('articles_slug_idx').on(t.slug),
-    statusIdx: index('articles_status_idx').on(t.status),
-    publishedIdx: index('articles_published_idx').on(t.publishedAt),
-  })
+  (t) => [
+    index('articles_author_idx').on(t.authorId),
+    index('articles_slug_idx').on(t.slug),
+    index('articles_status_idx').on(t.status),
+    index('articles_published_idx').on(t.publishedAt),
+  ]
 );
 
 export const categories = pgTable('categories', {

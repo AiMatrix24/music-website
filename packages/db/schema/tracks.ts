@@ -56,12 +56,12 @@ export const tracks = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => ({
-    userIdx: index('tracks_user_idx').on(t.userId),
-    slugIdx: index('tracks_slug_idx').on(t.slug),
-    statusIdx: index('tracks_status_idx').on(t.status),
-    createdIdx: index('tracks_created_idx').on(t.createdAt),
-  })
+  (t) => [
+    index('tracks_user_idx').on(t.userId),
+    index('tracks_slug_idx').on(t.slug),
+    index('tracks_status_idx').on(t.status),
+    index('tracks_created_idx').on(t.createdAt),
+  ]
 );
 
 export const albums = pgTable(
@@ -81,9 +81,9 @@ export const albums = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => ({
-    userIdx: index('albums_user_idx').on(t.userId),
-  })
+  (t) => [
+    index('albums_user_idx').on(t.userId),
+  ]
 );
 
 export const albumTracks = pgTable(
@@ -98,9 +98,9 @@ export const albumTracks = pgTable(
       .notNull(),
     position: integer('position').notNull(),
   },
-  (t) => ({
-    albumIdx: index('album_tracks_album_idx').on(t.albumId),
-  })
+  (t) => [
+    index('album_tracks_album_idx').on(t.albumId),
+  ]
 );
 
 export const playlists = pgTable('playlists', {
@@ -129,9 +129,9 @@ export const playlistTracks = pgTable(
       .notNull(),
     position: integer('position').notNull(),
   },
-  (t) => ({
-    playlistIdx: index('playlist_tracks_playlist_idx').on(t.playlistId),
-  })
+  (t) => [
+    index('playlist_tracks_playlist_idx').on(t.playlistId),
+  ]
 );
 
 export const comments = pgTable(
@@ -151,10 +151,10 @@ export const comments = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => ({
-    trackIdx: index('comments_track_idx').on(t.trackId),
-    parentIdx: index('comments_parent_idx').on(t.parentId),
-  })
+  (t) => [
+    index('comments_track_idx').on(t.trackId),
+    index('comments_parent_idx').on(t.parentId),
+  ]
 );
 
 export const likes = pgTable(
@@ -174,9 +174,9 @@ export const likes = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => ({
-    userIdx: index('likes_user_idx').on(t.userId),
-  })
+  (t) => [
+    index('likes_user_idx').on(t.userId),
+  ]
 );
 
 export const reposts = pgTable(
@@ -196,9 +196,9 @@ export const reposts = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => ({
-    userIdx: index('reposts_user_idx').on(t.userId),
-  })
+  (t) => [
+    index('reposts_user_idx').on(t.userId),
+  ]
 );
 
 export const tracksRelations = relations(tracks, ({ one, many }) => ({

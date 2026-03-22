@@ -53,13 +53,13 @@ export const commissions = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => ({
-    attrIdx: index('comm_attr_idx').on(t.attributionId),
-    recipientIdx: index('comm_recipient_idx').on(t.recipientId),
-    statusIdx: index('comm_status_idx').on(t.status),
-    tierIdx: index('comm_tier_idx').on(t.tier),
-    batchIdx: index('comm_batch_idx').on(t.payoutBatchId),
-  })
+  (t) => [
+    index('comm_attr_idx').on(t.attributionId),
+    index('comm_recipient_idx').on(t.recipientId),
+    index('comm_status_idx').on(t.status),
+    index('comm_tier_idx').on(t.tier),
+    index('comm_batch_idx').on(t.payoutBatchId),
+  ]
 );
 
 export const payoutBatches = pgTable(
@@ -77,10 +77,10 @@ export const payoutBatches = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => ({
-    monthIdx: index('payout_month_idx').on(t.month),
-    statusIdx: index('payout_status_idx').on(t.status),
-  })
+  (t) => [
+    index('payout_month_idx').on(t.month),
+    index('payout_status_idx').on(t.status),
+  ]
 );
 
 export const commissionsRelations = relations(commissions, ({ one }) => ({
