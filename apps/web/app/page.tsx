@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { trpc } from '@/lib/trpc/client';
+import { FadeIn } from './components/FadeIn';
 
 export default function HomePage() {
   return (
@@ -72,12 +73,14 @@ export default function HomePage() {
       {/* Revenue Transparency Section */}
       <section className="py-24 px-6">
         <div className="max-w-5xl mx-auto text-center">
+          <FadeIn>
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
             Where Your <span className="text-brand-500">$8.73</span> Goes
           </h2>
           <p className="text-gray-400 mb-16 max-w-xl mx-auto">
             Full transparency. Every cent accounted for. Verified on Polygon.
           </p>
+          </FadeIn>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <WaterfallCard
               amount="$1.00"
@@ -107,9 +110,11 @@ export default function HomePage() {
       {/* Features */}
       <section className="py-24 px-6 bg-brand-950/50">
         <div className="max-w-5xl mx-auto">
+          <FadeIn>
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">
             Built for <span className="text-brand-500">Superfans</span>
           </h2>
+          </FadeIn>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <FeatureCard
               title="320kbps Streaming"
@@ -139,25 +144,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-brand-800/30 py-12 px-6">
-        <div className="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-          <p className="text-sm text-gray-500">
-            &copy; 2026 OPYNX. FanEngage Protocol. All rights reserved.
-          </p>
-          <div className="flex gap-6 text-sm text-gray-500">
-            <Link href="/terms" className="hover:text-brand-400 transition">
-              Terms
-            </Link>
-            <Link href="/privacy" className="hover:text-brand-400 transition">
-              Privacy
-            </Link>
-            <Link href="/contact" className="hover:text-brand-400 transition">
-              Contact
-            </Link>
-          </div>
-        </div>
-      </footer>
     </main>
   );
 }

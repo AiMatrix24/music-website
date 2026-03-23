@@ -1,11 +1,7 @@
 import Redis from 'ioredis';
 
 const getRedisUrl = (): string => {
-  const url = process.env.REDIS_URL;
-  if (!url) {
-    throw new Error('REDIS_URL environment variable is not set');
-  }
-  return url;
+  return process.env.REDIS_URL ?? 'redis://localhost:6379';
 };
 
 /**

@@ -83,16 +83,16 @@ export default function ListingDetailPage() {
           <div>
             <h2 className="text-xl font-bold">Want this?</h2>
             <p className="text-gray-300 text-sm">
-              {listing.stock > 0
+              {(listing.stock ?? 0) > 0
                 ? `${listing.stock} left in stock`
                 : 'Sold out'}
             </p>
           </div>
           <button
-            disabled={listing.stock === 0}
+            disabled={(listing.stock ?? 0) === 0}
             className="rounded-full bg-white text-brand-950 px-8 py-3 font-semibold hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
           >
-            {listing.stock > 0 ? 'Add to Cart' : 'Sold Out'}
+            {(listing.stock ?? 0) > 0 ? 'Add to Cart' : 'Sold Out'}
           </button>
         </div>
       </div>

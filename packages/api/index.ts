@@ -50,8 +50,10 @@ const authRouter = createRouter({
 // ─── Users Router ───
 const usersRouter = createRouter({
   getProfile: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+    if (!userId) return null;
     const user = await db.query.users.findFirst({
-      where: eq(users.id, ctx.session.user.id),
+      where: eq(users.id, userId),
     });
     return user ?? null;
   }),

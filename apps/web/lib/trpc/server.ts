@@ -50,7 +50,7 @@ const loggerMiddleware = t.middleware(async ({ path, type, next }) => {
 
 // ─── Middleware: Enforce Authentication ───
 const enforceAuth = t.middleware(async ({ ctx, next }) => {
-  if (!ctx.session?.user) {
+  if (!ctx.session?.user?.id) {
     throw new TRPCError({
       code: 'UNAUTHORIZED',
       message: 'You must be signed in to access this resource',
@@ -60,8 +60,13 @@ const enforceAuth = t.middleware(async ({ ctx, next }) => {
   return next({
     ctx: {
       ...ctx,
-      session: ctx.session,
-      user: ctx.session.user,
+      session: {
+        ...ctx.session,
+        user: {
+          ...ctx.session.user,
+          id: ctx.session.user.id,
+        },
+      } as Session & { user: { id: string } },
     },
   });
 });

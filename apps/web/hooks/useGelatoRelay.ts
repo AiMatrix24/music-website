@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { GelatoRelay, type SponsoredCallERC2771Request } from '@gelatonetwork/relay-sdk';
+import { GelatoRelay, type SponsoredCallRequest } from '@gelatonetwork/relay-sdk';
 import { useEthersSigner } from './useEthersSigner';
 import { polygon } from '@/lib/wagmi';
 
@@ -74,17 +74,15 @@ export function useGelatoRelay() {
 
         const userAddress = await signer.getAddress();
 
-        const request: SponsoredCallERC2771Request = {
+        const request: SponsoredCallRequest = {
           chainId: BigInt(polygon.id),
           target,
           data,
-          user: userAddress,
         };
 
-        // sponsoredCallERC2771: the sponsor (OPYNX) pays gas via Gelato
-        const response = await gelatoRelay.sponsoredCallERC2771(
+        // sponsoredCall: the sponsor (OPYNX) pays gas via Gelato
+        const response = await gelatoRelay.sponsoredCall(
           request,
-          signer,
           GELATO_API_KEY
         );
 
