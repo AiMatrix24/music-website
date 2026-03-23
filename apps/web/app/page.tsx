@@ -161,8 +161,9 @@ function TrendingTracks() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {tracks.map((track, i) => (
-            <div
+            <Link
               key={track.id}
+              href={`/track/${track.id}`}
               className="flex items-center gap-4 rounded-xl bg-[#15151f] p-4 transition hover:bg-[#1a1a2e] hover:-translate-y-0.5"
             >
               <div className="relative">
@@ -183,7 +184,7 @@ function TrendingTracks() {
                 </p>
                 <p className="text-xs text-gray-500">plays</p>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </div>
@@ -219,9 +220,10 @@ function UpcomingEvents() {
           {events.map((event) => {
             const date = new Date(event.startDate);
             return (
-              <div
+              <Link
                 key={event.id}
-                className="rounded-2xl bg-[#15151f] overflow-hidden transition hover:-translate-y-1 hover:shadow-xl hover:shadow-brand-900/20"
+                href={`/event/${event.id}`}
+                className="rounded-2xl bg-[#15151f] overflow-hidden transition hover:-translate-y-1 hover:shadow-xl hover:shadow-brand-900/20 block"
               >
                 <div className="h-32 bg-gradient-to-br from-brand-700 to-brand-900 flex items-center justify-center">
                   <div className="text-center">
@@ -244,7 +246,7 @@ function UpcomingEvents() {
                     )}
                   </div>
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>
@@ -276,9 +278,10 @@ function FeaturedMarketplace() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {listings.map((listing) => (
-            <div
+            <Link
               key={listing.id}
-              className="rounded-2xl bg-[#15151f] overflow-hidden transition hover:-translate-y-1 hover:shadow-xl hover:shadow-brand-900/20"
+              href={`/marketplace/${listing.id}`}
+              className="rounded-2xl bg-[#15151f] overflow-hidden transition hover:-translate-y-1 hover:shadow-xl hover:shadow-brand-900/20 block"
             >
               <div className="h-40 bg-gradient-to-br from-brand-800 to-brand-950 flex items-center justify-center text-4xl">
                 {categoryEmoji(listing.category)}
@@ -297,7 +300,7 @@ function FeaturedMarketplace() {
                   </span>
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </div>

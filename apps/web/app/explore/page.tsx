@@ -46,8 +46,9 @@ function TracksSection() {
   return (
     <div className="space-y-3">
       {tracks?.map((track, i) => (
-        <div
+        <Link
           key={track.id}
+          href={`/track/${track.id}`}
           className="flex items-center gap-4 rounded-xl bg-[#15151f] p-4 transition hover:bg-[#1a1a2e]"
         >
           <span className="text-gray-500 text-sm w-8 text-right">{i + 1}</span>
@@ -62,7 +63,7 @@ function TracksSection() {
             <p className="text-sm text-gray-400">{formatDuration(track.duration)}</p>
             <p className="text-xs text-gray-500">{formatPlays(track.playCount ?? 0)} plays</p>
           </div>
-        </div>
+        </Link>
       ))}
       {(!tracks || tracks.length === 0) && (
         <p className="text-gray-500 text-center py-8">No tracks yet.</p>
@@ -82,9 +83,10 @@ function EventsSection() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {events?.map((event) => (
-        <div
+        <Link
           key={event.id}
-          className="rounded-2xl bg-[#15151f] p-6 transition hover:bg-[#1a1a2e]"
+          href={`/event/${event.id}`}
+          className="rounded-2xl bg-[#15151f] p-6 transition hover:bg-[#1a1a2e] block"
         >
           <div className="flex items-start justify-between mb-3">
             <div>
@@ -105,7 +107,7 @@ function EventsSection() {
             {event.capacity && <span>{event.capacity.toLocaleString()} cap</span>}
             {event.timezone && <span>{event.timezone.split('/')[1]?.replace('_', ' ')}</span>}
           </div>
-        </div>
+        </Link>
       ))}
       {(!events || events.length === 0) && (
         <p className="text-gray-500 text-center py-8 col-span-2">No upcoming events.</p>
@@ -122,9 +124,10 @@ function MarketplaceSection() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
       {listings?.map((listing) => (
-        <div
+        <Link
           key={listing.id}
-          className="rounded-2xl bg-[#15151f] p-6 transition hover:bg-[#1a1a2e]"
+          href={`/marketplace/${listing.id}`}
+          className="rounded-2xl bg-[#15151f] p-6 transition hover:bg-[#1a1a2e] block"
         >
           <div className="w-full h-32 rounded-xl bg-gradient-to-br from-brand-800 to-brand-950 flex items-center justify-center text-3xl mb-4">
             {categoryEmoji(listing.category)}
@@ -139,7 +142,7 @@ function MarketplaceSection() {
               {listing.category.replace('_', ' ')}
             </span>
           </div>
-        </div>
+        </Link>
       ))}
       {(!listings || listings.length === 0) && (
         <p className="text-gray-500 text-center py-8 col-span-3">No listings yet.</p>
