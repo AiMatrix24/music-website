@@ -3,6 +3,7 @@
 import { trpc } from '@/lib/trpc/client';
 import Link from 'next/link';
 import { useState } from 'react';
+import { TrackListSkeleton, CardGridSkeleton, ArtistCardSkeleton, EventCardSkeleton } from '../components/Skeleton';
 
 type Tab = 'tracks' | 'artists' | 'events' | 'marketplace' | 'articles';
 
@@ -42,7 +43,7 @@ export default function ExplorePage() {
 function TracksSection() {
   const { data: tracks, isLoading } = trpc.tracks.list.useQuery({ limit: 20 });
 
-  if (isLoading) return <LoadingState />;
+  if (isLoading) return <TrackListSkeleton count={8} />;
 
   return (
     <div className="space-y-3">
@@ -78,7 +79,11 @@ function TracksSection() {
 function ArtistsSection() {
   const { data: artists, isLoading } = trpc.users.listCreators.useQuery({ limit: 20 });
 
-  if (isLoading) return <LoadingState />;
+  if (isLoading) return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {Array.from({ length: 6 }).map((_, i) => <ArtistCardSkeleton key={i} />)}
+    </div>
+  );
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -110,7 +115,11 @@ function EventsSection() {
     status: 'published',
   });
 
-  if (isLoading) return <LoadingState />;
+  if (isLoading) return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {Array.from({ length: 4 }).map((_, i) => <EventCardSkeleton key={i} />)}
+    </div>
+  );
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -154,7 +163,7 @@ function EventsSection() {
 function MarketplaceSection() {
   const { data: listings, isLoading } = trpc.marketplace.listItems.useQuery({ limit: 20 });
 
-  if (isLoading) return <LoadingState />;
+  if (isLoading) return <CardGridSkeleton count={6} />;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -190,7 +199,7 @@ function MarketplaceSection() {
 function ArticlesSection() {
   const { data: articles, isLoading } = trpc.articles.list.useQuery({ limit: 20 });
 
-  if (isLoading) return <LoadingState />;
+  if (isLoading) return <TrackListSkeleton count={3} />;
 
   return (
     <div className="space-y-6">
@@ -215,14 +224,6 @@ function ArticlesSection() {
       {(!articles || articles.length === 0) && (
         <p className="text-gray-500 text-center py-8">No articles yet.</p>
       )}
-    </div>
-  );
-}
-
-function LoadingState() {
-  return (
-    <div className="flex justify-center py-12">
-      <div className="animate-pulse text-gray-400">Loading...</div>
     </div>
   );
 }

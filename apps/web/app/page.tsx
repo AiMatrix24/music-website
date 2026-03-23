@@ -8,7 +8,31 @@ export default function HomePage() {
     <main className="min-h-screen">
       {/* Hero */}
       <section className="relative flex min-h-screen items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-brand-900/30 via-brand-950 to-brand-950" />
+        {/* Animated gradient background */}
+        <div className="absolute inset-0 hero-gradient" />
+
+        {/* Glow orbs */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-brand-600/10 rounded-full blur-[120px] hero-glow" />
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-purple-600/10 rounded-full blur-[100px] hero-glow" style={{ animationDelay: '2s' }} />
+
+        {/* Floating particles */}
+        <div className="absolute inset-0 overflow-hidden">
+          {Array.from({ length: 20 }).map((_, i) => (
+            <div
+              key={i}
+              className="particle"
+              style={{
+                left: `${Math.random() * 100}%`,
+                animationDuration: `${6 + Math.random() * 8}s`,
+                animationDelay: `${Math.random() * 8}s`,
+                width: `${2 + Math.random() * 4}px`,
+                height: `${2 + Math.random() * 4}px`,
+                opacity: 0.2 + Math.random() * 0.3,
+              }}
+            />
+          ))}
+        </div>
+
         <div className="relative z-10 text-center px-6">
           <p className="text-sm font-semibold uppercase tracking-[4px] text-brand-500 mb-4">
             The FanEngage Protocol
