@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import { trpc } from '@/lib/trpc/client';
 
 export default function HomePage() {
   return (
@@ -27,14 +30,20 @@ export default function HomePage() {
               Start Listening — $8.73/mo
             </Link>
             <Link
-              href="/scan"
+              href="/explore"
               className="rounded-full border-2 border-white/20 px-8 py-4 font-semibold text-white transition hover:border-brand-500 hover:text-brand-400"
             >
-              Scan QR Code
+              Explore Music
             </Link>
           </div>
         </div>
       </section>
+
+      {/* Trending Tracks */}
+      <TrendingTracks />
+
+      {/* Upcoming Events */}
+      <UpcomingEvents />
 
       {/* Revenue Transparency Section */}
       <section className="py-24 px-6">
@@ -67,6 +76,9 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Featured Marketplace */}
+      <FeaturedMarketplace />
 
       {/* Features */}
       <section className="py-24 px-6 bg-brand-950/50">
@@ -126,6 +138,174 @@ export default function HomePage() {
   );
 }
 
+/* ─── Trending Tracks ─── */
+function TrendingTracks() {
+  const { data: tracks } = trpc.tracks.list.useQuery({ limit: 6 });
+
+  if (!tracks || tracks.length === 0) return null;
+
+  return (
+    <section className="py-24 px-6 bg-brand-950/50">
+      <div className="max-w-5xl mx-auto">
+        <div className="flex items-center justify-between mb-10">
+          <div>
+            <h2 className="text-3xl font-bold">Trending Now</h2>
+            <p className="text-gray-400 mt-1">Most played tracks this week</p>
+          </div>
+          <Link
+            href="/explore"
+            className="text-sm text-brand-400 hover:text-brand-300 transition font-semibold"
+          >
+            View All →
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {tracks.map((track, i) => (
+            <div
+              key={track.id}
+              className="flex items-center gap-4 rounded-xl bg-[#15151f] p-4 transition hover:bg-[#1a1a2e] hover:-translate-y-0.5"
+            >
+              <div className="relative">
+                <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-lg font-bold">
+                  {track.genre?.charAt(0) ?? '♪'}
+                </div>
+                <span className="absolute -top-2 -left-2 w-6 h-6 rounded-full bg-brand-600 flex items-center justify-center text-xs font-bold">
+                  {i + 1}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold truncate">{track.title}</p>
+                <p className="text-sm text-gray-400">{track.genre}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-semibold text-brand-400">
+                  {formatPlays(track.playCount ?? 0)}
+                </p>
+                <p className="text-xs text-gray-500">plays</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Upcoming Events ─── */
+function UpcomingEvents() {
+  const { data: events } = trpc.events.list.useQuery({
+    limit: 3,
+    status: 'published',
+  });
+
+  if (!events || events.length === 0) return null;
+
+  return (
+    <section className="py-24 px-6">
+      <div className="max-w-5xl mx-auto">
+        <div className="flex items-center justify-between mb-10">
+          <div>
+            <h2 className="text-3xl font-bold">Upcoming Events</h2>
+            <p className="text-gray-400 mt-1">Live shows & listening parties</p>
+          </div>
+          <Link
+            href="/explore"
+            className="text-sm text-brand-400 hover:text-brand-300 transition font-semibold"
+          >
+            View All →
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {events.map((event) => {
+            const date = new Date(event.startDate);
+            return (
+              <div
+                key={event.id}
+                className="rounded-2xl bg-[#15151f] overflow-hidden transition hover:-translate-y-1 hover:shadow-xl hover:shadow-brand-900/20"
+              >
+                <div className="h-32 bg-gradient-to-br from-brand-700 to-brand-900 flex items-center justify-center">
+                  <div className="text-center">
+                    <p className="text-3xl font-black">{date.getDate()}</p>
+                    <p className="text-sm font-semibold uppercase tracking-wider text-brand-300">
+                      {date.toLocaleDateString('en-US', { month: 'short' })}
+                    </p>
+                  </div>
+                </div>
+                <div className="p-5">
+                  <h3 className="font-bold text-lg mb-2">{event.title}</h3>
+                  <div className="flex items-center gap-3 text-sm text-gray-400">
+                    {event.capacity && (
+                      <span>{event.capacity.toLocaleString()} cap</span>
+                    )}
+                    {event.timezone && (
+                      <span>
+                        {event.timezone.split('/')[1]?.replace('_', ' ')}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Featured Marketplace ─── */
+function FeaturedMarketplace() {
+  const { data: listings } = trpc.marketplace.listItems.useQuery({ limit: 3 });
+
+  if (!listings || listings.length === 0) return null;
+
+  return (
+    <section className="py-24 px-6">
+      <div className="max-w-5xl mx-auto">
+        <div className="flex items-center justify-between mb-10">
+          <div>
+            <h2 className="text-3xl font-bold">Marketplace</h2>
+            <p className="text-gray-400 mt-1">Merch, vinyl, gear & services</p>
+          </div>
+          <Link
+            href="/explore"
+            className="text-sm text-brand-400 hover:text-brand-300 transition font-semibold"
+          >
+            Shop All →
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {listings.map((listing) => (
+            <div
+              key={listing.id}
+              className="rounded-2xl bg-[#15151f] overflow-hidden transition hover:-translate-y-1 hover:shadow-xl hover:shadow-brand-900/20"
+            >
+              <div className="h-40 bg-gradient-to-br from-brand-800 to-brand-950 flex items-center justify-center text-4xl">
+                {categoryEmoji(listing.category)}
+              </div>
+              <div className="p-5">
+                <h3 className="font-bold mb-1 truncate">{listing.title}</h3>
+                <p className="text-sm text-gray-400 line-clamp-2 mb-3">
+                  {listing.description}
+                </p>
+                <div className="flex items-center justify-between">
+                  <span className="text-xl font-bold text-brand-400">
+                    ${(listing.price / 100).toFixed(2)}
+                  </span>
+                  <span className="text-xs bg-brand-600/20 text-brand-400 px-3 py-1 rounded-full">
+                    {listing.category.replace('_', ' ')}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Helper Components ─── */
 function WaterfallCard({
   amount,
   label,
@@ -163,4 +343,19 @@ function FeatureCard({
       <p className="text-gray-400 text-sm">{description}</p>
     </div>
   );
+}
+
+function formatPlays(count: number): string {
+  if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
+  return String(count);
+}
+
+function categoryEmoji(category: string): string {
+  switch (category) {
+    case 'physical_music': return '💿';
+    case 'used_gear': return '🎛️';
+    case 'services': return '🎵';
+    case 'merch': return '👕';
+    default: return '📦';
+  }
 }
