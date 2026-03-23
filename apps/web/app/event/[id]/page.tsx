@@ -57,6 +57,14 @@ export default function EventDetailPage() {
               {event.status}
             </span>
             <h1 className="text-4xl font-black mb-2">{event.title}</h1>
+            {event.hostName && (
+              <Link
+                href={`/artist/${event.hostId}`}
+                className="text-gray-400 hover:text-brand-400 transition text-sm mb-2 inline-block"
+              >
+                Hosted by {event.hostName}
+              </Link>
+            )}
             <p className="text-gray-400">
               {startDate.toLocaleDateString('en-US', {
                 weekday: 'long',

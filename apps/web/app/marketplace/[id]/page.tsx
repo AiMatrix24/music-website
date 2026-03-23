@@ -49,6 +49,14 @@ export default function ListingDetailPage() {
                   {listing.category.replace('_', ' ')}
                 </span>
                 <h1 className="text-3xl font-black">{listing.title}</h1>
+                {listing.sellerName && (
+                  <Link
+                    href={`/artist/${listing.sellerId}`}
+                    className="text-gray-400 hover:text-brand-400 transition text-sm mt-1 inline-block"
+                  >
+                    by {listing.sellerName}
+                  </Link>
+                )}
               </div>
               <div className="text-right shrink-0">
                 <p className="text-3xl font-black text-brand-400">

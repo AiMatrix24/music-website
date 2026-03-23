@@ -4,7 +4,7 @@ import { trpc } from '@/lib/trpc/client';
 import Link from 'next/link';
 import { useState } from 'react';
 
-type Tab = 'tracks' | 'events' | 'marketplace' | 'articles';
+type Tab = 'tracks' | 'artists' | 'events' | 'marketplace' | 'articles';
 
 export default function ExplorePage() {
   const [activeTab, setActiveTab] = useState<Tab>('tracks');
@@ -15,7 +15,7 @@ export default function ExplorePage() {
       <p className="text-gray-400 mb-8">Discover music, events, and more on OPYNX.</p>
 
       <div className="flex gap-2 mb-8 overflow-x-auto">
-        {(['tracks', 'events', 'marketplace', 'articles'] as Tab[]).map((tab) => (
+        {(['tracks', 'artists', 'events', 'marketplace', 'articles'] as Tab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -31,6 +31,7 @@ export default function ExplorePage() {
       </div>
 
       {activeTab === 'tracks' && <TracksSection />}
+      {activeTab === 'artists' && <ArtistsSection />}
       {activeTab === 'events' && <EventsSection />}
       {activeTab === 'marketplace' && <MarketplaceSection />}
       {activeTab === 'articles' && <ArticlesSection />}
@@ -57,7 +58,9 @@ function TracksSection() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-semibold truncate">{track.title}</p>
-            <p className="text-sm text-gray-400 truncate">{track.genre ?? 'Unknown genre'}</p>
+            <p className="text-sm text-gray-400 truncate">
+              {track.artistName ?? 'Unknown artist'} · {track.genre ?? 'Unknown genre'}
+            </p>
           </div>
           <div className="text-right hidden sm:block">
             <p className="text-sm text-gray-400">{formatDuration(track.duration)}</p>
@@ -67,6 +70,35 @@ function TracksSection() {
       ))}
       {(!tracks || tracks.length === 0) && (
         <p className="text-gray-500 text-center py-8">No tracks yet.</p>
+      )}
+    </div>
+  );
+}
+
+function ArtistsSection() {
+  const { data: artists, isLoading } = trpc.users.listCreators.useQuery({ limit: 20 });
+
+  if (isLoading) return <LoadingState />;
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {artists?.map((artist) => (
+        <Link
+          key={artist.id}
+          href={`/artist/${artist.id}`}
+          className="rounded-2xl bg-[#15151f] p-6 transition hover:bg-[#1a1a2e] flex flex-col items-center text-center"
+        >
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-2xl font-black mb-4">
+            {artist.name?.charAt(0)?.toUpperCase() ?? '?'}
+          </div>
+          <h3 className="font-bold text-lg mb-1">{artist.name}</h3>
+          <span className="text-xs bg-brand-600/20 text-brand-400 px-3 py-1 rounded-full">
+            {artist.role}
+          </span>
+        </Link>
+      ))}
+      {(!artists || artists.length === 0) && (
+        <p className="text-gray-500 text-center py-8 col-span-3">No artists yet.</p>
       )}
     </div>
   );
@@ -98,6 +130,9 @@ function EventsSection() {
                 })}
               </p>
               <h3 className="text-lg font-bold">{event.title}</h3>
+              {event.hostName && (
+                <p className="text-sm text-gray-400 mt-1">Hosted by {event.hostName}</p>
+              )}
             </div>
             <span className="text-xs bg-brand-600/20 text-brand-400 px-3 py-1 rounded-full">
               {event.status}
@@ -133,6 +168,7 @@ function MarketplaceSection() {
             {categoryEmoji(listing.category)}
           </div>
           <h3 className="font-bold mb-1 truncate">{listing.title}</h3>
+          <p className="text-xs text-gray-400 mb-2">by {listing.sellerName ?? 'Unknown'}</p>
           <p className="text-sm text-gray-400 line-clamp-2 mb-3">{listing.description}</p>
           <div className="flex items-center justify-between">
             <span className="text-lg font-bold text-brand-400">

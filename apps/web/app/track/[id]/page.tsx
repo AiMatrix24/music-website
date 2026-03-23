@@ -48,8 +48,16 @@ export default function TrackDetailPage() {
               Track
             </p>
             <h1 className="text-4xl font-black mb-2">{track.title}</h1>
+            {track.artistName && (
+              <Link
+                href={`/artist/${track.userId}`}
+                className="text-gray-400 hover:text-brand-400 transition text-sm mb-2 inline-block"
+              >
+                by {track.artistName}
+              </Link>
+            )}
             {track.genre && (
-              <span className="inline-block bg-brand-600/20 text-brand-400 text-sm px-3 py-1 rounded-full mb-4">
+              <span className="inline-block bg-brand-600/20 text-brand-400 text-sm px-3 py-1 rounded-full mb-4 ml-2">
                 {track.genre}
               </span>
             )}

@@ -97,6 +97,32 @@ const usersRouter = createRouter({
         .where(ilike(users.name, `%${input.query}%`))
         .limit(input.limit);
     }),
+
+  getById: publicProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ input }) => {
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, input.id),
+      });
+      return user ?? null;
+    }),
+
+  listCreators: publicProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(50).default(20),
+        offset: z.number().min(0).default(0),
+      })
+    )
+    .query(async ({ input }) => {
+      return db
+        .select()
+        .from(users)
+        .where(eq(users.role, 'creator'))
+        .orderBy(desc(users.createdAt))
+        .limit(input.limit)
+        .offset(input.offset);
+    }),
 });
 
 // ─── Subscriptions Router ───
@@ -215,8 +241,23 @@ const tracksRouter = createRouter({
       if (input.userId) conditions.push(eq(tracks.userId, input.userId));
 
       return db
-        .select()
+        .select({
+          id: tracks.id,
+          userId: tracks.userId,
+          title: tracks.title,
+          slug: tracks.slug,
+          genre: tracks.genre,
+          bpm: tracks.bpm,
+          duration: tracks.duration,
+          visibility: tracks.visibility,
+          status: tracks.status,
+          playCount: tracks.playCount,
+          price: tracks.price,
+          createdAt: tracks.createdAt,
+          artistName: users.name,
+        })
         .from(tracks)
+        .leftJoin(users, eq(tracks.userId, users.id))
         .where(and(...conditions))
         .orderBy(desc(tracks.createdAt))
         .limit(input.limit)
@@ -226,10 +267,28 @@ const tracksRouter = createRouter({
   getById: publicProcedure
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ input }) => {
-      const track = await db.query.tracks.findFirst({
-        where: eq(tracks.id, input.id),
-      });
-      return track ?? null;
+      const rows = await db
+        .select({
+          id: tracks.id,
+          userId: tracks.userId,
+          title: tracks.title,
+          slug: tracks.slug,
+          genre: tracks.genre,
+          bpm: tracks.bpm,
+          duration: tracks.duration,
+          visibility: tracks.visibility,
+          status: tracks.status,
+          playCount: tracks.playCount,
+          price: tracks.price,
+          createdAt: tracks.createdAt,
+          updatedAt: tracks.updatedAt,
+          artistName: users.name,
+        })
+        .from(tracks)
+        .leftJoin(users, eq(tracks.userId, users.id))
+        .where(eq(tracks.id, input.id))
+        .limit(1);
+      return rows[0] ?? null;
     }),
 
   upload: protectedProcedure
@@ -517,8 +576,22 @@ const eventsRouter = createRouter({
       if (input.status) conditions.push(eq(events.status, input.status));
 
       return db
-        .select()
+        .select({
+          id: events.id,
+          hostId: events.hostId,
+          title: events.title,
+          startDate: events.startDate,
+          endDate: events.endDate,
+          venueId: events.venueId,
+          countryCode: events.countryCode,
+          timezone: events.timezone,
+          status: events.status,
+          capacity: events.capacity,
+          createdAt: events.createdAt,
+          hostName: users.name,
+        })
         .from(events)
+        .leftJoin(users, eq(events.hostId, users.id))
         .where(conditions.length ? and(...conditions) : undefined)
         .orderBy(desc(events.startDate))
         .limit(input.limit)
@@ -528,10 +601,26 @@ const eventsRouter = createRouter({
   getById: publicProcedure
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ input }) => {
-      const event = await db.query.events.findFirst({
-        where: eq(events.id, input.id),
-      });
-      return event ?? null;
+      const rows = await db
+        .select({
+          id: events.id,
+          hostId: events.hostId,
+          title: events.title,
+          startDate: events.startDate,
+          endDate: events.endDate,
+          venueId: events.venueId,
+          countryCode: events.countryCode,
+          timezone: events.timezone,
+          status: events.status,
+          capacity: events.capacity,
+          createdAt: events.createdAt,
+          hostName: users.name,
+        })
+        .from(events)
+        .leftJoin(users, eq(events.hostId, users.id))
+        .where(eq(events.id, input.id))
+        .limit(1);
+      return rows[0] ?? null;
     }),
 
   create: protectedProcedure
@@ -672,8 +761,21 @@ const marketplaceRouter = createRouter({
       if (input.category) conditions.push(eq(listings.category, input.category));
 
       return db
-        .select()
+        .select({
+          id: listings.id,
+          sellerId: listings.sellerId,
+          title: listings.title,
+          description: listings.description,
+          category: listings.category,
+          price: listings.price,
+          currency: listings.currency,
+          stock: listings.stock,
+          status: listings.status,
+          createdAt: listings.createdAt,
+          sellerName: users.name,
+        })
         .from(listings)
+        .leftJoin(users, eq(listings.sellerId, users.id))
         .where(and(...conditions))
         .orderBy(desc(listings.createdAt))
         .limit(input.limit)
@@ -683,10 +785,25 @@ const marketplaceRouter = createRouter({
   getItem: publicProcedure
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ input }) => {
-      const listing = await db.query.listings.findFirst({
-        where: eq(listings.id, input.id),
-      });
-      return listing ?? null;
+      const rows = await db
+        .select({
+          id: listings.id,
+          sellerId: listings.sellerId,
+          title: listings.title,
+          description: listings.description,
+          category: listings.category,
+          price: listings.price,
+          currency: listings.currency,
+          stock: listings.stock,
+          status: listings.status,
+          createdAt: listings.createdAt,
+          sellerName: users.name,
+        })
+        .from(listings)
+        .leftJoin(users, eq(listings.sellerId, users.id))
+        .where(eq(listings.id, input.id))
+        .limit(1);
+      return rows[0] ?? null;
     }),
 
   createListing: protectedProcedure
