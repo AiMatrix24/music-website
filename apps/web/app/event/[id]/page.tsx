@@ -3,6 +3,7 @@
 import { trpc } from '@/lib/trpc/client';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { ShareButton } from '@/app/components/ShareButton';
 
 export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -56,7 +57,10 @@ export default function EventDetailPage() {
             <span className="inline-block bg-brand-600/20 text-brand-400 text-xs px-3 py-1 rounded-full mb-2 font-semibold uppercase">
               {event.status}
             </span>
-            <h1 className="text-4xl font-black mb-2">{event.title}</h1>
+            <div className="flex items-start justify-between gap-4">
+              <h1 className="text-4xl font-black mb-2">{event.title}</h1>
+              <ShareButton title={event.title} />
+            </div>
             {event.hostName && (
               <Link
                 href={`/artist/${event.hostId}`}

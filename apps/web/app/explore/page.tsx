@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { TrackListSkeleton, CardGridSkeleton, ArtistCardSkeleton, EventCardSkeleton } from '../components/Skeleton';
 
-type Tab = 'tracks' | 'artists' | 'events' | 'marketplace' | 'articles';
+type Tab = 'tracks' | 'artists' | 'events' | 'marketplace' | 'playlists' | 'articles';
 
 export default function ExplorePage() {
   const [activeTab, setActiveTab] = useState<Tab>('tracks');
@@ -16,7 +16,7 @@ export default function ExplorePage() {
       <p className="text-gray-400 mb-8">Discover music, events, and more on OPYNX.</p>
 
       <div className="flex gap-2 mb-8 overflow-x-auto">
-        {(['tracks', 'artists', 'events', 'marketplace', 'articles'] as Tab[]).map((tab) => (
+        {(['tracks', 'artists', 'events', 'marketplace', 'playlists', 'articles'] as Tab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -35,6 +35,7 @@ export default function ExplorePage() {
       {activeTab === 'artists' && <ArtistsSection />}
       {activeTab === 'events' && <EventsSection />}
       {activeTab === 'marketplace' && <MarketplaceSection />}
+      {activeTab === 'playlists' && <PlaylistsSection />}
       {activeTab === 'articles' && <ArticlesSection />}
     </div>
   );
@@ -191,6 +192,38 @@ function MarketplaceSection() {
       ))}
       {(!listings || listings.length === 0) && (
         <p className="text-gray-500 text-center py-8 col-span-3">No listings yet.</p>
+      )}
+    </div>
+  );
+}
+
+function PlaylistsSection() {
+  const { data: playlists, isLoading } = trpc.playlists.list.useQuery({ limit: 20 });
+
+  if (isLoading) return <CardGridSkeleton count={4} />;
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {playlists?.map((playlist) => (
+        <Link
+          key={playlist.id}
+          href={`/playlist/${playlist.id}`}
+          className="rounded-2xl bg-[#15151f] p-6 transition hover:bg-[#1a1a2e] block"
+        >
+          <div className="w-full h-32 rounded-xl bg-gradient-to-br from-brand-500 to-purple-800 flex items-center justify-center text-4xl mb-4">
+            🎧
+          </div>
+          <h3 className="font-bold text-lg mb-1 truncate">{playlist.title}</h3>
+          {playlist.description && (
+            <p className="text-sm text-gray-400 line-clamp-2 mb-2">{playlist.description}</p>
+          )}
+          <span className="text-xs bg-brand-600/20 text-brand-400 px-3 py-1 rounded-full capitalize">
+            {playlist.visibility}
+          </span>
+        </Link>
+      ))}
+      {(!playlists || playlists.length === 0) && (
+        <p className="text-gray-500 text-center py-8 col-span-3">No playlists yet.</p>
       )}
     </div>
   );

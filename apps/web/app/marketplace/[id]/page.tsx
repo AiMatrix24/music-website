@@ -3,6 +3,7 @@
 import { trpc } from '@/lib/trpc/client';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { ShareButton } from '@/app/components/ShareButton';
 
 export default function ListingDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -48,7 +49,10 @@ export default function ListingDetailPage() {
                 <span className="inline-block bg-brand-600/20 text-brand-400 text-xs px-3 py-1 rounded-full mb-3 font-semibold uppercase">
                   {listing.category.replace('_', ' ')}
                 </span>
-                <h1 className="text-3xl font-black">{listing.title}</h1>
+                <div className="flex items-start justify-between gap-4">
+                  <h1 className="text-3xl font-black">{listing.title}</h1>
+                  <ShareButton title={listing.title} />
+                </div>
                 {listing.sellerName && (
                   <Link
                     href={`/artist/${listing.sellerId}`}

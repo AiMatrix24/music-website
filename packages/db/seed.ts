@@ -211,6 +211,37 @@ async function seed() {
   `;
   console.log('Created articles');
 
+  // ─── Playlists ───
+  const playlistData = await sql`
+    INSERT INTO playlists (user_id, title, description, visibility) VALUES
+      (${fans[0].id}, 'Late Night Synthwave', 'Perfect for midnight coding sessions.', 'public'),
+      (${fans[1].id}, 'Chill Lo-fi Vibes', 'Relaxing beats for studying and focus.', 'public'),
+      (${artists[3].id}, 'Cipher''s Favorites', 'Tracks that inspire my own production.', 'public'),
+      (${fans[2].id}, 'Indie Discovery', 'New indie rock and alternative finds.', 'public')
+    RETURNING id, title
+  `;
+  console.log(`Created ${playlistData.length} playlists`);
+
+  // ─── Playlist Tracks ───
+  await sql`
+    INSERT INTO playlist_tracks (playlist_id, track_id, position) VALUES
+      (${playlistData[0].id}, ${tracks[0].id}, 1),
+      (${playlistData[0].id}, ${tracks[1].id}, 2),
+      (${playlistData[0].id}, ${tracks[2].id}, 3),
+      (${playlistData[0].id}, ${tracks[8].id}, 4),
+      (${playlistData[1].id}, ${tracks[3].id}, 1),
+      (${playlistData[1].id}, ${tracks[4].id}, 2),
+      (${playlistData[1].id}, ${tracks[5].id}, 3),
+      (${playlistData[2].id}, ${tracks[6].id}, 1),
+      (${playlistData[2].id}, ${tracks[7].id}, 2),
+      (${playlistData[2].id}, ${tracks[11].id}, 3),
+      (${playlistData[2].id}, ${tracks[14].id}, 4),
+      (${playlistData[3].id}, ${tracks[6].id}, 1),
+      (${playlistData[3].id}, ${tracks[7].id}, 2),
+      (${playlistData[3].id}, ${tracks[13].id}, 3)
+  `;
+  console.log('Linked playlist tracks');
+
   console.log('\nSeed complete!');
   await sql.end();
 }
