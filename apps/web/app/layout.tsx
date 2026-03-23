@@ -5,6 +5,8 @@ import { Providers } from './providers';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { BackToTop } from './components/BackToTop';
+import { PlayerProvider, MusicPlayerBar } from './components/MusicPlayer';
+import { CookieConsent } from './components/CookieConsent';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -62,10 +64,14 @@ export default function RootLayout({
     <html lang="en" className={inter.variable}>
       <body className="flex flex-col min-h-screen">
         <Providers>
-          <Navbar />
-          <main className="pt-16 flex-1">{children}</main>
-          <Footer />
-          <BackToTop />
+          <PlayerProvider>
+            <Navbar />
+            <main className="pt-16 flex-1">{children}</main>
+            <Footer />
+            <BackToTop />
+            <MusicPlayerBar />
+            <CookieConsent />
+          </PlayerProvider>
         </Providers>
       </body>
     </html>

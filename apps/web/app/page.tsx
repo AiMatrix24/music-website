@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { trpc } from '@/lib/trpc/client';
 import { FadeIn } from './components/FadeIn';
+import { StatsCounter } from './components/StatsCounter';
 
 export default function HomePage() {
   return (
@@ -63,6 +64,9 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Platform Stats */}
+      <StatsCounter />
 
       {/* Trending Tracks */}
       <TrendingTracks />

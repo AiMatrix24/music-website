@@ -3,6 +3,8 @@
 import { trpc } from '@/lib/trpc/client';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { ShareButton } from '../../components/ShareButton';
+import { PlayButton } from '../../components/PlayButton';
 
 export default function TrackDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -61,6 +63,19 @@ export default function TrackDetailPage() {
                 {track.genre}
               </span>
             )}
+            <div className="flex items-center gap-3 mt-4">
+              <PlayButton
+                track={{
+                  id: track.id,
+                  title: track.title,
+                  artist: track.artistName ?? undefined,
+                  genre: track.genre ?? undefined,
+                  duration: track.duration ?? undefined,
+                }}
+                size="lg"
+              />
+              <ShareButton title={`${track.title} on OPYNX`} text={`Listen to ${track.title} by ${track.artistName ?? 'Unknown'} on OPYNX`} />
+            </div>
           </div>
         </div>
 
