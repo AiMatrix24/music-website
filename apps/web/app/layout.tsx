@@ -17,6 +17,10 @@ const KeyboardShortcuts = dynamic(() =>
   import('./components/KeyboardShortcuts').then((m) => m.KeyboardShortcuts),
   { ssr: false }
 );
+const TopLoadingBar = dynamic(() =>
+  import('./components/TopLoadingBar').then((m) => m.TopLoadingBar),
+  { ssr: false }
+);
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -73,6 +77,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.variable}>
       <body className="flex flex-col min-h-screen">
+        <TopLoadingBar />
         <a href="#main-content" className="skip-nav">Skip to content</a>
         <Providers>
           <ToastProvider>

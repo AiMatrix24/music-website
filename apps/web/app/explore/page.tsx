@@ -4,6 +4,7 @@ import { trpc } from '@/lib/trpc/client';
 import Link from 'next/link';
 import { useState } from 'react';
 import { TrackListSkeleton, CardGridSkeleton, ArtistCardSkeleton, EventCardSkeleton } from '../components/Skeleton';
+import { EmptyState } from '../components/EmptyState';
 
 type Tab = 'tracks' | 'artists' | 'events' | 'marketplace' | 'playlists' | 'articles';
 
@@ -71,7 +72,7 @@ function TracksSection() {
         </Link>
       ))}
       {(!tracks || tracks.length === 0) && (
-        <p className="text-gray-500 text-center py-8">No tracks yet.</p>
+        <EmptyState icon="🎵" title="No tracks yet" description="Be the first to upload a track and share your music with the world." actionLabel="Learn More" actionHref="/subscribe" />
       )}
     </div>
   );
@@ -155,7 +156,9 @@ function EventsSection() {
         </Link>
       ))}
       {(!events || events.length === 0) && (
-        <p className="text-gray-500 text-center py-8 col-span-2">No upcoming events.</p>
+        <div className="col-span-2">
+          <EmptyState icon="📅" title="No upcoming events" description="Check back soon for live shows and listening parties." />
+        </div>
       )}
     </div>
   );

@@ -5,10 +5,16 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ShareButton } from '../../components/ShareButton';
 import { PlayButton } from '../../components/PlayButton';
+import { LikeButton } from '../../components/LikeButton';
+import { Breadcrumbs } from '../../components/Breadcrumbs';
 
 export default function TrackDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: track, isLoading, error } = trpc.tracks.getById.useQuery({ id });
+  const { data: relatedTracks } = trpc.tracks.list.useQuery(
+    { limit: 4 },
+    { enabled: !!track }
+  );
 
   if (isLoading) {
     return (
@@ -32,13 +38,10 @@ export default function TrackDetailPage() {
   return (
     <div className="min-h-screen pt-24 pb-16 px-6">
       <div className="max-w-3xl mx-auto">
-        {/* Back link */}
-        <Link
-          href="/explore"
-          className="text-sm text-gray-400 hover:text-white transition mb-8 inline-block"
-        >
-          ← Back to Explore
-        </Link>
+        <Breadcrumbs items={[
+          { label: 'Explore', href: '/explore' },
+          { label: track.title },
+        ]} />
 
         {/* Track header */}
         <div className="flex flex-col sm:flex-row gap-6 items-start mb-10">
@@ -74,6 +77,7 @@ export default function TrackDetailPage() {
                 }}
                 size="lg"
               />
+              <LikeButton initialCount={Math.floor((track.playCount ?? 0) * 0.12)} />
               <ShareButton title={`${track.title} on OPYNX`} text={`Listen to ${track.title} by ${track.artistName ?? 'Unknown'} on OPYNX`} />
             </div>
           </div>
@@ -111,24 +115,33 @@ export default function TrackDetailPage() {
           </div>
         </div>
 
-        {/* Placeholder audio player */}
-        <div className="rounded-2xl bg-[#15151f] p-6">
-          <h2 className="text-lg font-bold mb-4">Player</h2>
-          <div className="flex items-center gap-4">
-            <button className="w-14 h-14 rounded-full bg-brand-600 hover:bg-brand-500 transition flex items-center justify-center text-2xl">
-              ▶
-            </button>
-            <div className="flex-1">
-              <div className="h-2 bg-brand-900 rounded-full overflow-hidden">
-                <div className="h-full w-0 bg-brand-500 rounded-full" />
-              </div>
-              <div className="flex justify-between mt-1 text-xs text-gray-500">
-                <span>0:00</span>
-                <span>{formatDuration(track.duration)}</span>
-              </div>
+        {/* Related Tracks */}
+        {relatedTracks && relatedTracks.filter((t) => t.id !== track.id).length > 0 && (
+          <div className="rounded-2xl bg-[#15151f] p-6">
+            <h2 className="text-lg font-bold mb-4">More Tracks</h2>
+            <div className="space-y-3">
+              {relatedTracks
+                .filter((t) => t.id !== track.id)
+                .slice(0, 3)
+                .map((t) => (
+                  <Link
+                    key={t.id}
+                    href={`/track/${t.id}`}
+                    className="flex items-center gap-4 p-3 rounded-xl transition hover:bg-brand-950/50"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-sm font-bold shrink-0">
+                      {t.genre?.charAt(0) ?? '♪'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold truncate text-sm">{t.title}</p>
+                      <p className="text-xs text-gray-400">{t.artistName ?? 'Unknown'} · {t.genre}</p>
+                    </div>
+                    <span className="text-xs text-gray-500">{formatPlays(t.playCount ?? 0)} plays</span>
+                  </Link>
+                ))}
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
