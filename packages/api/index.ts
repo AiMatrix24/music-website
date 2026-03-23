@@ -552,6 +552,17 @@ const playlistsRouter = createRouter({
       return entry;
     }),
 
+  getTracks: publicProcedure
+    .input(z.object({ playlistId: z.string().uuid() }))
+    .query(async ({ input }) => {
+      return db
+        .select({ track: tracks, position: playlistTracks.position })
+        .from(playlistTracks)
+        .innerJoin(tracks, eq(playlistTracks.trackId, tracks.id))
+        .where(eq(playlistTracks.playlistId, input.playlistId))
+        .orderBy(playlistTracks.position);
+    }),
+
   removeTrack: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ input }) => {

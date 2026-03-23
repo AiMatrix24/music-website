@@ -6,7 +6,17 @@ import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { BackToTop } from './components/BackToTop';
 import { PlayerProvider, MusicPlayerBar } from './components/MusicPlayer';
-import { CookieConsent } from './components/CookieConsent';
+import { ToastProvider } from './components/Toast';
+import dynamic from 'next/dynamic';
+
+const CookieConsent = dynamic(() =>
+  import('./components/CookieConsent').then((m) => m.CookieConsent),
+  { ssr: false }
+);
+const KeyboardShortcuts = dynamic(() =>
+  import('./components/KeyboardShortcuts').then((m) => m.KeyboardShortcuts),
+  { ssr: false }
+);
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -63,15 +73,19 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.variable}>
       <body className="flex flex-col min-h-screen">
+        <a href="#main-content" className="skip-nav">Skip to content</a>
         <Providers>
-          <PlayerProvider>
-            <Navbar />
-            <main className="pt-16 flex-1">{children}</main>
-            <Footer />
-            <BackToTop />
-            <MusicPlayerBar />
-            <CookieConsent />
-          </PlayerProvider>
+          <ToastProvider>
+            <PlayerProvider>
+              <Navbar />
+              <main id="main-content" className="pt-16 flex-1" role="main">{children}</main>
+              <Footer />
+              <BackToTop />
+              <MusicPlayerBar />
+              <CookieConsent />
+              <KeyboardShortcuts />
+            </PlayerProvider>
+          </ToastProvider>
         </Providers>
       </body>
     </html>
