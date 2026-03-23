@@ -14,6 +14,9 @@ export function Navbar() {
         </Link>
 
         <div className="flex items-center gap-6">
+          <Link href="/explore" className="text-sm text-gray-400 hover:text-white transition hidden sm:block">
+            Explore
+          </Link>
           <Link href="/subscribe" className="text-sm text-gray-400 hover:text-white transition hidden sm:block">
             Subscribe
           </Link>
