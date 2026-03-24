@@ -1,60 +1,169 @@
 'use client';
 
 import { useState } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useToast } from '../components/Toast';
 
-/**
- * Checkout Page — P0 Priority
- * Tier selector + dual checkout (Helio USDC primary, Samiteon fiat fallback).
- * Attribution IDs pre-populated from URL params after QR scan.
- */
+type TierId = 'premium' | 'bundle' | 'studio';
+
+const tiers = [
+  {
+    id: 'premium' as TierId,
+    name: 'Premium',
+    price: '$8.73',
+    priceNum: 8.73,
+    period: '/mo',
+    features: [
+      '320kbps streaming',
+      'No ads, unlimited skips',
+      'Offline listening (PWA)',
+      'Pre-sale tickets',
+      '10% merch discount',
+      'Digital backstage access',
+    ],
+  },
+  {
+    id: 'bundle' as TierId,
+    name: 'Superfan Bundle',
+    price: '$12.73',
+    priceNum: 12.73,
+    period: '/mo',
+    badge: 'Best Value',
+    features: [
+      'Support 4 creators',
+      '320kbps streaming',
+      'All Premium features',
+      'Exclusive bundle perks',
+      'Priority event access',
+      'Verified Superfan badge',
+    ],
+  },
+  {
+    id: 'studio' as TierId,
+    name: 'Studio',
+    price: '$16.00',
+    priceNum: 16.0,
+    period: '/mo',
+    features: [
+      'Lossless FLAC streaming',
+      '48h early access',
+      'Studio session access',
+      'Platinum badge',
+      '15% merch discount',
+      'All Premium features',
+    ],
+  },
+];
+
 export default function SubscribePage() {
-  const [selectedTier, setSelectedTier] = useState<'premium' | 'bundle' | 'studio'>('premium');
+  const [selectedTier, setSelectedTier] = useState<TierId>('premium');
+  const [step, setStep] = useState<'select' | 'checkout'>('select');
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const { toast } = useToast();
 
-  const tiers = [
-    {
-      id: 'premium' as const,
-      name: 'Premium',
-      price: '$8.73',
-      period: '/mo',
-      features: [
-        '320kbps streaming',
-        'No ads, unlimited skips',
-        'Offline listening (PWA)',
-        'Pre-sale tickets',
-        '10% merch discount',
-        'Digital backstage access',
-      ],
-    },
-    {
-      id: 'bundle' as const,
-      name: 'Superfan Bundle',
-      price: '$12.73',
-      period: '/mo',
-      badge: 'Best Value',
-      features: [
-        'Support 4 creators',
-        '320kbps streaming',
-        'All Premium features',
-        'Exclusive bundle perks',
-        'Priority event access',
-        'Verified Superfan badge',
-      ],
-    },
-    {
-      id: 'studio' as const,
-      name: 'Studio',
-      price: '$16.00',
-      period: '/mo',
-      features: [
-        'Lossless FLAC streaming',
-        '48h early access',
-        'Studio session access',
-        'Platinum badge',
-        '15% merch discount',
-        'All Premium features',
-      ],
-    },
-  ];
+  const selected = tiers.find((t) => t.id === selectedTier)!;
+
+  const handleContinue = () => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/login');
+      return;
+    }
+    setStep('checkout');
+  };
+
+  const handleCheckout = (method: 'usdc' | 'card') => {
+    toast(
+      `${selected.name} plan selected — ${method === 'usdc' ? 'USDC' : 'Card'} checkout coming soon!`,
+      'info'
+    );
+  };
+
+  if (step === 'checkout') {
+    return (
+      <div className="min-h-screen py-16 px-6">
+        <div className="max-w-lg mx-auto">
+          <button
+            onClick={() => setStep('select')}
+            className="text-sm text-gray-400 hover:text-white transition mb-8 inline-block"
+          >
+            ← Change plan
+          </button>
+
+          <div className="rounded-2xl bg-[#15151f] p-8 mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold">{selected.name}</h2>
+                <p className="text-gray-400 text-sm">Monthly subscription</p>
+              </div>
+              <div className="text-right">
+                <p className="text-3xl font-black text-brand-400">{selected.price}</p>
+                <p className="text-xs text-gray-500">{selected.period}</p>
+              </div>
+            </div>
+
+            <div className="border-t border-brand-800/20 pt-4 mb-6">
+              <p className="text-sm text-gray-400 mb-3">What you get:</p>
+              <ul className="space-y-2">
+                {selected.features.map((f) => (
+                  <li key={f} className="flex items-center gap-2 text-sm">
+                    <svg className="w-4 h-4 text-brand-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-gray-300">{f}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {session?.user && (
+              <div className="bg-brand-950/50 rounded-xl p-4 mb-6">
+                <p className="text-xs text-gray-500 mb-1">Subscribing as</p>
+                <p className="font-semibold">{session.user.name ?? session.user.email}</p>
+              </div>
+            )}
+
+            <div className="border-t border-brand-800/20 pt-4">
+              <div className="flex justify-between mb-1">
+                <span className="text-gray-400 text-sm">Subtotal</span>
+                <span className="text-sm">{selected.price}</span>
+              </div>
+              <div className="flex justify-between mb-4">
+                <span className="text-gray-400 text-sm">Platform fee</span>
+                <span className="text-sm text-gray-500">$0.00</span>
+              </div>
+              <div className="flex justify-between font-bold text-lg border-t border-brand-800/20 pt-3">
+                <span>Total</span>
+                <span className="text-brand-400">{selected.price}/mo</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <button
+              onClick={() => handleCheckout('usdc')}
+              className="w-full rounded-full bg-gradient-to-r from-brand-600 to-brand-500 py-4 font-semibold text-white text-lg transition hover:shadow-lg hover:shadow-brand-600/30"
+            >
+              Pay with USDC (Helio)
+            </button>
+            <button
+              onClick={() => handleCheckout('card')}
+              className="w-full rounded-full border-2 border-white/20 py-4 font-semibold text-white transition hover:border-brand-500"
+            >
+              Pay with Card (Samiteon)
+            </button>
+            <p className="text-center text-xs text-gray-500">
+              Payments settled on Polygon. Verifiable on-chain.
+              <br />
+              Cancel anytime. 5-day grace period on renewal.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen py-16 px-6">
@@ -102,18 +211,18 @@ export default function SubscribePage() {
           ))}
         </div>
 
-        {/* Checkout Buttons */}
+        {/* Continue Button */}
         <div className="max-w-md mx-auto space-y-4">
-          <button className="w-full rounded-full bg-gradient-to-r from-brand-600 to-brand-500 py-4 font-semibold text-white text-lg transition hover:shadow-lg hover:shadow-brand-600/30">
-            Pay with USDC (Helio)
-          </button>
-          <button className="w-full rounded-full border-2 border-white/20 py-4 font-semibold text-white transition hover:border-brand-500">
-            Pay with Card (Samiteon)
+          <button
+            onClick={handleContinue}
+            className="w-full rounded-full bg-gradient-to-r from-brand-600 to-brand-500 py-4 font-semibold text-white text-lg transition hover:shadow-lg hover:shadow-brand-600/30"
+          >
+            Continue with {selected.name} — {selected.price}/mo
           </button>
           <p className="text-center text-xs text-gray-500">
-            Payments settled on Polygon. Verifiable on-chain.
-            <br />
-            Cancel anytime. 5-day grace period on renewal.
+            {status === 'unauthenticated'
+              ? 'You\'ll be asked to sign in first.'
+              : 'You\'ll review your plan before payment.'}
           </p>
         </div>
 
