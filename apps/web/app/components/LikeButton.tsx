@@ -11,9 +11,13 @@ interface LikeButtonProps {
 export function LikeButton({ initialCount = 0, size = 'md' }: LikeButtonProps) {
   const [liked, setLiked] = useState(false);
   const [count, setCount] = useState(initialCount);
+  const [bouncing, setBouncing] = useState(false);
   const { toast } = useToast();
 
   const toggle = () => {
+    setBouncing(true);
+    setTimeout(() => setBouncing(false), 400);
+
     if (liked) {
       setLiked(false);
       setCount((c) => c - 1);
@@ -37,7 +41,7 @@ export function LikeButton({ initialCount = 0, size = 'md' }: LikeButtonProps) {
       aria-label={liked ? 'Unlike' : 'Like'}
     >
       <svg
-        className={`${iconSize} transition-transform ${liked ? 'scale-110' : ''}`}
+        className={`${iconSize} transition-transform ${bouncing ? 'scale-125' : liked ? 'scale-110' : ''}`}
         fill={liked ? 'currentColor' : 'none'}
         stroke="currentColor"
         viewBox="0 0 24 24"
