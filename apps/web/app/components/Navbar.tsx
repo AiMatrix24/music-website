@@ -57,6 +57,9 @@ export function Navbar() {
                 <Link href="/dashboard" className="text-sm text-gray-400 hover:text-white transition">
                   Dashboard
                 </Link>
+                <Link href="/settings" className="text-sm text-gray-400 hover:text-white transition">
+                  Settings
+                </Link>
                 <button
                   onClick={() => signOut({ callbackUrl: '/' })}
                   className="text-sm text-gray-400 hover:text-white transition"

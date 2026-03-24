@@ -7,6 +7,7 @@ import { ShareButton } from '../../components/ShareButton';
 import { PlayButton } from '../../components/PlayButton';
 import { LikeButton } from '../../components/LikeButton';
 import { Breadcrumbs } from '../../components/Breadcrumbs';
+import { TrackComments } from '../../components/TrackComments';
 
 export default function TrackDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -113,6 +114,11 @@ export default function TrackDetailPage() {
               })}
             />
           </div>
+        </div>
+
+        {/* Comments */}
+        <div className="mb-6">
+          <TrackComments trackId={track.id} />
         </div>
 
         {/* Related Tracks */}

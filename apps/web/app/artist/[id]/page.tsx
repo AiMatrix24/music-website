@@ -3,6 +3,7 @@
 import { trpc } from '@/lib/trpc/client';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { FollowButton } from '../../components/FollowButton';
 
 export default function ArtistProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -13,6 +14,10 @@ export default function ArtistProfilePage() {
   );
   const { data: events } = trpc.events.list.useQuery(
     { limit: 10 },
+    { enabled: !!artist }
+  );
+  const { data: followerCount } = trpc.users.getFollowerCount.useQuery(
+    { userId: id },
     { enabled: !!artist }
   );
 
@@ -59,12 +64,16 @@ export default function ArtistProfilePage() {
               {artist.role}
             </span>
             <h1 className="text-4xl font-black mb-2">{artist.name}</h1>
-            <p className="text-gray-400">
+            <p className="text-gray-400 mb-3">
               Joined {new Date(artist.createdAt).toLocaleDateString('en-US', {
                 month: 'long',
                 year: 'numeric',
               })}
+              {followerCount !== undefined && (
+                <span className="ml-3">· {followerCount} follower{followerCount !== 1 ? 's' : ''}</span>
+              )}
             </p>
+            <FollowButton artistId={id} artistName={artist.name ?? undefined} />
           </div>
         </div>
 

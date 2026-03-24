@@ -126,6 +126,60 @@ const usersRouter = createRouter({
         .limit(input.limit)
         .offset(input.offset);
     }),
+
+  follow: protectedProcedure
+    .input(z.object({ followeeId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      // Don't allow self-follow
+      if (ctx.session.user.id === input.followeeId) return null;
+      try {
+        const [row] = await db
+          .insert(follows)
+          .values({ followerId: ctx.session.user.id, followeeId: input.followeeId })
+          .onConflictDoNothing()
+          .returning();
+        return row ?? null;
+      } catch {
+        return null;
+      }
+    }),
+
+  unfollow: protectedProcedure
+    .input(z.object({ followeeId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const [deleted] = await db
+        .delete(follows)
+        .where(
+          and(
+            eq(follows.followerId, ctx.session.user.id),
+            eq(follows.followeeId, input.followeeId)
+          )
+        )
+        .returning();
+      return deleted ?? null;
+    }),
+
+  isFollowing: protectedProcedure
+    .input(z.object({ followeeId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const row = await db.query.follows.findFirst({
+        where: and(
+          eq(follows.followerId, ctx.session.user.id),
+          eq(follows.followeeId, input.followeeId)
+        ),
+      });
+      return !!row;
+    }),
+
+  getFollowerCount: publicProcedure
+    .input(z.object({ userId: z.string().uuid() }))
+    .query(async ({ input }) => {
+      const result = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(follows)
+        .where(eq(follows.followeeId, input.userId));
+      return result[0]?.count ?? 0;
+    }),
 });
 
 // ─── Subscriptions Router ───
@@ -1091,6 +1145,65 @@ const adminRouter = createRouter({
     }),
 });
 
+// ─── Comments Router ───
+const commentsRouter = createRouter({
+  list: publicProcedure
+    .input(
+      z.object({
+        trackId: z.string().uuid(),
+        limit: z.number().min(1).max(50).default(20),
+      })
+    )
+    .query(async ({ input }) => {
+      return db
+        .select({
+          id: comments.id,
+          userId: comments.userId,
+          trackId: comments.trackId,
+          body: comments.body,
+          createdAt: comments.createdAt,
+          userName: users.name,
+          userAvatar: users.avatar,
+        })
+        .from(comments)
+        .leftJoin(users, eq(comments.userId, users.id))
+        .where(eq(comments.trackId, input.trackId))
+        .orderBy(desc(comments.createdAt))
+        .limit(input.limit);
+    }),
+
+  add: protectedProcedure
+    .input(
+      z.object({
+        trackId: z.string().uuid(),
+        body: z.string().min(1).max(2000),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [comment] = await db
+        .insert(comments)
+        .values({
+          userId: ctx.session.user.id,
+          trackId: input.trackId,
+          body: input.body,
+        })
+        .returning();
+      return comment;
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const [deleted] = await db
+        .delete(comments)
+        .where(
+          and(eq(comments.id, input.id), eq(comments.userId, ctx.session.user.id))
+        )
+        .returning();
+      return deleted ?? null;
+    }),
+});
+
 // ─── Broadcasts Router ───
 const broadcastsRouter = createRouter({
   list: publicProcedure
@@ -1179,6 +1292,7 @@ export const appRouter = createRouter({
   bookings: bookingsRouter,
   upload: uploadRouter,
   broadcasts: broadcastsRouter,
+  comments: commentsRouter,
   admin: adminRouter,
 });
 
