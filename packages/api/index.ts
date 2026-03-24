@@ -38,6 +38,7 @@ import {
   articles,
   categories,
   articleCategories,
+  broadcasts,
 } from '@opynx/db';
 
 // ─── Auth Router ───
@@ -1090,6 +1091,78 @@ const adminRouter = createRouter({
     }),
 });
 
+// ─── Broadcasts Router ───
+const broadcastsRouter = createRouter({
+  list: publicProcedure
+    .input(
+      z.object({
+        artistId: z.string().uuid().optional(),
+        limit: z.number().min(1).max(50).default(20),
+      })
+    )
+    .query(async ({ input }) => {
+      const conditions = [];
+      if (input.artistId) conditions.push(eq(broadcasts.artistId, input.artistId));
+
+      return db
+        .select({
+          id: broadcasts.id,
+          artistId: broadcasts.artistId,
+          type: broadcasts.type,
+          title: broadcasts.title,
+          body: broadcasts.body,
+          mediaUrl: broadcasts.mediaUrl,
+          subscribersOnly: broadcasts.subscribersOnly,
+          publishedAt: broadcasts.publishedAt,
+          createdAt: broadcasts.createdAt,
+          artistName: users.name,
+        })
+        .from(broadcasts)
+        .leftJoin(users, eq(broadcasts.artistId, users.id))
+        .where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(desc(broadcasts.createdAt))
+        .limit(input.limit);
+    }),
+
+  send: protectedProcedure
+    .input(
+      z.object({
+        title: z.string().min(1).max(200),
+        body: z.string().min(1).max(5000),
+        type: z.enum(['text', 'voice_memo', 'announcement', 'exclusive']).default('text'),
+        subscribersOnly: z.boolean().default(true),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [broadcast] = await db
+        .insert(broadcasts)
+        .values({
+          artistId: ctx.session.user.id,
+          title: input.title,
+          body: input.body,
+          type: input.type,
+          subscribersOnly: input.subscribersOnly,
+        })
+        .returning();
+      return broadcast;
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const [deleted] = await db
+        .delete(broadcasts)
+        .where(
+          and(
+            eq(broadcasts.id, input.id),
+            eq(broadcasts.artistId, ctx.session.user.id)
+          )
+        )
+        .returning();
+      return deleted ?? null;
+    }),
+});
+
 // ─── App Router ───
 export const appRouter = createRouter({
   auth: authRouter,
@@ -1105,6 +1178,7 @@ export const appRouter = createRouter({
   articles: articlesRouter,
   bookings: bookingsRouter,
   upload: uploadRouter,
+  broadcasts: broadcastsRouter,
   admin: adminRouter,
 });
 
