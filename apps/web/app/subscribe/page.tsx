@@ -23,6 +23,14 @@ const tiers = [
       '10% merch discount',
       'Digital backstage access',
     ],
+    breakdown: {
+      artist: '$1.00',
+      artistPct: '11.5%',
+      facilitator: '$0.25–$0.50',
+      facilitatorPct: '2.9–5.7%',
+      platform: '$7.20',
+      platformPct: '82.5%',
+    },
   },
   {
     id: 'bundle' as TierId,
@@ -39,6 +47,14 @@ const tiers = [
       'Priority event access',
       'Verified Superfan badge',
     ],
+    breakdown: {
+      artist: '$4.00',
+      artistPct: '31.4%',
+      facilitator: '$0.50–$1.00',
+      facilitatorPct: '3.9–7.9%',
+      platform: '$7.73',
+      platformPct: '60.7%',
+    },
   },
   {
     id: 'studio' as TierId,
@@ -54,6 +70,14 @@ const tiers = [
       '15% merch discount',
       'All Premium features',
     ],
+    breakdown: {
+      artist: '$3.00',
+      artistPct: '18.8%',
+      facilitator: '$0.50–$1.00',
+      facilitatorPct: '3.1–6.3%',
+      platform: '$12.00',
+      platformPct: '75.0%',
+    },
   },
 ];
 
@@ -226,20 +250,26 @@ export default function SubscribePage() {
           </p>
         </div>
 
-        {/* Revenue Transparency */}
-        <div className="mt-16 max-w-md mx-auto rounded-2xl bg-[#15151f] p-6">
-          <h3 className="font-bold mb-4 text-center">
-            Where Your Money Goes
+        {/* Revenue Transparency — dynamic per plan */}
+        <div className="mt-16 max-w-md mx-auto rounded-2xl bg-[#15151f] p-6 transition-all">
+          <h3 className="font-bold mb-1 text-center">
+            Where Your {selected.price} Goes
           </h3>
+          <p className="text-center text-xs text-gray-500 mb-4">{selected.name} plan</p>
           <div className="space-y-3">
-            <WaterfallRow label="Artist" amount="$1.00" pct="11.5%" />
-            <WaterfallRow label="Facilitator" amount="$0.25–$0.50" pct="2.9–5.7%" />
-            <WaterfallRow label="Platform" amount="$7.20" pct="82%" />
+            <WaterfallRow label="Artist" amount={selected.breakdown.artist} pct={selected.breakdown.artistPct} color="text-brand-400" />
+            <WaterfallRow label="Facilitator" amount={selected.breakdown.facilitator} pct={selected.breakdown.facilitatorPct} color="text-pink-400" />
+            <WaterfallRow label="Platform" amount={selected.breakdown.platform} pct={selected.breakdown.platformPct} color="text-cyan-400" />
             <div className="border-t border-brand-800/30 pt-3 flex justify-between font-bold">
               <span>Total</span>
-              <span className="text-brand-400">$8.73</span>
+              <span className="text-brand-400">{selected.price}</span>
             </div>
           </div>
+          {selected.id === 'bundle' && (
+            <p className="text-xs text-brand-400 text-center mt-3">
+              Bundle splits $4.00 across 4 artists — $1.00 each
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -250,16 +280,18 @@ function WaterfallRow({
   label,
   amount,
   pct,
+  color,
 }: {
   label: string;
   amount: string;
   pct: string;
+  color?: string;
 }) {
   return (
     <div className="flex justify-between text-sm">
       <span className="text-gray-400">{label}</span>
       <span>
-        {amount}{' '}
+        <span className={color ?? ''}>{amount}</span>{' '}
         <span className="text-gray-500 text-xs">({pct})</span>
       </span>
     </div>
