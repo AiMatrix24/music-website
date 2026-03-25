@@ -696,7 +696,7 @@ const eventsRouter = createRouter({
       z.object({
         title: z.string().min(1).max(200),
         startDate: z.string().datetime(),
-        endDate: z.string().datetime(),
+        endDate: z.string().datetime().optional(),
         venueId: z.string().uuid().optional(),
         countryCode: z.string().max(2).optional(),
         timezone: z.string().optional(),
@@ -711,7 +711,7 @@ const eventsRouter = createRouter({
           hostId: ctx.session.user.id,
           title: input.title,
           startDate: new Date(input.startDate),
-          endDate: new Date(input.endDate),
+          endDate: input.endDate ? new Date(input.endDate) : new Date(new Date(input.startDate).getTime() + 3 * 60 * 60 * 1000),
           venueId: input.venueId ?? null,
           countryCode: input.countryCode ?? null,
           timezone: input.timezone ?? null,

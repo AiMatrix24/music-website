@@ -21,7 +21,12 @@ export default function ArtistDashboard() {
     { enabled: status === 'authenticated' && !!session?.user?.id }
   );
 
-  const [activeTab, setActiveTab] = useState<'tracks' | 'upload' | 'messages'>('tracks');
+  const myEvents = trpc.events.list.useQuery(
+    { limit: 20 },
+    { enabled: status === 'authenticated' }
+  );
+
+  const [activeTab, setActiveTab] = useState<'tracks' | 'upload' | 'messages' | 'events'>('tracks');
 
   if (status === 'loading') {
     return (
@@ -66,24 +71,25 @@ export default function ArtistDashboard() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-6">
-        {(['tracks', 'upload', 'messages'] as const).map((tab) => (
+      <div className="flex gap-2 mb-6 overflow-x-auto">
+        {(['tracks', 'upload', 'events', 'messages'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-5 py-2 rounded-full text-sm font-semibold transition ${
+            className={`px-5 py-2 rounded-full text-sm font-semibold transition whitespace-nowrap ${
               activeTab === tab
                 ? 'bg-brand-600 text-white'
                 : 'bg-[#15151f] text-gray-400 hover:text-white'
             }`}
           >
-            {tab === 'tracks' ? 'My Tracks' : tab === 'upload' ? 'Upload Music' : 'Message Fans'}
+            {tab === 'tracks' ? 'My Tracks' : tab === 'upload' ? 'Upload Music' : tab === 'events' ? 'Events & Tickets' : 'Message Fans'}
           </button>
         ))}
       </div>
 
       {activeTab === 'tracks' && <MyTracksTab tracks={myTracks.data ?? []} />}
       {activeTab === 'upload' && <UploadTab onSuccess={() => { myTracks.refetch(); setActiveTab('tracks'); }} />}
+      {activeTab === 'events' && <EventsTab events={myEvents.data ?? []} onRefresh={() => myEvents.refetch()} />}
       {activeTab === 'messages' && <MessagesTab broadcasts={myBroadcasts.data ?? []} onSent={() => myBroadcasts.refetch()} />}
     </div>
   );
@@ -478,6 +484,194 @@ function MessagesTab({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ─── Events & Tickets Tab ─── */
+function EventsTab({ events, onRefresh }: { events: Array<{ id: string; title: string; startDate: string | Date; status: string; capacity: number | null; hostName?: string | null }>; onRefresh: () => void }) {
+  const [showCreate, setShowCreate] = useState(false);
+  const [title, setTitle] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [capacity, setCapacity] = useState('');
+  const [timezone, setTimezone] = useState('America/New_York');
+  const { toast } = useToast();
+
+  const createEvent = trpc.events.create.useMutation({
+    onSuccess: () => {
+      toast('Event created! Add ticket types to start selling.', 'success');
+      setShowCreate(false);
+      setTitle('');
+      setStartDate('');
+      setEndDate('');
+      setCapacity('');
+      onRefresh();
+    },
+    onError: (err) => {
+      toast(err.message ?? 'Failed to create event', 'error');
+    },
+  });
+
+  const handleCreate = () => {
+    if (!title || !startDate) {
+      toast('Title and start date are required', 'error');
+      return;
+    }
+    createEvent.mutate({
+      title,
+      startDate: new Date(startDate).toISOString(),
+      endDate: endDate ? new Date(endDate).toISOString() : undefined,
+      capacity: capacity ? parseInt(capacity) : undefined,
+      timezone,
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Create event form */}
+      {showCreate ? (
+        <div className="rounded-2xl bg-[#15151f] p-6">
+          <h3 className="font-bold text-lg mb-4">Create Event</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Event Title *</label>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Neon Nights Tour — LA"
+                className="w-full bg-brand-950 border border-brand-800/30 rounded-xl px-4 py-3 text-white placeholder:text-gray-600 focus:border-brand-500 outline-none transition"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Start Date & Time *</label>
+                <input
+                  type="datetime-local"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full bg-brand-950 border border-brand-800/30 rounded-xl px-4 py-3 text-white focus:border-brand-500 outline-none transition"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">End Date & Time</label>
+                <input
+                  type="datetime-local"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full bg-brand-950 border border-brand-800/30 rounded-xl px-4 py-3 text-white focus:border-brand-500 outline-none transition"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Capacity</label>
+                <input
+                  type="number"
+                  value={capacity}
+                  onChange={(e) => setCapacity(e.target.value)}
+                  placeholder="500"
+                  className="w-full bg-brand-950 border border-brand-800/30 rounded-xl px-4 py-3 text-white placeholder:text-gray-600 focus:border-brand-500 outline-none transition"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Timezone</label>
+                <select
+                  value={timezone}
+                  onChange={(e) => setTimezone(e.target.value)}
+                  className="w-full bg-brand-950 border border-brand-800/30 rounded-xl px-4 py-3 text-white focus:border-brand-500 outline-none transition"
+                >
+                  <option value="America/New_York">Eastern (ET)</option>
+                  <option value="America/Chicago">Central (CT)</option>
+                  <option value="America/Denver">Mountain (MT)</option>
+                  <option value="America/Los_Angeles">Pacific (PT)</option>
+                  <option value="Europe/London">London (GMT)</option>
+                  <option value="Europe/Berlin">Berlin (CET)</option>
+                  <option value="Asia/Tokyo">Tokyo (JST)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Anti-scalper info */}
+            <div className="rounded-xl bg-brand-600/5 border border-brand-600/20 p-4">
+              <p className="text-sm font-semibold text-brand-400 mb-2">Anti-Scalper Protections (Auto-Enabled)</p>
+              <ul className="text-xs text-gray-300 space-y-1">
+                <li>• 4 ticket max per buyer</li>
+                <li>• Non-transferable QR tickets with ID verification</li>
+                <li>• Refunds go back to buyer, never resold</li>
+                <li>• Revenue breakdown: 70% Artist / 10% Venue / 15% Platform / 5% Processing</li>
+              </ul>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleCreate}
+                disabled={createEvent.isPending}
+                className="rounded-full bg-brand-600 px-6 py-3 font-semibold text-white hover:bg-brand-500 transition disabled:opacity-50"
+              >
+                {createEvent.isPending ? 'Creating...' : 'Create Event'}
+              </button>
+              <button
+                onClick={() => setShowCreate(false)}
+                className="rounded-full border border-brand-800/30 px-6 py-3 font-semibold text-gray-400 hover:text-white transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setShowCreate(true)}
+          className="rounded-full bg-brand-600 px-6 py-3 font-semibold text-white hover:bg-brand-500 transition"
+        >
+          + Create Event
+        </button>
+      )}
+
+      {/* Events list */}
+      {events.length === 0 ? (
+        <div className="rounded-2xl bg-[#15151f] p-12 text-center">
+          <p className="text-4xl mb-4">🎪</p>
+          <p className="text-gray-400">No events yet. Create your first event to start selling tickets directly to fans.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {events.map((event) => {
+            const date = new Date(event.startDate);
+            return (
+              <Link
+                key={event.id}
+                href={`/event/${event.id}`}
+                className="flex items-center gap-4 rounded-2xl bg-[#15151f] p-5 transition hover:bg-[#1a1a2e] block"
+              >
+                <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-brand-700 to-brand-900 flex flex-col items-center justify-center shrink-0">
+                  <p className="text-xl font-black">{date.getDate()}</p>
+                  <p className="text-[10px] font-semibold uppercase text-brand-300">
+                    {date.toLocaleDateString('en-US', { month: 'short' })}
+                  </p>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold truncate">{event.title}</p>
+                  <p className="text-sm text-gray-400">
+                    {date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                    {event.capacity && ` · ${event.capacity} cap`}
+                  </p>
+                </div>
+                <span className={`text-xs px-3 py-1 rounded-full font-semibold ${
+                  event.status === 'published'
+                    ? 'bg-green-600/20 text-green-400'
+                    : event.status === 'draft'
+                    ? 'bg-yellow-600/20 text-yellow-400'
+                    : 'bg-brand-600/20 text-brand-400'
+                }`}>
+                  {event.status}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

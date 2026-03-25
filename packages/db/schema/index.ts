@@ -7,3 +7,5 @@ export * from './events';
 export * from './marketplace';
 export * from './articles';
 export * from './broadcasts';
+export * from './beats';
+export * from './podcasts';
