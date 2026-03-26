@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useSession, signOut } from 'next-auth/react';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -25,8 +26,11 @@ export function Navbar() {
     <>
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-brand-800/20 bg-brand-950/80 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-6 h-16">
-          <Link href="/" className="text-xl font-black tracking-tight">
-            <span className="text-brand-500">O</span>PYNX
+          <Link href="/" className="flex items-center gap-2">
+            <Image src="/logo.jpeg" alt="OPYNX" width={36} height={36} className="rounded-lg" />
+            <span className="text-xl font-black tracking-tight">
+              <span className="text-red-500">O</span>pyn<span className="text-red-500">X</span>
+            </span>
           </Link>
 
           {/* Desktop nav */}

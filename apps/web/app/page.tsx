@@ -40,7 +40,7 @@ export default function HomePage() {
             The FanEngage Protocol
           </p>
           <h1 className="text-5xl md:text-7xl font-black mb-6 leading-tight">
-            Music. <span className="text-brand-500">Direct.</span>
+            Music. <span className="text-red-500">Direct.</span>
             <br />
             No Middlemen.
           </h1>

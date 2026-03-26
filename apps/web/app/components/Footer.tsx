@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 export function Footer() {
   return (
@@ -7,8 +8,11 @@ export function Footer() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-10">
           {/* Brand */}
           <div>
-            <Link href="/" className="text-xl font-black tracking-tight inline-block mb-3">
-              <span className="text-brand-500">O</span>PYNX
+            <Link href="/" className="flex items-center gap-2 mb-3">
+              <Image src="/logo.jpeg" alt="OPYNX" width={32} height={32} className="rounded-lg" />
+              <span className="text-xl font-black tracking-tight">
+                <span className="text-red-500">O</span>pyn<span className="text-red-500">X</span>
+              </span>
             </Link>
             <p className="text-sm text-gray-500 leading-relaxed">
               The FanEngage Protocol. Direct-to-fan music, events, and transparent revenue sharing.
