@@ -56,8 +56,10 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
           <QuickAction href="/dashboard/upload" icon="🎵" label="Upload Track" />
           <QuickAction href="/dashboard/create-event" icon="🎫" label="Create Event" />
-          <QuickAction href="/dashboard/tickets" icon="📊" label="Ticket Sales" />
+          <QuickAction href="/dashboard/analytics" icon="📊" label="Analytics" />
+          <QuickAction href="/dashboard/tickets" icon="🎟️" label="Ticket Sales" />
           <QuickAction href="/dashboard/broadcast" icon="📢" label="Message Fans" />
+          <QuickAction href="/dashboard/podcasts" icon="🎙️" label="Podcasts" />
         </div>
 
         {/* Recent Tracks */}
