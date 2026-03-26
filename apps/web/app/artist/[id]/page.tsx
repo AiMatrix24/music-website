@@ -74,8 +74,18 @@ export default function ArtistProfilePage() {
               )}
             </p>
             <FollowButton artistId={id} artistName={artist.name ?? undefined} />
+
+            {/* Social Links */}
+            <SocialLinks artist={artist} />
           </div>
         </div>
+
+        {/* Bio */}
+        {(artist as any).bio && (
+          <div className="rounded-xl bg-[#15151f] p-5 mb-6">
+            <p className="text-gray-300 text-sm leading-relaxed">{(artist as any).bio}</p>
+          </div>
+        )}
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-10">
@@ -170,4 +180,42 @@ function formatDuration(seconds: number | null): string {
 function formatPlays(count: number): string {
   if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
   return String(count);
+}
+
+function SocialLinks({ artist }: { artist: any }) {
+  const socials = [
+    { key: 'socialInstagram', icon: '📸', label: 'Instagram', prefix: 'https://instagram.com/' },
+    { key: 'socialTwitter', icon: '𝕏', label: 'Twitter', prefix: 'https://x.com/' },
+    { key: 'socialTiktok', icon: '🎵', label: 'TikTok', prefix: 'https://tiktok.com/@' },
+    { key: 'socialYoutube', icon: '▶️', label: 'YouTube', prefix: '' },
+    { key: 'socialSpotify', icon: '🎧', label: 'Spotify', prefix: '' },
+    { key: 'socialSoundcloud', icon: '☁️', label: 'SoundCloud', prefix: '' },
+    { key: 'socialWebsite', icon: '🌐', label: 'Website', prefix: '' },
+  ];
+
+  const activeSocials = socials.filter((s) => artist[s.key]);
+
+  if (activeSocials.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-2 mt-3">
+      {activeSocials.map((s) => {
+        const value = artist[s.key] as string;
+        const href = value.startsWith('http') ? value : s.prefix + value.replace('@', '');
+        return (
+          <a
+            key={s.key}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 bg-[#15151f] hover:bg-[#1a1a2e] border border-brand-800/20 px-3 py-1.5 rounded-full text-sm transition hover:border-red-600/30"
+            title={s.label}
+          >
+            <span>{s.icon}</span>
+            <span className="text-gray-400 text-xs">{s.label}</span>
+          </a>
+        );
+      })}
+    </div>
+  );
 }

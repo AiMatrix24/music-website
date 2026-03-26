@@ -18,11 +18,27 @@ export default function SettingsPage() {
 
   const [name, setName] = useState('');
   const [walletAddress, setWalletAddress] = useState('');
+  const [bio, setBio] = useState('');
+  const [socialInstagram, setSocialInstagram] = useState('');
+  const [socialTwitter, setSocialTwitter] = useState('');
+  const [socialTiktok, setSocialTiktok] = useState('');
+  const [socialYoutube, setSocialYoutube] = useState('');
+  const [socialSpotify, setSocialSpotify] = useState('');
+  const [socialSoundcloud, setSocialSoundcloud] = useState('');
+  const [socialWebsite, setSocialWebsite] = useState('');
 
   useEffect(() => {
     if (profile.data) {
       setName(profile.data.name ?? '');
       setWalletAddress(profile.data.walletAddress ?? '');
+      setBio((profile.data as any).bio ?? '');
+      setSocialInstagram((profile.data as any).socialInstagram ?? '');
+      setSocialTwitter((profile.data as any).socialTwitter ?? '');
+      setSocialTiktok((profile.data as any).socialTiktok ?? '');
+      setSocialYoutube((profile.data as any).socialYoutube ?? '');
+      setSocialSpotify((profile.data as any).socialSpotify ?? '');
+      setSocialSoundcloud((profile.data as any).socialSoundcloud ?? '');
+      setSocialWebsite((profile.data as any).socialWebsite ?? '');
     }
   }, [profile.data]);
 
@@ -41,6 +57,14 @@ export default function SettingsPage() {
     updateMutation.mutate({
       name: name.trim() || undefined,
       walletAddress: walletAddress.trim() || undefined,
+      bio: bio.trim() || undefined,
+      socialInstagram: socialInstagram.trim() || undefined,
+      socialTwitter: socialTwitter.trim() || undefined,
+      socialTiktok: socialTiktok.trim() || undefined,
+      socialYoutube: socialYoutube.trim() || undefined,
+      socialSpotify: socialSpotify.trim() || undefined,
+      socialSoundcloud: socialSoundcloud.trim() || undefined,
+      socialWebsite: socialWebsite.trim() || undefined,
     });
   };
 
@@ -111,6 +135,19 @@ export default function SettingsPage() {
             </div>
 
             <div>
+              <label className="block text-sm text-gray-400 mb-1">Bio</label>
+              <textarea
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                placeholder="Tell fans about yourself..."
+                rows={3}
+                maxLength={500}
+                className="w-full bg-brand-950 border border-brand-800/30 rounded-xl px-4 py-3 text-white placeholder:text-gray-600 focus:border-brand-500 outline-none transition resize-none"
+              />
+              <p className="text-xs text-gray-600 mt-1 text-right">{bio.length}/500</p>
+            </div>
+
+            <div>
               <label className="block text-sm text-gray-400 mb-1">Wallet Address (Polygon)</label>
               <input
                 type="text"
@@ -120,6 +157,20 @@ export default function SettingsPage() {
                 className="w-full bg-brand-950 border border-brand-800/30 rounded-xl px-4 py-3 text-white placeholder:text-gray-600 focus:border-brand-500 outline-none transition font-mono text-sm"
               />
               <p className="text-xs text-gray-600 mt-1">Used for on-chain payout verification</p>
+            </div>
+          </div>
+
+          {/* Social Media Channels */}
+          <div className="border-t border-brand-800/20 pt-6 mt-6">
+            <h3 className="text-lg font-bold mb-4">Social Media Channels</h3>
+            <div className="space-y-4">
+              <SocialInput label="Instagram" icon="📸" value={socialInstagram} onChange={setSocialInstagram} placeholder="@yourusername" />
+              <SocialInput label="Twitter / X" icon="𝕏" value={socialTwitter} onChange={setSocialTwitter} placeholder="@yourusername" />
+              <SocialInput label="TikTok" icon="🎵" value={socialTiktok} onChange={setSocialTiktok} placeholder="@yourusername" />
+              <SocialInput label="YouTube" icon="▶️" value={socialYoutube} onChange={setSocialYoutube} placeholder="youtube.com/c/yourchannel" />
+              <SocialInput label="Spotify" icon="🎧" value={socialSpotify} onChange={setSocialSpotify} placeholder="open.spotify.com/artist/..." />
+              <SocialInput label="SoundCloud" icon="☁️" value={socialSoundcloud} onChange={setSocialSoundcloud} placeholder="soundcloud.com/yourusername" />
+              <SocialInput label="Website" icon="🌐" value={socialWebsite} onChange={setSocialWebsite} placeholder="https://yoursite.com" />
             </div>
           </div>
 
@@ -188,6 +239,36 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function SocialInput({
+  label,
+  icon,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  icon: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-xl w-8 text-center">{icon}</span>
+      <div className="flex-1">
+        <label className="block text-xs text-gray-500 mb-1">{label}</label>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:border-red-600 outline-none transition"
+        />
       </div>
     </div>
   );

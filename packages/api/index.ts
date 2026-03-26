@@ -67,6 +67,14 @@ const usersRouter = createRouter({
         avatar: z.string().url().optional(),
         locale: z.string().max(10).optional(),
         walletAddress: z.string().optional(),
+        bio: z.string().max(500).optional(),
+        socialInstagram: z.string().max(200).optional(),
+        socialTwitter: z.string().max(200).optional(),
+        socialTiktok: z.string().max(200).optional(),
+        socialYoutube: z.string().max(200).optional(),
+        socialSpotify: z.string().max(200).optional(),
+        socialSoundcloud: z.string().max(200).optional(),
+        socialWebsite: z.string().max(200).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {

@@ -28,8 +28,16 @@ export const users = pgTable(
     name: text('name'),
     avatar: text('avatar'),
     role: userRoleEnum('role').default('free').notNull(),
+    bio: text('bio'),
     walletAddress: text('wallet_address'),
     samiteonAccountId: text('samiteon_account_id'),
+    socialInstagram: text('social_instagram'),
+    socialTwitter: text('social_twitter'),
+    socialTiktok: text('social_tiktok'),
+    socialYoutube: text('social_youtube'),
+    socialSpotify: text('social_spotify'),
+    socialSoundcloud: text('social_soundcloud'),
+    socialWebsite: text('social_website'),
     locale: text('locale').default('en-US').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
