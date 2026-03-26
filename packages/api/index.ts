@@ -753,6 +753,14 @@ const eventsRouter = createRouter({
       return deleted ?? null;
     }),
 
+  getMyEvents: protectedProcedure.query(async ({ ctx }) => {
+    return db
+      .select()
+      .from(events)
+      .where(eq(events.hostId, ctx.session.user.id))
+      .orderBy(desc(events.startDate));
+  }),
+
   getTickets: publicProcedure
     .input(z.object({ eventId: z.string().uuid() }))
     .query(async ({ input }) => {
@@ -802,6 +810,58 @@ const ticketsRouter = createRouter({
       .where(eq(tickets.attendeeId, ctx.session.user.id))
       .orderBy(desc(events.startDate));
   }),
+
+  getTicketTypes: publicProcedure
+    .input(z.object({ eventId: z.string().uuid() }))
+    .query(async ({ input }) => {
+      return db
+        .select()
+        .from(ticketTypes)
+        .where(eq(ticketTypes.eventId, input.eventId))
+        .orderBy(ticketTypes.price);
+    }),
+
+  getEventSales: protectedProcedure
+    .input(z.object({ eventId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      // Verify the user owns this event
+      const event = await db.query.events.findFirst({
+        where: and(eq(events.id, input.eventId), eq(events.hostId, ctx.session.user.id)),
+      });
+      if (!event) return null;
+
+      const types = await db
+        .select()
+        .from(ticketTypes)
+        .where(eq(ticketTypes.eventId, input.eventId));
+
+      const soldTickets = await db
+        .select({
+          id: tickets.id,
+          ticketTypeId: tickets.ticketTypeId,
+          status: tickets.status,
+          createdAt: tickets.createdAt,
+          attendeeName: users.name,
+          attendeeEmail: users.email,
+        })
+        .from(tickets)
+        .leftJoin(users, eq(tickets.attendeeId, users.id))
+        .where(eq(tickets.eventId, input.eventId))
+        .orderBy(desc(tickets.createdAt));
+
+      const totalRevenue = types.reduce((sum, t) => sum + (t.sold ?? 0) * t.price, 0);
+      const totalSold = types.reduce((sum, t) => sum + (t.sold ?? 0), 0);
+      const totalCapacity = types.reduce((sum, t) => sum + (t.quantity ?? 0), 0);
+
+      return {
+        event,
+        ticketTypes: types,
+        soldTickets,
+        totalRevenue,
+        totalSold,
+        totalCapacity,
+      };
+    }),
 
   validate: publicProcedure
     .input(z.object({ qrToken: z.string() }))

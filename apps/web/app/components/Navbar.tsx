@@ -38,6 +38,9 @@ export function Navbar() {
             <Link href="/explore" className="text-sm text-gray-400 hover:text-white transition">
               Explore
             </Link>
+            <Link href="/tickets" className="text-sm text-gray-400 hover:text-white transition">
+              Tickets
+            </Link>
             <Link href="/subscribe" className="text-sm text-gray-400 hover:text-white transition">
               Subscribe
             </Link>
@@ -123,6 +126,13 @@ export function Navbar() {
                 className="text-sm text-gray-300 hover:text-white transition py-2"
               >
                 Explore
+              </Link>
+              <Link
+                href="/tickets"
+                onClick={() => setMobileOpen(false)}
+                className="text-sm text-gray-300 hover:text-white transition py-2"
+              >
+                Tickets
               </Link>
               <Link
                 href="/subscribe"
