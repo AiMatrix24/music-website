@@ -349,6 +349,36 @@ const tracksRouter = createRouter({
       return rows[0] ?? null;
     }),
 
+  create: protectedProcedure
+    .input(
+      z.object({
+        title: z.string().min(1).max(200),
+        slug: z.string().min(1).max(200),
+        genre: z.string().optional(),
+        bpm: z.number().int().min(1).max(999).optional(),
+        duration: z.number().int().optional(),
+        visibility: z.enum(['public', 'private', 'unlisted', 'subscribers_only']).default('public'),
+        price: z.number().int().min(0).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [track] = await db
+        .insert(tracks)
+        .values({
+          userId: ctx.session.user.id,
+          title: input.title,
+          slug: input.slug,
+          genre: input.genre ?? null,
+          bpm: input.bpm ?? null,
+          duration: input.duration ?? null,
+          visibility: input.visibility,
+          price: input.price ?? null,
+          status: 'published',
+        })
+        .returning();
+      return track;
+    }),
+
   upload: protectedProcedure
     .input(
       z.object({
