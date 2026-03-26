@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useSession, signOut } from 'next-auth/react';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { NotificationBell } from './NotificationCenter';
 
 export function Navbar() {
   const { data: session, status } = useSession();
@@ -64,6 +65,7 @@ export function Navbar() {
 
             {status === 'authenticated' ? (
               <>
+                <NotificationBell />
                 <Link href="/dashboard" className="text-sm text-gray-400 hover:text-white transition">
                   Dashboard
                 </Link>

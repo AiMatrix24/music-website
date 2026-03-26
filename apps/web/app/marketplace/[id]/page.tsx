@@ -92,12 +92,14 @@ export default function ListingDetailPage() {
                 : 'Sold out'}
             </p>
           </div>
-          <button
-            disabled={(listing.stock ?? 0) === 0}
-            className="rounded-full bg-white text-brand-950 px-8 py-3 font-semibold hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+          <Link
+            href={(listing.stock ?? 0) > 0 ? `/marketplace/checkout?item=${listing.id}` : '#'}
+            className={`rounded-full bg-white text-brand-950 px-8 py-3 font-semibold hover:bg-gray-100 transition whitespace-nowrap text-center ${
+              (listing.stock ?? 0) === 0 ? 'opacity-50 pointer-events-none' : ''
+            }`}
           >
-            {(listing.stock ?? 0) > 0 ? 'Add to Cart' : 'Sold Out'}
-          </button>
+            {(listing.stock ?? 0) > 0 ? 'Buy Now' : 'Sold Out'}
+          </Link>
         </div>
       </div>
     </div>
