@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { eq, desc, and, sql, ilike } from 'drizzle-orm';
 import {
   createRouter,
@@ -810,6 +811,37 @@ const ticketsRouter = createRouter({
       .where(eq(tickets.attendeeId, ctx.session.user.id))
       .orderBy(desc(events.startDate));
   }),
+
+  createTicketType: protectedProcedure
+    .input(
+      z.object({
+        eventId: z.string().uuid(),
+        name: z.string().min(1).max(100),
+        tier: z.enum(['free', 'early_bird', 'general', 'vip']).default('general'),
+        price: z.number().int().min(0),
+        quantity: z.number().int().min(1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify user owns the event
+      const event = await db.query.events.findFirst({
+        where: and(eq(events.id, input.eventId), eq(events.hostId, ctx.session.user.id)),
+      });
+      if (!event) throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your event' });
+
+      const [ticketType] = await db
+        .insert(ticketTypes)
+        .values({
+          eventId: input.eventId,
+          name: input.name,
+          tier: input.tier,
+          price: input.price,
+          quantity: input.quantity,
+          sold: 0,
+        })
+        .returning();
+      return ticketType;
+    }),
 
   getTicketTypes: publicProcedure
     .input(z.object({ eventId: z.string().uuid() }))

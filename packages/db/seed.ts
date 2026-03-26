@@ -156,7 +156,7 @@ async function seed() {
   console.log(`Created ${events.length} events`);
 
   // ─── Ticket Types ───
-  await sql`
+  const ticketTypeRows = await sql`
     INSERT INTO ticket_types (event_id, name, tier, price, quantity, sold) VALUES
       (${events[0].id}, 'General Admission', 'general', 2500, 400, 156),
       (${events[0].id}, 'VIP', 'vip', 7500, 100, 34),
@@ -166,8 +166,23 @@ async function seed() {
       (${events[2].id}, 'General', 'general', 4500, 2500, 1823),
       (${events[2].id}, 'VIP', 'vip', 15000, 500, 198),
       (${events[3].id}, 'Free Entry', 'free', 0, 200, 145)
+  RETURNING id, event_id
   `;
   console.log('Created ticket types');
+
+  // ─── Ticket Purchases (sample) ───
+  await sql`DELETE FROM tickets`;
+  await sql`
+    INSERT INTO tickets (ticket_type_id, attendee_id, event_id, qr_token, status) VALUES
+      (${ticketTypeRows[0].id}, ${fans[0].id}, ${events[0].id}, ${'opynx_ticket_' + Date.now() + '_fan1_ga'}, 'valid'),
+      (${ticketTypeRows[1].id}, ${fans[0].id}, ${events[0].id}, ${'opynx_ticket_' + Date.now() + '_fan1_vip'}, 'valid'),
+      (${ticketTypeRows[0].id}, ${fans[1].id}, ${events[0].id}, ${'opynx_ticket_' + Date.now() + '_fan2_ga'}, 'valid'),
+      (${ticketTypeRows[3].id}, ${fans[1].id}, ${events[1].id}, ${'opynx_ticket_' + Date.now() + '_fan2_wf'}, 'valid'),
+      (${ticketTypeRows[4].id}, ${fans[2].id}, ${events[1].id}, ${'opynx_ticket_' + Date.now() + '_fan3_wfvip'}, 'valid'),
+      (${ticketTypeRows[5].id}, ${fans[0].id}, ${events[2].id}, ${'opynx_ticket_' + Date.now() + '_fan1_so'}, 'valid'),
+      (${ticketTypeRows[7].id}, ${fans[2].id}, ${events[3].id}, ${'opynx_ticket_' + Date.now() + '_fan3_free'}, 'valid')
+  `;
+  console.log('Created ticket purchases');
 
   // ─── Marketplace Listings ───
   await sql`
