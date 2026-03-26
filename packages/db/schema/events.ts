@@ -8,6 +8,7 @@ import {
   jsonb,
   index,
   real,
+  boolean,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import { users } from './users';
@@ -179,6 +180,86 @@ export const tickets = pgTable(
   (t) => [
     index('tickets_attendee_idx').on(t.attendeeId),
     index('tickets_event_idx').on(t.eventId),
+  ]
+);
+
+// ─── Waitlist ───
+export const waitlist = pgTable(
+  'waitlist',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    eventId: uuid('event_id')
+      .references(() => events.id)
+      .notNull(),
+    userId: uuid('user_id')
+      .references(() => users.id)
+      .notNull(),
+    ticketTypeId: uuid('ticket_type_id')
+      .references(() => ticketTypes.id),
+    position: integer('position').notNull(),
+    status: text('status').default('waiting').notNull(), // waiting | offered | accepted | expired
+    notifiedAt: timestamp('notified_at', { withTimezone: true }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index('waitlist_event_idx').on(t.eventId),
+    index('waitlist_user_idx').on(t.userId),
+  ]
+);
+
+// ─── Promo Codes ───
+export const promoCodes = pgTable(
+  'promo_codes',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    eventId: uuid('event_id')
+      .references(() => events.id)
+      .notNull(),
+    code: text('code').notNull(),
+    discountType: text('discount_type').default('percentage').notNull(), // percentage | fixed
+    discountValue: integer('discount_value').notNull(), // percentage (0-100) or fixed amount in cents
+    maxUses: integer('max_uses'),
+    usedCount: integer('used_count').default(0).notNull(),
+    validFrom: timestamp('valid_from', { withTimezone: true }),
+    validUntil: timestamp('valid_until', { withTimezone: true }),
+    subscriberOnly: boolean('subscriber_only').default(false).notNull(),
+    active: boolean('active').default(true).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index('promo_event_idx').on(t.eventId),
+  ]
+);
+
+// ─── Ticket Transfers ───
+export const ticketTransfers = pgTable(
+  'ticket_transfers',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    ticketId: uuid('ticket_id')
+      .references(() => tickets.id)
+      .notNull(),
+    fromUserId: uuid('from_user_id')
+      .references(() => users.id)
+      .notNull(),
+    toEmail: text('to_email').notNull(),
+    toUserId: uuid('to_user_id')
+      .references(() => users.id),
+    status: text('status').default('pending').notNull(), // pending | accepted | rejected | expired
+    reason: text('reason'), // why they're transferring
+    approvedByHost: boolean('approved_by_host').default(false).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  },
+  (t) => [
+    index('transfer_ticket_idx').on(t.ticketId),
   ]
 );
 

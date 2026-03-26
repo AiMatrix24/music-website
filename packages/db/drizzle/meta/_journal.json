@@ -8,6 +8,13 @@
       "when": 1774213669996,
       "tag": "0000_flashy_kinsey_walden",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1774499244414,
+      "tag": "0001_watery_cassandra_nova",
+      "breakpoints": true
     }
   ]
 }
