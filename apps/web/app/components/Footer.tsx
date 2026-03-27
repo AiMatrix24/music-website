@@ -27,6 +27,7 @@ export function Footer() {
               <li><Link href="/subscribe" className="text-gray-500 hover:text-brand-400 transition">Subscribe</Link></li>
               <li><Link href="/scan" className="text-gray-500 hover:text-brand-400 transition">Scan QR</Link></li>
               <li><Link href="/search" className="text-gray-500 hover:text-brand-400 transition">Search</Link></li>
+              <li><Link href="/community" className="text-gray-500 hover:text-brand-400 transition">Community</Link></li>
             </ul>
           </div>
 
@@ -38,6 +39,7 @@ export function Footer() {
               <li><Link href="/privacy" className="text-gray-500 hover:text-brand-400 transition">Privacy Policy</Link></li>
               <li><Link href="/contact" className="text-gray-500 hover:text-brand-400 transition">Contact</Link></li>
               <li><Link href="/help" className="text-gray-500 hover:text-brand-400 transition">Help / FAQ</Link></li>
+              <li><Link href="/developers" className="text-gray-500 hover:text-brand-400 transition">Developers</Link></li>
             </ul>
           </div>
 
