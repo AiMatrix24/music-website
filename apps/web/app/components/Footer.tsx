@@ -30,6 +30,8 @@ export function Footer() {
               <li><Link href="/community" className="text-gray-500 hover:text-brand-400 transition">Community</Link></li>
               <li><Link href="/charts" className="text-gray-500 hover:text-brand-400 transition">Charts</Link></li>
               <li><Link href="/live" className="text-gray-500 hover:text-brand-400 transition">Live</Link></li>
+              <li><Link href="/beats" className="text-gray-500 hover:text-brand-400 transition">Beat Store</Link></li>
+              <li><Link href="/videos" className="text-gray-500 hover:text-brand-400 transition">Videos</Link></li>
             </ul>
           </div>
 
@@ -44,6 +46,8 @@ export function Footer() {
               <li><Link href="/developers" className="text-gray-500 hover:text-brand-400 transition">Developers</Link></li>
               <li><Link href="/dmca" className="text-gray-500 hover:text-brand-400 transition">DMCA</Link></li>
               <li><Link href="/accessibility" className="text-gray-500 hover:text-brand-400 transition">Accessibility</Link></li>
+              <li><Link href="/changelog" className="text-gray-500 hover:text-brand-400 transition">Changelog</Link></li>
+              <li><Link href="/status" className="text-gray-500 hover:text-brand-400 transition">Status</Link></li>
             </ul>
           </div>
 
