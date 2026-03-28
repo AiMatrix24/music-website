@@ -8,6 +8,7 @@ import { PlayButton } from '../../components/PlayButton';
 import { LikeButton } from '../../components/LikeButton';
 import { Breadcrumbs } from '../../components/Breadcrumbs';
 import { TrackComments } from '../../components/TrackComments';
+import { TipJar } from '../../components/TipJar';
 
 export default function TrackDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -80,6 +81,7 @@ export default function TrackDetailPage() {
               />
               <LikeButton initialCount={Math.floor((track.playCount ?? 0) * 0.12)} />
               <ShareButton title={`${track.title} on OPYNX`} text={`Listen to ${track.title} by ${track.artistName ?? 'Unknown'} on OPYNX`} />
+              <TipJar artistName={track.artistName ?? 'Unknown'} artistId={track.userId} />
             </div>
           </div>
         </div>
