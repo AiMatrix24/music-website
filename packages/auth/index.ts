@@ -3,11 +3,99 @@ import type { NextAuthConfig } from 'next-auth';
 import DiscordProvider from 'next-auth/providers/discord';
 import TwitterProvider from 'next-auth/providers/twitter';
 import TwitchProvider from 'next-auth/providers/twitch';
+import CredentialsProvider from 'next-auth/providers/credentials';
 import { db, users, oauthConnections, subscriptions } from '@opynx/db';
 import { eq, and } from 'drizzle-orm';
 
 export const authConfig: NextAuthConfig = {
   providers: [
+    CredentialsProvider({
+      id: 'email-login',
+      name: 'Email',
+      credentials: {
+        email: { label: 'Email', type: 'email', placeholder: 'you@example.com' },
+      },
+      async authorize(credentials) {
+        const email = credentials?.email as string;
+        if (!email) return null;
+
+        // Find or create user by email
+        let user = await db.query.users.findFirst({
+          where: eq(users.email, email),
+        });
+
+        if (!user) {
+          const [newUser] = await db
+            .insert(users)
+            .values({
+              email,
+              name: email.split('@')[0],
+              role: 'free',
+            })
+            .returning();
+          user = newUser;
+
+          // Create default subscription
+          await db.insert(subscriptions).values({
+            userId: user.id,
+            tier: 'free',
+            status: 'active',
+          });
+        }
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          image: user.avatar,
+          role: user.role,
+        };
+      },
+    }),
+    CredentialsProvider({
+      id: 'phone-login',
+      name: 'Phone',
+      credentials: {
+        phone: { label: 'Phone', type: 'tel', placeholder: '+1 (555) 123-4567' },
+      },
+      async authorize(credentials) {
+        const phone = credentials?.phone as string;
+        if (!phone) return null;
+
+        // Normalize phone — use as email placeholder for DB
+        const phoneEmail = `${phone.replace(/\D/g, '')}@phone.opynx.dev`;
+
+        let user = await db.query.users.findFirst({
+          where: eq(users.email, phoneEmail),
+        });
+
+        if (!user) {
+          const [newUser] = await db
+            .insert(users)
+            .values({
+              email: phoneEmail,
+              name: `User ${phone.slice(-4)}`,
+              role: 'free',
+            })
+            .returning();
+          user = newUser;
+
+          await db.insert(subscriptions).values({
+            userId: user.id,
+            tier: 'free',
+            status: 'active',
+          });
+        }
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          image: user.avatar,
+          role: user.role,
+        };
+      },
+    }),
     DiscordProvider({
       clientId: process.env.DISCORD_CLIENT_ID ?? '',
       clientSecret: process.env.DISCORD_CLIENT_SECRET ?? '',
