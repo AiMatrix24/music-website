@@ -39,6 +39,11 @@ export function Navbar() {
             <Link href="/explore" className="text-sm text-gray-400 hover:text-white transition">
               Explore
             </Link>
+            {status === 'authenticated' && (
+              <Link href="/for-you" className="text-sm text-gray-400 hover:text-white transition">
+                For You
+              </Link>
+            )}
             <Link href="/library" className="text-sm text-gray-400 hover:text-white transition">
               Library
             </Link>
