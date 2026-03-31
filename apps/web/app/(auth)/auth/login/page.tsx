@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [tab, setTab] = useState<Tab>('email');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [role, setRole] = useState<'fan' | 'creator' | 'venue'>('fan');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -23,9 +24,10 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     try {
+      const callbackUrl = role === 'creator' ? '/dashboard' : role === 'venue' ? '/booking' : '/explore';
       await signIn('email-login', {
         email: email.trim(),
-        callbackUrl: '/dashboard',
+        callbackUrl,
       });
     } catch {
       setError('Sign in failed. Please try again.');
@@ -42,9 +44,10 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     try {
+      const callbackUrl = role === 'creator' ? '/dashboard' : role === 'venue' ? '/booking' : '/explore';
       await signIn('phone-login', {
         phone: phone.trim(),
-        callbackUrl: '/dashboard',
+        callbackUrl,
       });
     } catch {
       setError('Sign in failed. Please try again.');
@@ -61,14 +64,18 @@ export default function LoginPage() {
             <Image src="/logo.jpeg" alt="OPYNX" width={48} height={48} className="rounded-xl" />
           </Link>
           <h1 className="text-3xl font-bold mb-2">Welcome to OPYNX</h1>
-          <p className="text-gray-400">Sign in to start listening and earning.</p>
+          <p className="text-gray-400">
+            {role === 'fan' && 'Sign in to start listening and discovering.'}
+            {role === 'creator' && 'Sign in to upload music and grow your fanbase.'}
+            {role === 'venue' && 'Sign in to book artists and manage events.'}
+          </p>
         </div>
 
         {/* Role selector */}
         <div className="grid grid-cols-3 gap-2 mb-6">
-          <RoleCard icon="🎧" label="Fan" desc="Listen & discover" active />
-          <RoleCard icon="🎤" label="Artist" desc="Upload & sell" />
-          <RoleCard icon="🏟️" label="Venue" desc="Host & book" />
+          <RoleCard icon="🎧" label="Fan" desc="Listen & discover" active={role === 'fan'} onClick={() => setRole('fan')} />
+          <RoleCard icon="🎤" label="Creator" desc="Upload & sell" active={role === 'creator'} onClick={() => setRole('creator')} />
+          <RoleCard icon="🏟️" label="Venue" desc="Host & book" active={role === 'venue'} onClick={() => setRole('venue')} />
         </div>
 
         {/* Tab selector */}
@@ -206,9 +213,9 @@ export default function LoginPage() {
   );
 }
 
-function RoleCard({ icon, label, desc, active }: { icon: string; label: string; desc: string; active?: boolean }) {
+function RoleCard({ icon, label, desc, active, onClick }: { icon: string; label: string; desc: string; active?: boolean; onClick?: () => void }) {
   return (
-    <button className={`rounded-xl p-3 text-center transition border-2 ${
+    <button onClick={onClick} className={`rounded-xl p-3 text-center transition border-2 ${
       active ? 'border-red-600 bg-red-900/10' : 'border-brand-800/20 bg-[#15151f] hover:border-red-600/50'
     }`}>
       <p className="text-xl mb-1">{icon}</p>
@@ -231,7 +238,10 @@ function OAuthButton({
 }) {
   return (
     <button
-      onClick={() => signIn(provider, { callbackUrl: '/dashboard' })}
+      onClick={() => {
+        const cb = provider === 'discord' ? '/dashboard' : '/dashboard';
+        signIn(provider, { callbackUrl: cb });
+      }}
       className={`w-full rounded-xl ${color} py-4 font-semibold text-white transition hover:opacity-90 flex items-center justify-center gap-3`}
     >
       <span className="text-lg">{icon}</span>
