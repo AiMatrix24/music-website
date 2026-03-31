@@ -64,6 +64,13 @@ export default function LoginPage() {
           <p className="text-gray-400">Sign in to start listening and earning.</p>
         </div>
 
+        {/* Role selector */}
+        <div className="grid grid-cols-3 gap-2 mb-6">
+          <RoleCard icon="🎧" label="Fan" desc="Listen & discover" active />
+          <RoleCard icon="🎤" label="Artist" desc="Upload & sell" />
+          <RoleCard icon="🏟️" label="Venue" desc="Host & book" />
+        </div>
+
         {/* Tab selector */}
         <div className="flex bg-[#15151f] rounded-xl p-1 mb-6">
           <button
@@ -196,6 +203,18 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+function RoleCard({ icon, label, desc, active }: { icon: string; label: string; desc: string; active?: boolean }) {
+  return (
+    <button className={`rounded-xl p-3 text-center transition border-2 ${
+      active ? 'border-red-600 bg-red-900/10' : 'border-brand-800/20 bg-[#15151f] hover:border-red-600/50'
+    }`}>
+      <p className="text-xl mb-1">{icon}</p>
+      <p className="text-xs font-bold">{label}</p>
+      <p className="text-[10px] text-gray-500">{desc}</p>
+    </button>
   );
 }
 
