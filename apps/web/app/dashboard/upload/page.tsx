@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
 import { useToast } from '@/app/components/Toast';
+import { useUploadThing } from '@/lib/uploadthing-client';
 
 const GENRES = [
   'Synthwave', 'Lo-fi Hip Hop', 'Electronic', 'Indie Rock', 'Post-Punk',
@@ -18,6 +19,7 @@ export default function UploadTrackPage() {
   const router = useRouter();
   const { toast } = useToast();
   const createTrack = trpc.tracks.create.useMutation();
+  const { startUpload, isUploading: utUploading } = useUploadThing('audioUpload');
 
   const [title, setTitle] = useState('');
   const [genre, setGenre] = useState('');
@@ -46,6 +48,18 @@ export default function UploadTrackPage() {
 
     setUploading(true);
     try {
+      // Upload audio file to UploadThing if provided
+      let audioUrl: string | undefined;
+      if (file) {
+        toast('Uploading audio file...', 'info');
+        const result = await startUpload([file]);
+        if (result?.[0]?.ufsUrl) {
+          audioUrl = result[0].ufsUrl;
+        } else if (result?.[0]?.url) {
+          audioUrl = result[0].url;
+        }
+      }
+
       const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
       const track = await createTrack.mutateAsync({
         title,
@@ -55,6 +69,7 @@ export default function UploadTrackPage() {
         duration: duration ? parseDuration(duration) : undefined,
         visibility,
         price: price ? Math.round(parseFloat(price) * 100) : undefined,
+        audioUrl,
       });
 
       toast('Track published successfully!', 'success');

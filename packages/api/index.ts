@@ -367,6 +367,7 @@ const tracksRouter = createRouter({
         duration: z.number().int().optional(),
         visibility: z.enum(['public', 'private', 'unlisted', 'subscribers_only']).default('public'),
         price: z.number().int().min(0).optional(),
+        audioUrl: z.string().url().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -381,6 +382,7 @@ const tracksRouter = createRouter({
           duration: input.duration ?? null,
           visibility: input.visibility,
           price: input.price ?? null,
+          audioUrl320: input.audioUrl ?? null,
           status: 'published',
         })
         .returning();
