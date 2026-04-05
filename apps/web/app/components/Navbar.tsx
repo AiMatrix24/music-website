@@ -85,8 +85,11 @@ export function Navbar() {
                 >
                   Sign Out
                 </button>
-                <div className="w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center text-sm font-bold">
-                  {session.user?.name?.charAt(0)?.toUpperCase() ?? '?'}
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center text-sm font-bold">
+                    {session.user?.name?.charAt(0)?.toUpperCase() ?? '?'}
+                  </div>
+                  <SubscriptionBadge role={(session.user as { role?: string })?.role} />
                 </div>
               </>
             ) : (
@@ -257,4 +260,27 @@ export function Navbar() {
       )}
     </>
   );
+}
+
+function SubscriptionBadge({ role }: { role?: string }) {
+  if (!role) return null;
+
+  if (role === 'creator') {
+    return (
+      <span className="rounded-full bg-red-600/20 border border-red-500/30 px-2 py-0.5 text-[10px] font-semibold text-red-400 whitespace-nowrap">
+        Creator
+      </span>
+    );
+  }
+
+  if (role === 'subscriber') {
+    return (
+      <span className="rounded-full bg-yellow-600/20 border border-yellow-500/30 px-2 py-0.5 text-[10px] font-semibold text-yellow-400 whitespace-nowrap">
+        Standard
+      </span>
+    );
+  }
+
+  // free or other roles — no badge
+  return null;
 }

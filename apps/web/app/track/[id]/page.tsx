@@ -3,6 +3,7 @@
 import { trpc } from '@/lib/trpc/client';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useState, useCallback } from 'react';
 import { ShareButton } from '../../components/ShareButton';
 import { PlayButton } from '../../components/PlayButton';
 import { LikeButton } from '../../components/LikeButton';
@@ -17,6 +18,15 @@ export default function TrackDetailPage() {
     { limit: 4 },
     { enabled: !!track }
   );
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const handleCopyLink = useCallback(() => {
+    const url = typeof window !== 'undefined' ? window.location.href : '';
+    navigator.clipboard.writeText(url).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    });
+  }, []);
 
   if (isLoading) {
     return (
@@ -95,6 +105,63 @@ export default function TrackDetailPage() {
             label="Status"
             value={track.status.charAt(0).toUpperCase() + track.status.slice(1)}
           />
+        </div>
+
+        {/* Prominent Play Count */}
+        <div className="rounded-2xl bg-gradient-to-r from-brand-600/10 to-brand-800/10 border border-brand-800/20 p-6 mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-brand-600/20 flex items-center justify-center">
+              <svg className="w-6 h-6 text-brand-400" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-3xl font-black text-white">{formatPlays(track.playCount ?? 0)}</p>
+              <p className="text-sm text-gray-400">total plays</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-gray-500">Updated live as listeners stream</p>
+          </div>
+        </div>
+
+        {/* Share Section */}
+        <div className="rounded-2xl bg-[#15151f] p-6 mb-6">
+          <h2 className="text-lg font-bold mb-4">Share This Track</h2>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex-1 flex items-center gap-2 bg-brand-950/50 rounded-xl px-4 py-3 border border-brand-800/20">
+              <svg className="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+              </svg>
+              <span className="text-sm text-gray-400 truncate flex-1">
+                {typeof window !== 'undefined' ? window.location.href : `opynx.com/track/${id}`}
+              </span>
+            </div>
+            <button
+              onClick={handleCopyLink}
+              className="rounded-xl bg-brand-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-500 shrink-0"
+            >
+              {linkCopied ? 'Copied!' : 'Copy Link'}
+            </button>
+          </div>
+          <div className="flex gap-3 mt-4">
+            <a
+              href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Listen to ${track.title} by ${track.artistName ?? 'Unknown'} on OPYNX`)}&url=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg bg-brand-950/50 border border-brand-800/20 px-4 py-2 text-sm text-gray-400 hover:text-white transition"
+            >
+              Share on X
+            </a>
+            <a
+              href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg bg-brand-950/50 border border-brand-800/20 px-4 py-2 text-sm text-gray-400 hover:text-white transition"
+            >
+              Share on Facebook
+            </a>
+          </div>
         </div>
 
         {/* Details */}

@@ -180,6 +180,31 @@ const usersRouter = createRouter({
       return !!row;
     }),
 
+  toggleFollow: protectedProcedure
+    .input(z.object({ artistId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      if (!userId) throw new TRPCError({ code: 'UNAUTHORIZED' });
+      if (userId === input.artistId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Cannot follow yourself' });
+
+      const existing = await db.query.follows.findFirst({
+        where: and(eq(follows.followerId, userId), eq(follows.followeeId, input.artistId)),
+      });
+
+      if (existing) {
+        await db.delete(follows).where(
+          and(eq(follows.followerId, userId), eq(follows.followeeId, input.artistId))
+        );
+        return { following: false };
+      } else {
+        await db.insert(follows).values({
+          followerId: userId,
+          followeeId: input.artistId,
+        });
+        return { following: true };
+      }
+    }),
+
   getFollowerCount: publicProcedure
     .input(z.object({ userId: z.string().uuid() }))
     .query(async ({ input }) => {
@@ -1293,6 +1318,8 @@ const commentsRouter = createRouter({
           userId: comments.userId,
           trackId: comments.trackId,
           body: comments.body,
+          timestampMs: comments.timestampMs,
+          parentId: comments.parentId,
           createdAt: comments.createdAt,
           userName: users.name,
           userAvatar: users.avatar,
@@ -1309,6 +1336,8 @@ const commentsRouter = createRouter({
       z.object({
         trackId: z.string().uuid(),
         body: z.string().min(1).max(2000),
+        timestampMs: z.number().int().min(0).optional(),
+        parentId: z.string().uuid().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -1318,6 +1347,8 @@ const commentsRouter = createRouter({
           userId: ctx.session.user.id,
           trackId: input.trackId,
           body: input.body,
+          timestampMs: input.timestampMs ?? null,
+          parentId: input.parentId ?? null,
         })
         .returning();
       return comment;
@@ -1408,6 +1439,51 @@ const broadcastsRouter = createRouter({
     }),
 });
 
+// ─── Likes Router ───
+const likesRouter = createRouter({
+  toggleLike: protectedProcedure
+    .input(z.object({ trackId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      if (!userId) throw new TRPCError({ code: 'UNAUTHORIZED' });
+
+      const existing = await db.query.likes.findFirst({
+        where: and(eq(likes.userId, userId), eq(likes.trackId, input.trackId)),
+      });
+
+      if (existing) {
+        await db.delete(likes).where(
+          and(eq(likes.userId, userId), eq(likes.trackId, input.trackId))
+        );
+        return { liked: false };
+      } else {
+        await db.insert(likes).values({ userId, trackId: input.trackId });
+        return { liked: true };
+      }
+    }),
+
+  isLiked: protectedProcedure
+    .input(z.object({ trackId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      if (!userId) return false;
+      const existing = await db.query.likes.findFirst({
+        where: and(eq(likes.userId, userId), eq(likes.trackId, input.trackId)),
+      });
+      return !!existing;
+    }),
+
+  getLikeCount: publicProcedure
+    .input(z.object({ trackId: z.string().uuid() }))
+    .query(async ({ input }) => {
+      const result = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(likes)
+        .where(eq(likes.trackId, input.trackId));
+      return result[0]?.count ?? 0;
+    }),
+});
+
 // ─── App Router ───
 export const appRouter = createRouter({
   auth: authRouter,
@@ -1425,6 +1501,7 @@ export const appRouter = createRouter({
   upload: uploadRouter,
   broadcasts: broadcastsRouter,
   comments: commentsRouter,
+  likes: likesRouter,
   admin: adminRouter,
 });
 

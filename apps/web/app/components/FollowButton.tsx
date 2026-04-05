@@ -20,15 +20,44 @@ export function FollowButton({ artistId, artistName }: FollowButtonProps) {
   );
 
   const followMutation = trpc.users.follow.useMutation({
+    onMutate: async () => {
+      await utils.users.isFollowing.cancel({ followeeId: artistId });
+      const previous = utils.users.isFollowing.getData({ followeeId: artistId });
+      utils.users.isFollowing.setData({ followeeId: artistId }, true);
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous !== undefined) {
+        utils.users.isFollowing.setData({ followeeId: artistId }, context.previous);
+      }
+      toast('Failed to follow. Please try again.');
+    },
     onSuccess: () => {
+      toast(`Following ${artistName ?? 'artist'}`);
+    },
+    onSettled: () => {
       utils.users.isFollowing.invalidate({ followeeId: artistId });
       utils.users.getFollowerCount.invalidate({ userId: artistId });
-      toast(`Following ${artistName ?? 'artist'}`);
     },
   });
 
   const unfollowMutation = trpc.users.unfollow.useMutation({
+    onMutate: async () => {
+      await utils.users.isFollowing.cancel({ followeeId: artistId });
+      const previous = utils.users.isFollowing.getData({ followeeId: artistId });
+      utils.users.isFollowing.setData({ followeeId: artistId }, false);
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous !== undefined) {
+        utils.users.isFollowing.setData({ followeeId: artistId }, context.previous);
+      }
+      toast('Failed to unfollow. Please try again.');
+    },
     onSuccess: () => {
+      toast(`Unfollowed ${artistName ?? 'artist'}`);
+    },
+    onSettled: () => {
       utils.users.isFollowing.invalidate({ followeeId: artistId });
       utils.users.getFollowerCount.invalidate({ userId: artistId });
     },
