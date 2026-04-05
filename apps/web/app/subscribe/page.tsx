@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -81,7 +81,15 @@ const tiers = [
   },
 ];
 
-export default function SubscribePage() {
+export default function SubscribePageWrapper() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-pulse text-gray-400">Loading...</div></div>}>
+      <SubscribePage />
+    </Suspense>
+  );
+}
+
+function SubscribePage() {
   const [selectedTier, setSelectedTier] = useState<TierId>('premium');
   const [step, setStep] = useState<'select' | 'checkout'>('select');
   const [checkoutLoading, setCheckoutLoading] = useState(false);
