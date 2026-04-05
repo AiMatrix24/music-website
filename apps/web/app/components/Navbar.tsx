@@ -50,6 +50,12 @@ export function Navbar() {
             <Link href="/tickets" className="text-sm text-gray-400 hover:text-white transition">
               Tickets
             </Link>
+            <Link href="/venues/discover" className="text-sm text-gray-400 hover:text-white transition">
+              Venues
+            </Link>
+            <Link href="/showcase" className="text-sm text-gray-400 hover:text-white transition">
+              Showcase
+            </Link>
             <Link href="/subscribe" className="text-sm text-gray-400 hover:text-white transition">
               Subscribe
             </Link>
