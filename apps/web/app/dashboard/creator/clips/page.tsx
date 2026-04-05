@@ -2,10 +2,10 @@
 
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useToast } from '@/app/components/Toast';
 
-/* ── Mock data ── */
+/* -- Mock data -- */
 const MOCK_TRACKS = [
   { id: '1', title: 'Midnight Drive', duration: 214 },
   { id: '2', title: 'Solar Flare', duration: 187 },
@@ -43,16 +43,18 @@ export default function ClipsPage() {
   const [generating, setGenerating] = useState(false);
   const [clipReady, setClipReady] = useState(false);
   const [autoDetecting, setAutoDetecting] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
+  const [shareText, setShareText] = useState('');
 
   const dragging = useRef<'start' | 'end' | null>(null);
   const waveRef = useRef<HTMLDivElement>(null);
 
-  /* ── Mock waveform heights ── */
+  /* -- Mock waveform heights -- */
   const bars = useRef(
     Array.from({ length: TOTAL_BARS }, () => 20 + Math.random() * 60)
   ).current;
 
-  /* ── Auth gate ── */
+  /* -- Auth gate -- */
   if (status !== 'authenticated') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
@@ -67,7 +69,7 @@ export default function ClipsPage() {
     ? Math.round(((regionEnd - regionStart) / TOTAL_BARS) * track.duration)
     : 0;
 
-  /* ── Drag handling for waveform region ── */
+  /* -- Drag handling for waveform region -- */
   const handleWavePointer = (e: React.PointerEvent) => {
     if (!waveRef.current || !dragging.current) return;
     const rect = waveRef.current.getBoundingClientRect();
@@ -80,7 +82,7 @@ export default function ClipsPage() {
     }
   };
 
-  /* ── Auto-detect ── */
+  /* -- Auto-detect -- */
   const autoDetect = () => {
     if (!track) return;
     setAutoDetecting(true);
@@ -94,15 +96,49 @@ export default function ClipsPage() {
     }, 1000);
   };
 
-  /* ── Generate clip ── */
+  /* -- Generate clip: create shareable link -- */
   const generateClip = () => {
+    if (!track) return;
     setGenerating(true);
     setClipReady(false);
+
+    // Calculate start time in seconds from the region
+    const startSeconds = Math.round((regionStart / TOTAL_BARS) * track.duration);
+
     setTimeout(() => {
+      const url = `https://opynx.com/track/${track.id}?t=${startSeconds}`;
+      const text = `Check out this clip from ${track.title} on OPYNX`;
+      setShareUrl(url);
+      setShareText(text);
       setGenerating(false);
       setClipReady(true);
       toast('Your clip is ready!', 'success');
-    }, 2000);
+    }, 1500);
+  };
+
+  /* -- Share actions -- */
+  const shareToTwitter = () => {
+    const tweetText = encodeURIComponent(`${shareText} ${shareUrl}`);
+    window.open(`https://twitter.com/intent/tweet?text=${tweetText}`, '_blank', 'noopener');
+  };
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast('Link copied to clipboard!', 'success');
+    } catch {
+      toast('Failed to copy link', 'error');
+    }
+  };
+
+  const shareToTikTok = () => {
+    navigator.clipboard?.writeText(`${shareText}\n${shareUrl}`);
+    toast('Share text copied! Paste it into TikTok.', 'success');
+  };
+
+  const shareToInstagram = () => {
+    navigator.clipboard?.writeText(`${shareText}\n${shareUrl}`);
+    toast('Share text copied! Paste it into Instagram.', 'success');
   };
 
   const formatInfo = FORMAT_OPTIONS.find((f) => f.id === exportFormat)!;
@@ -127,7 +163,7 @@ export default function ClipsPage() {
           <label className="block text-sm font-semibold text-gray-300 mb-2">Select Track</label>
           <select
             value={selectedTrack}
-            onChange={(e) => { setSelectedTrack(e.target.value); setClipReady(false); }}
+            onChange={(e) => { setSelectedTrack(e.target.value); setClipReady(false); setShareUrl(''); }}
             className="w-full bg-brand-950 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-red-600"
           >
             <option value="">-- Choose a track --</option>
@@ -300,17 +336,50 @@ export default function ClipsPage() {
               {clipReady && (
                 <div className="space-y-3">
                   <p className="text-green-400 text-sm font-semibold text-center">Your clip is ready!</p>
-                  <button className="w-full rounded-xl bg-brand-950 border border-gray-700 text-white font-semibold py-3 hover:border-gray-500 transition">
-                    &#11015; Download
+
+                  {/* Shareable URL display */}
+                  {shareUrl && (
+                    <div className="bg-brand-950 border border-gray-700 rounded-xl px-3 py-2 flex items-center gap-2">
+                      <p className="text-xs text-gray-400 font-mono truncate flex-1">{shareUrl}</p>
+                      <button
+                        onClick={copyLink}
+                        className="text-xs text-red-400 font-semibold hover:text-red-300 transition shrink-0"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Coming soon note */}
+                  <p className="text-xs text-gray-500 text-center">
+                    Full audio clip generation coming soon &mdash; share the timestamped link for now
+                  </p>
+
+                  {/* Copy Link button */}
+                  <button
+                    onClick={copyLink}
+                    className="w-full rounded-xl bg-brand-950 border border-gray-700 text-white font-semibold py-3 hover:border-gray-500 transition"
+                  >
+                    &#128279; Copy Link
                   </button>
+
                   <div className="flex gap-2">
-                    <button className="flex-1 rounded-xl bg-[#1DA1F2]/10 border border-[#1DA1F2]/30 text-[#1DA1F2] text-sm py-2 hover:bg-[#1DA1F2]/20 transition">
+                    <button
+                      onClick={shareToTwitter}
+                      className="flex-1 rounded-xl bg-[#1DA1F2]/10 border border-[#1DA1F2]/30 text-[#1DA1F2] text-sm py-2 hover:bg-[#1DA1F2]/20 transition"
+                    >
                       Twitter
                     </button>
-                    <button className="flex-1 rounded-xl bg-[#E1306C]/10 border border-[#E1306C]/30 text-[#E1306C] text-sm py-2 hover:bg-[#E1306C]/20 transition">
+                    <button
+                      onClick={shareToInstagram}
+                      className="flex-1 rounded-xl bg-[#E1306C]/10 border border-[#E1306C]/30 text-[#E1306C] text-sm py-2 hover:bg-[#E1306C]/20 transition"
+                    >
                       Instagram
                     </button>
-                    <button className="flex-1 rounded-xl bg-white/10 border border-white/20 text-white text-sm py-2 hover:bg-white/20 transition">
+                    <button
+                      onClick={shareToTikTok}
+                      className="flex-1 rounded-xl bg-white/10 border border-white/20 text-white text-sm py-2 hover:bg-white/20 transition"
+                    >
                       TikTok
                     </button>
                   </div>
@@ -336,8 +405,32 @@ export default function ClipsPage() {
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <button className="text-xs text-gray-400 hover:text-white transition">Download</button>
-                    <button className="text-xs text-red-500 hover:text-red-400 transition">Share</button>
+                    <button
+                      onClick={() => {
+                        const mockTrack = MOCK_TRACKS.find((t) => t.title === c.trackTitle);
+                        if (mockTrack) {
+                          const url = `https://opynx.com/track/${mockTrack.id}?t=0`;
+                          navigator.clipboard?.writeText(url);
+                          toast('Link copied!', 'success');
+                        }
+                      }}
+                      className="text-xs text-gray-400 hover:text-white transition"
+                    >
+                      Copy Link
+                    </button>
+                    <button
+                      onClick={() => {
+                        const mockTrack = MOCK_TRACKS.find((t) => t.title === c.trackTitle);
+                        if (mockTrack) {
+                          const url = `https://opynx.com/track/${mockTrack.id}?t=0`;
+                          const text = encodeURIComponent(`Check out this clip from ${c.trackTitle} on OPYNX ${url}`);
+                          window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank', 'noopener');
+                        }
+                      }}
+                      className="text-xs text-red-500 hover:text-red-400 transition"
+                    >
+                      Share
+                    </button>
                   </div>
                 </div>
               ))}

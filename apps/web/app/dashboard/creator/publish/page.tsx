@@ -1,8 +1,9 @@
 'use client';
 
+import { trpc } from '@/lib/trpc/client';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from '@/app/components/Toast';
 
 // ─── Types ───
@@ -41,26 +42,57 @@ const EXCLUSIVITY_LABELS: Record<Exclusivity, string> = {
   'time-gated-48h': 'Time-Gated (48h Early Access)',
 };
 
-// ─── Mock Data ───
+// ─── Helpers ───
 
-function getMockTracks(): TrackPublishSettings[] {
-  return [
-    { id: 't1', title: 'Midnight Signal', artist: 'You', visibility: 'public', downloadable: 'yes', license: 'all-rights-reserved', monetization: 'free', fixedPrice: '', exclusivity: 'open', preSave: false },
-    { id: 't2', title: 'Voltage Drop', artist: 'You', visibility: 'public', downloadable: 'purchasers-only', license: 'cc-by', monetization: 'fixed-price', fixedPrice: '2.99', exclusivity: 'subscriber-only', preSave: true },
-    { id: 't3', title: 'Phantom Frequency', artist: 'You', visibility: 'unlisted', downloadable: 'no', license: 'cc-by-nc', monetization: 'pay-what-you-want', fixedPrice: '', exclusivity: 'open', preSave: false },
-    { id: 't4', title: 'Neon Cascade', artist: 'You', visibility: 'subscriber-only', downloadable: 'yes', license: 'all-rights-reserved', monetization: 'fixed-price', fixedPrice: '4.99', exclusivity: 'time-gated-24h', preSave: true },
-    { id: 't5', title: 'Solar Drift (Unreleased)', artist: 'You', visibility: 'private', downloadable: 'no', license: 'all-rights-reserved', monetization: 'free', fixedPrice: '', exclusivity: 'open', preSave: false },
-  ];
+/** Map DB visibility value to local UI type */
+function mapVisibility(v: string | undefined | null): Visibility {
+  if (v === 'subscribers_only') return 'subscriber-only';
+  if (v === 'public' || v === 'private' || v === 'unlisted') return v;
+  return 'public';
+}
+
+/** Map local UI visibility back to DB enum */
+function toDbVisibility(v: Visibility): 'public' | 'private' | 'unlisted' | 'subscribers_only' {
+  if (v === 'subscriber-only') return 'subscribers_only';
+  return v as 'public' | 'private' | 'unlisted';
 }
 
 // ─── Component ───
 
 export default function PublishingPreferencesPage() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const { toast } = useToast();
-  const [tracks, setTracks] = useState<TrackPublishSettings[]>(getMockTracks);
+  const [tracks, setTracks] = useState<TrackPublishSettings[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
+
+  // Load real tracks from backend
+  const { data: dbTracks, isLoading: tracksLoading } = trpc.tracks.list.useQuery(
+    { userId: session?.user?.id, limit: 50 },
+    { enabled: status === 'authenticated' && !!session?.user?.id }
+  );
+
+  const updateMutation = trpc.tracks.update.useMutation();
+
+  // Sync DB tracks into local state
+  useEffect(() => {
+    if (dbTracks && dbTracks.length > 0) {
+      setTracks(
+        dbTracks.map((t) => ({
+          id: t.id,
+          title: t.title,
+          artist: (t as any).artistName ?? 'You',
+          visibility: mapVisibility(t.visibility),
+          downloadable: 'yes' as Downloadable,
+          license: 'all-rights-reserved' as License,
+          monetization: (t.price && t.price > 0 ? 'fixed-price' : 'free') as Monetization,
+          fixedPrice: t.price ? (t.price / 100).toFixed(2) : '',
+          exclusivity: 'open' as Exclusivity,
+          preSave: false,
+        }))
+      );
+    }
+  }, [dbTracks]);
 
   if (status !== 'authenticated') {
     return (
@@ -76,11 +108,26 @@ export default function PublishingPreferencesPage() {
   }
 
   function handleSave(id: string) {
+    const track = tracks.find((t) => t.id === id);
+    if (!track) return;
     setSaving(id);
-    setTimeout(() => {
-      setSaving(null);
-      toast('Publishing preferences saved', 'success');
-    }, 800);
+    updateMutation.mutate(
+      {
+        id: track.id,
+        title: track.title,
+        visibility: toDbVisibility(track.visibility),
+      },
+      {
+        onSuccess: () => {
+          setSaving(null);
+          toast('Publishing preferences saved', 'success');
+        },
+        onError: (err) => {
+          setSaving(null);
+          toast(err.message || 'Failed to save preferences', 'error');
+        },
+      }
+    );
   }
 
   return (
@@ -124,6 +171,12 @@ export default function PublishingPreferencesPage() {
         </div>
 
         {/* Track List */}
+        {tracksLoading && (
+          <div className="text-center py-12 text-gray-400">Loading your tracks...</div>
+        )}
+        {!tracksLoading && tracks.length === 0 && (
+          <div className="text-center py-12 text-gray-500">No published tracks found. Upload a track first.</div>
+        )}
         <div className="space-y-3">
           {tracks.map((track) => {
             const isExpanded = expandedId === track.id;

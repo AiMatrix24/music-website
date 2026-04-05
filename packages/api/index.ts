@@ -40,6 +40,8 @@ import {
   categories,
   articleCategories,
   broadcasts,
+  podcasts,
+  podcastEpisodes,
 } from '@opynx/db';
 
 // ─── Auth Router ───
@@ -1484,6 +1486,67 @@ const likesRouter = createRouter({
     }),
 });
 
+// ─── Podcasts Router ───
+const podcastsRouter = createRouter({
+  list: publicProcedure
+    .input(
+      z.object({
+        userId: z.string().uuid().optional(),
+        limit: z.number().min(1).max(50).default(20),
+      })
+    )
+    .query(async ({ input }) => {
+      const rows = await db
+        .select()
+        .from(podcasts)
+        .where(input.userId ? eq(podcasts.userId, input.userId) : undefined)
+        .orderBy(desc(podcasts.createdAt))
+        .limit(input.limit);
+
+      // Attach episode counts
+      const withEpisodes = await Promise.all(
+        rows.map(async (show) => {
+          const episodes = await db
+            .select()
+            .from(podcastEpisodes)
+            .where(eq(podcastEpisodes.podcastId, show.id))
+            .orderBy(desc(podcastEpisodes.createdAt));
+          const totalPlays = episodes.reduce((sum, ep) => sum + (ep.downloadCount ?? 0), 0);
+          return { ...show, episodes, episodeCount: episodes.length, totalPlays };
+        })
+      );
+      return withEpisodes;
+    }),
+
+  create: protectedProcedure
+    .input(
+      z.object({
+        title: z.string().min(1).max(200),
+        description: z.string().max(2000).optional(),
+        category: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const slug = input.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 100)
+        + '-' + Date.now().toString(36);
+      const [show] = await db
+        .insert(podcasts)
+        .values({
+          userId: ctx.session.user.id,
+          title: input.title,
+          slug,
+          description: input.description ?? null,
+          category: input.category ?? null,
+        })
+        .returning();
+      return show;
+    }),
+});
+
 // ─── App Router ───
 export const appRouter = createRouter({
   auth: authRouter,
@@ -1503,6 +1566,7 @@ export const appRouter = createRouter({
   comments: commentsRouter,
   likes: likesRouter,
   admin: adminRouter,
+  podcasts: podcastsRouter,
 });
 
 export type AppRouter = typeof appRouter;

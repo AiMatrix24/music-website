@@ -156,6 +156,19 @@ export default function QRGeneratorPage() {
         {generatedUrl && (
           <div className="rounded-2xl bg-[#15151f] border border-red-600/30 p-6 mb-6">
             <h2 className="text-lg font-bold mb-4">Generated QR URL</h2>
+            {/* QR Code Image */}
+            <div className="flex justify-center mb-6">
+              <div className="bg-white rounded-2xl p-4 inline-block">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(generatedUrl)}`}
+                  alt="QR Code"
+                  width={250}
+                  height={250}
+                  className="block"
+                />
+              </div>
+            </div>
+
             <div className="rounded-xl bg-brand-950 border border-brand-800/30 p-4 mb-4 break-all">
               <code className="text-sm text-green-400">{generatedUrl}</code>
             </div>
@@ -171,7 +184,15 @@ export default function QRGeneratorPage() {
               <h3 className="text-sm font-semibold text-gray-400 mb-3">Print Format (for facilitator badges)</h3>
               <div className="rounded-xl bg-white p-6 text-center">
                 <p className="text-xs text-gray-500 mb-2">Scan to subscribe</p>
-                <p className="text-lg font-mono text-black font-bold break-all">{generatedUrl}</p>
+                <div className="flex justify-center my-4">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(generatedUrl)}`}
+                    alt="QR Code"
+                    width={200}
+                    height={200}
+                    className="block"
+                  />
+                </div>
                 <p className="text-xs text-gray-500 mt-2">Powered by OPYNX</p>
               </div>
             </div>

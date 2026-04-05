@@ -4,15 +4,10 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useToast } from '@/app/components/Toast';
+import { useUploadThing } from '@/lib/uploadthing-client';
 
-/* ── Types ── */
+/* -- Types -- */
 type RecordingStatus = 'ready' | 'recording' | 'paused' | 'saved';
-
-const MOCK_DEVICES = [
-  { id: 'built-in', label: 'Built-in Microphone' },
-  { id: 'usb', label: 'USB Mic' },
-  { id: 'interface', label: 'Audio Interface' },
-];
 
 const SOUNDBOARD: { id: string; label: string; emoji: string }[] = [
   { id: 'applause', label: 'Applause', emoji: '&#128079;' },
@@ -34,22 +29,52 @@ export default function RecordPage() {
   const { data: session, status } = useSession();
   const { toast } = useToast();
 
-  const [device, setDevice] = useState('built-in');
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState('');
   const [recStatus, setRecStatus] = useState<RecordingStatus>('ready');
   const [elapsed, setElapsed] = useState(0);
   const [autoDucking, setAutoDucking] = useState(false);
   const [inviteLink, setInviteLink] = useState('');
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const levelRef = useRef<HTMLDivElement>(null);
   const animFrameRef = useRef<number | null>(null);
 
-  /* ── Mock waveform for playback preview ── */
-  const previewBars = useRef(
-    Array.from({ length: 100 }, () => 10 + Math.random() * 70)
-  ).current;
+  // Real audio refs
+  const streamRef = useRef<MediaStream | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const recordedBlobRef = useRef<Blob | null>(null);
 
-  /* ── Auth gate ── */
+  const { startUpload, isUploading } = useUploadThing('audioUpload');
+
+  /* -- Enumerate audio input devices -- */
+  useEffect(() => {
+    async function getDevices() {
+      try {
+        // Need a brief getUserMedia to prompt permission, then enumerate
+        const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        tempStream.getTracks().forEach((t) => t.stop());
+        const allDevices = await navigator.mediaDevices.enumerateDevices();
+        const audioInputs = allDevices.filter((d) => d.kind === 'audioinput');
+        setDevices(audioInputs);
+        if (audioInputs.length > 0 && !selectedDeviceId) {
+          setSelectedDeviceId(audioInputs[0].deviceId);
+        }
+        setPermissionError(null);
+      } catch {
+        setDevices([]);
+        setPermissionError('Microphone access is required. Please allow microphone permission in your browser settings.');
+      }
+    }
+    if (status === 'authenticated') getDevices();
+  }, [status, selectedDeviceId]);
+
+  /* -- Auth gate -- */
   if (status !== 'authenticated') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
@@ -59,7 +84,7 @@ export default function RecordPage() {
     );
   }
 
-  /* ── Timer logic ── */
+  /* -- Timer logic -- */
   const startTimer = () => {
     if (timerRef.current) return;
     timerRef.current = setInterval(() => {
@@ -74,47 +99,22 @@ export default function RecordPage() {
     }
   };
 
-  /* ── Recording controls ── */
-  const handleRecord = () => {
-    if (recStatus === 'ready' || recStatus === 'saved') {
-      setElapsed(0);
-      setRecStatus('recording');
-      startTimer();
-      startLevelAnimation();
-    }
-  };
-
-  const handlePause = () => {
-    if (recStatus === 'recording') {
-      setRecStatus('paused');
-      stopTimer();
-      stopLevelAnimation();
-    } else if (recStatus === 'paused') {
-      setRecStatus('recording');
-      startTimer();
-      startLevelAnimation();
-    }
-  };
-
-  const handleStop = () => {
-    setRecStatus('saved');
-    stopTimer();
-    stopLevelAnimation();
-    toast('Recording saved!', 'success');
-  };
-
-  const handleRestart = () => {
-    setElapsed(0);
-    setRecStatus('ready');
-    stopTimer();
-    stopLevelAnimation();
-  };
-
-  /* ── Level meter animation (CSS-driven mock) ── */
+  /* -- Real level meter animation using AnalyserNode -- */
   const startLevelAnimation = () => {
+    const analyser = analyserRef.current;
+    if (!analyser) return;
+
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
     const animate = () => {
+      analyser.getByteFrequencyData(dataArray);
+      // Average the frequency data to get an overall level
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) {
+        sum += dataArray[i];
+      }
+      const avg = sum / dataArray.length;
+      const level = (avg / 255) * 100;
       if (levelRef.current) {
-        const level = 30 + Math.random() * 60;
         levelRef.current.style.width = `${level}%`;
       }
       animFrameRef.current = requestAnimationFrame(animate);
@@ -130,19 +130,152 @@ export default function RecordPage() {
     if (levelRef.current) levelRef.current.style.width = '0%';
   };
 
-  /* ── Soundboard ── */
+  /* -- Recording controls -- */
+  const handleRecord = async () => {
+    if (recStatus === 'ready' || recStatus === 'saved') {
+      setPermissionError(null);
+      setAudioUrl(null);
+      recordedBlobRef.current = null;
+      try {
+        const constraints: MediaStreamConstraints = {
+          audio: selectedDeviceId
+            ? { deviceId: { exact: selectedDeviceId } }
+            : true,
+        };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        streamRef.current = stream;
+
+        // Set up Web Audio API analyser for real level metering
+        const audioContext = new AudioContext();
+        const source = audioContext.createMediaStreamSource(stream);
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        audioContextRef.current = audioContext;
+        analyserRef.current = analyser;
+
+        // Set up MediaRecorder
+        const mediaRecorder = new MediaRecorder(stream, {
+          mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+            ? 'audio/webm;codecs=opus'
+            : 'audio/webm',
+        });
+        chunksRef.current = [];
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) chunksRef.current.push(e.data);
+        };
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(chunksRef.current, { type: mediaRecorder.mimeType });
+          recordedBlobRef.current = blob;
+          const url = URL.createObjectURL(blob);
+          setAudioUrl(url);
+        };
+        mediaRecorderRef.current = mediaRecorder;
+        mediaRecorder.start(1000); // collect data every second
+
+        setElapsed(0);
+        setRecStatus('recording');
+        startTimer();
+        startLevelAnimation();
+      } catch (err: unknown) {
+        const message =
+          err instanceof DOMException && err.name === 'NotAllowedError'
+            ? 'Microphone permission denied. Please allow access in your browser settings.'
+            : 'Could not access microphone. Please check your device and try again.';
+        setPermissionError(message);
+        toast(message, 'error');
+      }
+    }
+  };
+
+  const handlePause = () => {
+    if (recStatus === 'recording' && mediaRecorderRef.current) {
+      mediaRecorderRef.current.pause();
+      setRecStatus('paused');
+      stopTimer();
+      stopLevelAnimation();
+    } else if (recStatus === 'paused' && mediaRecorderRef.current) {
+      mediaRecorderRef.current.resume();
+      setRecStatus('recording');
+      startTimer();
+      startLevelAnimation();
+    }
+  };
+
+  const handleStop = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    // Stop all tracks from the stream
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    // Close audio context
+    audioContextRef.current?.close();
+    audioContextRef.current = null;
+    analyserRef.current = null;
+
+    setRecStatus('saved');
+    stopTimer();
+    stopLevelAnimation();
+    toast('Recording saved!', 'success');
+  };
+
+  const handleRestart = () => {
+    // Clean up any existing stream
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    audioContextRef.current?.close();
+    audioContextRef.current = null;
+    analyserRef.current = null;
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
+    setAudioUrl(null);
+    recordedBlobRef.current = null;
+
+    setElapsed(0);
+    setRecStatus('ready');
+    stopTimer();
+    stopLevelAnimation();
+  };
+
+  /* -- Upload recording -- */
+  const handleUpload = async () => {
+    if (!recordedBlobRef.current) {
+      toast('No recording to upload', 'error');
+      return;
+    }
+    const file = new File(
+      [recordedBlobRef.current],
+      `recording-${Date.now()}.webm`,
+      { type: recordedBlobRef.current.type }
+    );
+    try {
+      const result = await startUpload([file]);
+      if (result && result.length > 0) {
+        toast('Recording uploaded successfully!', 'success');
+      } else {
+        toast('Upload failed. Please try again.', 'error');
+      }
+    } catch {
+      toast('Upload failed. Please try again.', 'error');
+    }
+  };
+
+  /* -- Soundboard -- */
   const playSFX = (label: string) => {
     toast(`Playing: ${label}`, 'info');
   };
 
-  /* ── Invite link generator ── */
+  /* -- Invite link generator -- */
   const generateInviteLink = () => {
     const code = Math.random().toString(36).slice(2, 10).toUpperCase();
     setInviteLink(`https://opynx.com/studio/join/${code}`);
     toast('Invite link generated!', 'success');
   };
 
-  /* ── Status badge ── */
+  /* -- Status badge -- */
   const statusColors: Record<RecordingStatus, string> = {
     ready: 'text-gray-400',
     recording: 'text-red-500',
@@ -171,17 +304,30 @@ export default function RecordPage() {
           </p>
         </div>
 
+        {/* Permission Error */}
+        {permissionError && (
+          <div className="bg-red-600/10 border border-red-600/30 rounded-2xl p-4 mb-6 text-center">
+            <p className="text-red-400 text-sm">{permissionError}</p>
+          </div>
+        )}
+
         {/* Input Device */}
         <div className="bg-[#15151f] rounded-2xl p-6 mb-6">
           <label className="block text-sm font-semibold text-gray-300 mb-2">Input Device</label>
           <select
-            value={device}
-            onChange={(e) => setDevice(e.target.value)}
+            value={selectedDeviceId}
+            onChange={(e) => setSelectedDeviceId(e.target.value)}
             className="w-full bg-brand-950 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-red-600"
           >
-            {MOCK_DEVICES.map((d) => (
-              <option key={d.id} value={d.id}>{d.label}</option>
-            ))}
+            {devices.length === 0 ? (
+              <option value="">No microphones found</option>
+            ) : (
+              devices.map((d) => (
+                <option key={d.deviceId} value={d.deviceId}>
+                  {d.label || `Microphone (${d.deviceId.slice(0, 8)}...)`}
+                </option>
+              ))
+            )}
           </select>
         </div>
 
@@ -289,18 +435,22 @@ export default function RecordPage() {
         {recStatus === 'saved' && (
           <div className="bg-[#15151f] rounded-2xl p-6 mb-6">
             <h2 className="text-lg font-bold mb-4">Recording Preview</h2>
-            <div className="flex items-end gap-[1px] h-20 mb-4">
-              {previewBars.map((h, i) => (
-                <div key={i} className="flex-1 bg-red-500 rounded-sm" style={{ height: `${h}%` }} />
-              ))}
-            </div>
+
+            {/* HTML5 audio player for playback */}
+            {audioUrl && (
+              <div className="mb-4">
+                <audio controls src={audioUrl} className="w-full" />
+              </div>
+            )}
+
             <p className="text-sm text-gray-400 mb-4">Duration: {formatTimer(elapsed)}</p>
             <div className="flex flex-wrap gap-3">
               <button
-                onClick={() => toast('Recording uploaded!', 'success')}
-                className="rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 transition"
+                onClick={handleUpload}
+                disabled={isUploading}
+                className="rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 transition disabled:opacity-50"
               >
-                Save &amp; Upload
+                {isUploading ? 'Uploading...' : 'Save & Upload'}
               </button>
               <button
                 onClick={handleRestart}

@@ -7,8 +7,9 @@ import { useState } from 'react';
 import { useToast } from '@/app/components/Toast';
 
 export default function BroadcastPage() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const { toast } = useToast();
+  const utils = trpc.useUtils();
 
   const [tab, setTab] = useState<'compose' | 'sent'>('compose');
   const [title, setTitle] = useState('');
@@ -16,36 +17,36 @@ export default function BroadcastPage() {
   const [audience, setAudience] = useState<'all_followers' | 'subscribers' | 'premium'>('all_followers');
   const [sending, setSending] = useState(false);
 
-  // Mock sent messages
-  const [sentMessages] = useState([
-    {
-      id: '1',
-      title: 'New Album Out Now! 🎶',
-      body: 'Hey superfans! My new album "Neon Nights" just dropped. Check it out on OPYNX first!',
-      audience: 'all_followers',
-      sentAt: new Date('2026-03-20T14:00:00'),
-      readCount: 234,
-      totalSent: 456,
+  // Fetch sent broadcasts from backend
+  const { data: sentBroadcasts } = trpc.broadcasts.list.useQuery(
+    { artistId: session?.user?.id, limit: 50 },
+    { enabled: status === 'authenticated' && !!session?.user?.id }
+  );
+
+  const sendMutation = trpc.broadcasts.send.useMutation({
+    onSuccess: () => {
+      setTitle('');
+      setBody('');
+      setSending(false);
+      toast('Broadcast sent to your fans!', 'success');
+      utils.broadcasts.list.invalidate();
+      setTab('sent');
     },
-    {
-      id: '2',
-      title: 'Exclusive Demo — Subscribers Only',
-      body: 'I just uploaded a raw demo of my next single. Only you get to hear it first. Let me know what you think!',
-      audience: 'subscribers',
-      sentAt: new Date('2026-03-15T10:30:00'),
-      readCount: 89,
-      totalSent: 102,
+    onError: (err) => {
+      setSending(false);
+      toast(err.message || 'Failed to send broadcast', 'error');
     },
-    {
-      id: '3',
-      title: 'VIP Pre-Sale: Neon Nights Tour',
-      body: 'Get your tickets 48 hours before they go public. Use code SUPERFAN25 for 25% off.',
-      audience: 'premium',
-      sentAt: new Date('2026-03-10T18:00:00'),
-      readCount: 45,
-      totalSent: 52,
-    },
-  ]);
+  });
+
+  const sentMessages = sentBroadcasts?.map((b) => ({
+    id: b.id,
+    title: b.title,
+    body: b.body ?? '',
+    audience: b.subscribersOnly ? 'subscribers' : 'all_followers',
+    sentAt: new Date(b.createdAt),
+    readCount: 0,
+    totalSent: 0,
+  })) ?? [];
 
   if (status !== 'authenticated') {
     return (
@@ -62,13 +63,12 @@ export default function BroadcastPage() {
       return;
     }
     setSending(true);
-    setTimeout(() => {
-      setSending(false);
-      setTitle('');
-      setBody('');
-      toast('Broadcast sent to your fans!', 'success');
-      setTab('sent');
-    }, 1500);
+    sendMutation.mutate({
+      title,
+      body,
+      type: 'text',
+      subscribersOnly: audience === 'subscribers' || audience === 'premium',
+    });
   };
 
   const audienceLabel = {
@@ -208,7 +208,7 @@ export default function BroadcastPage() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-bold">{Math.round((msg.readCount / msg.totalSent) * 100)}%</p>
+                    <p className="text-sm font-bold">{msg.totalSent > 0 ? Math.round((msg.readCount / msg.totalSent) * 100) : 0}%</p>
                     <p className="text-xs text-gray-500">open rate</p>
                   </div>
                 </div>

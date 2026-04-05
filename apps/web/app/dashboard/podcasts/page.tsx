@@ -4,9 +4,10 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { useToast } from '@/app/components/Toast';
+import { trpc } from '@/lib/trpc/client';
 
 export default function PodcastDashboardPage() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const { toast } = useToast();
   const [tab, setTab] = useState<'shows' | 'create'>('shows');
 
@@ -15,23 +16,31 @@ export default function PodcastDashboardPage() {
   const [showDescription, setShowDescription] = useState('');
   const [showCategory, setShowCategory] = useState('Music');
 
-  // Mock shows
-  const [shows] = useState([
-    {
-      id: '1', title: 'Behind The Beat', description: 'Weekly deep dives into music production.',
-      episodeCount: 12, totalPlays: 4523, category: 'Music',
-      episodes: [
-        { id: 'e1', title: 'EP 12: Making Synthwave in 2026', duration: 2340, plays: 892, publishedAt: '2026-03-20' },
-        { id: 'e2', title: 'EP 11: Lo-fi Hip Hop Secrets', duration: 1856, plays: 654, publishedAt: '2026-03-13' },
-        { id: 'e3', title: 'EP 10: The Art of Sampling', duration: 2100, plays: 421, publishedAt: '2026-03-06' },
-      ],
+  // Real data from tRPC
+  const utils = trpc.useUtils();
+  const { data: shows = [], isLoading } = trpc.podcasts.list.useQuery(
+    { userId: session?.user?.id },
+    { enabled: status === 'authenticated' && !!session?.user?.id }
+  );
+
+  const createMutation = trpc.podcasts.create.useMutation({
+    onSuccess: () => {
+      toast('Podcast show created!', 'success');
+      setTab('shows');
+      setShowTitle('');
+      setShowDescription('');
+      setShowCategory('Music');
+      utils.podcasts.list.invalidate();
     },
-  ]);
+    onError: (err) => {
+      toast(err.message || 'Failed to create show', 'error');
+    },
+  });
 
   if (status !== 'authenticated') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <p className="text-5xl mb-2">🎙️</p>
+        <p className="text-5xl mb-2">&#127897;</p>
         <p className="text-gray-400">Sign in to manage podcasts</p>
         <Link href="/auth/login" className="rounded-full bg-red-600 px-6 py-3 font-semibold text-white">Sign In</Link>
       </div>
@@ -40,16 +49,17 @@ export default function PodcastDashboardPage() {
 
   const handleCreateShow = () => {
     if (!showTitle) { toast('Enter a show title', 'error'); return; }
-    toast('Podcast show created!', 'success');
-    setTab('shows');
-    setShowTitle('');
-    setShowDescription('');
+    createMutation.mutate({
+      title: showTitle,
+      description: showDescription || undefined,
+      category: showCategory,
+    });
   };
 
   return (
     <div className="min-h-screen py-16 px-6">
       <div className="max-w-4xl mx-auto">
-        <Link href="/dashboard" className="text-sm text-gray-400 hover:text-white transition mb-2 inline-block">← Dashboard</Link>
+        <Link href="/dashboard" className="text-sm text-gray-400 hover:text-white transition mb-2 inline-block">&larr; Dashboard</Link>
 
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -91,13 +101,13 @@ export default function PodcastDashboardPage() {
                 <div>
                   <label className="block text-sm font-semibold mb-2">Cover Art</label>
                   <div className="w-full bg-brand-950 border-2 border-dashed border-brand-800/30 rounded-xl px-4 py-3 text-center cursor-pointer hover:border-red-600 transition">
-                    <span className="text-gray-500 text-sm">📷 Upload (3000×3000)</span>
+                    <span className="text-gray-500 text-sm">&#128247; Upload (3000x3000)</span>
                   </div>
                 </div>
               </div>
-              <button onClick={handleCreateShow}
-                className="rounded-full bg-red-600 px-8 py-3 font-semibold text-white hover:bg-red-500 transition">
-                Create Show
+              <button onClick={handleCreateShow} disabled={createMutation.isPending}
+                className="rounded-full bg-red-600 px-8 py-3 font-semibold text-white hover:bg-red-500 transition disabled:opacity-50">
+                {createMutation.isPending ? 'Creating...' : 'Create Show'}
               </button>
             </div>
           </div>
@@ -106,9 +116,13 @@ export default function PodcastDashboardPage() {
         {/* Shows list */}
         {tab === 'shows' && (
           <div className="space-y-6">
-            {shows.length === 0 ? (
+            {isLoading ? (
               <div className="rounded-2xl bg-[#15151f] p-16 text-center">
-                <p className="text-5xl mb-4">🎙️</p>
+                <p className="text-gray-400">Loading your podcasts...</p>
+              </div>
+            ) : shows.length === 0 ? (
+              <div className="rounded-2xl bg-[#15151f] p-16 text-center">
+                <p className="text-5xl mb-4">&#127897;</p>
                 <h2 className="text-xl font-bold mb-2">No podcasts yet</h2>
                 <p className="text-gray-400 mb-6">Start your first podcast show and reach fans in a new way.</p>
                 <button onClick={() => setTab('create')}
@@ -123,7 +137,7 @@ export default function PodcastDashboardPage() {
                   <div className="p-6 border-b border-brand-800/20">
                     <div className="flex items-start gap-4">
                       <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-red-600 to-purple-700 flex items-center justify-center text-3xl shrink-0">
-                        🎙️
+                        &#127897;
                       </div>
                       <div className="flex-1">
                         <h2 className="text-xl font-bold">{show.title}</h2>
@@ -131,7 +145,9 @@ export default function PodcastDashboardPage() {
                         <div className="flex items-center gap-4 mt-3 text-sm text-gray-500">
                           <span>{show.episodeCount} episodes</span>
                           <span>{formatNumber(show.totalPlays)} plays</span>
-                          <span className="text-xs bg-red-600/20 text-red-400 px-2 py-0.5 rounded-full">{show.category}</span>
+                          {show.category && (
+                            <span className="text-xs bg-red-600/20 text-red-400 px-2 py-0.5 rounded-full">{show.category}</span>
+                          )}
                         </div>
                       </div>
                       <Link href={`/dashboard/podcasts/${show.id}/upload`}
@@ -145,7 +161,7 @@ export default function PodcastDashboardPage() {
                       <div className="flex-1 bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 font-mono text-xs text-gray-500 truncate">
                         https://opynx.com/rss/{show.id}
                       </div>
-                      <button onClick={() => toast('RSS URL copied!', 'success')}
+                      <button onClick={() => { navigator.clipboard?.writeText(`https://opynx.com/rss/${show.id}`); toast('RSS URL copied!', 'success'); }}
                         className="text-xs text-red-400 font-semibold hover:text-red-300 transition">
                         Copy RSS
                       </button>
@@ -163,22 +179,31 @@ export default function PodcastDashboardPage() {
 
                   {/* Episodes */}
                   <div className="divide-y divide-brand-800/10">
-                    {show.episodes.map((ep) => (
-                      <div key={ep.id} className="px-6 py-4 flex items-center gap-4 transition hover:bg-brand-950/50">
-                        <button className="w-10 h-10 rounded-full bg-red-600 flex items-center justify-center text-white shrink-0 hover:bg-red-500 transition">
-                          ▶
-                        </button>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold truncate">{ep.title}</p>
-                          <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
-                            <span>{formatDuration(ep.duration)}</span>
-                            <span>{formatNumber(ep.plays)} plays</span>
-                            <span>{new Date(ep.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                          </div>
-                        </div>
-                        <button className="text-xs text-gray-500 hover:text-white transition">⋯</button>
+                    {show.episodes.length === 0 ? (
+                      <div className="px-6 py-8 text-center text-gray-500 text-sm">
+                        No episodes yet. Upload your first episode!
                       </div>
-                    ))}
+                    ) : (
+                      show.episodes.map((ep) => (
+                        <div key={ep.id} className="px-6 py-4 flex items-center gap-4 transition hover:bg-brand-950/50">
+                          <button className="w-10 h-10 rounded-full bg-red-600 flex items-center justify-center text-white shrink-0 hover:bg-red-500 transition">
+                            &#9654;
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold truncate">{ep.title}</p>
+                            <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
+                              {ep.duration != null && <span>{formatDuration(ep.duration)}</span>}
+                              <span>{formatNumber(ep.downloadCount ?? 0)} plays</span>
+                              {ep.publishedAt && (
+                                <span>{new Date(ep.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                              )}
+                              <span className="text-xs capitalize">{ep.status}</span>
+                            </div>
+                          </div>
+                          <button className="text-xs text-gray-500 hover:text-white transition">&hellip;</button>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               ))
