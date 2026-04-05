@@ -10,6 +10,8 @@
  * Floating-point arithmetic on currency is FORBIDDEN.
  */
 
+import { getCreatorCommission } from './founding-member';
+
 // ─── Constants (integer cents) ───
 
 const STANDARD_PRICE = 873; // $8.73
@@ -33,7 +35,7 @@ const DEFAULT_OUTLIER_MAX = 150; // $1.50
 
 // ─── Types ───
 
-export type SubscriptionTier = 'standard' | 'superfan_bundle';
+export type SubscriptionTier = 'standard' | 'superfan_bundle' | 'studio';
 export type FacilitatorTier = 'silver' | 'gold' | 'platinum';
 
 export interface CommissionWaterfallParams {
@@ -48,6 +50,9 @@ export interface CommissionWaterfallParams {
   geoVerified: boolean;
   facilitatorTier: FacilitatorTier;
   outlierRate?: number; // cents, negotiated per-deal (100-150)
+  /** Founding member fields for creator commission bonus */
+  isFoundingMember?: boolean;
+  foundingMemberExpiresAt?: Date | null;
 }
 
 export interface CommissionWaterfallResult {
@@ -98,9 +103,13 @@ export async function processCommissionWaterfall(
     geoVerified,
     facilitatorTier,
     outlierRate,
+    isFoundingMember = false,
+    foundingMemberExpiresAt = null,
   } = params;
 
-  const splits: CommissionSplitRecord[] = [];
+  if (tier === 'studio') {
+    return processStudioWaterfall({ subscriptionId });
+  }
 
   if (tier === 'standard') {
     return processStandardWaterfall({
@@ -111,6 +120,8 @@ export async function processCommissionWaterfall(
       geoVerified,
       facilitatorTier,
       outlierRate,
+      isFoundingMember,
+      foundingMemberExpiresAt,
     });
   }
 
@@ -122,6 +133,8 @@ export async function processCommissionWaterfall(
       facilitatorId,
       geoVerified,
       facilitatorTier,
+      isFoundingMember,
+      foundingMemberExpiresAt,
     });
   }
 
@@ -139,11 +152,16 @@ function processStandardWaterfall(params: {
   geoVerified: boolean;
   facilitatorTier: FacilitatorTier;
   outlierRate?: number;
+  isFoundingMember: boolean;
+  foundingMemberExpiresAt: Date | null;
 }): CommissionWaterfallResult {
   const splits: CommissionSplitRecord[] = [];
 
-  // Step 1: Creator — ALWAYS $1.00, non-negotiable
-  let creatorAmount = CREATOR_AMOUNT;
+  // Step 1: Creator — $1.00 (or $1.25 for founding members), non-negotiable
+  let creatorAmount = getCreatorCommission(
+    params.isFoundingMember,
+    params.foundingMemberExpiresAt
+  );
   splits.push({
     recipientId: params.creatorId,
     role: 'creator',
@@ -171,7 +189,7 @@ function processStandardWaterfall(params: {
   const totalBeforeCap = creatorAmount + facilitatorAmount + outlierAmount;
   if (totalBeforeCap > MAX_STAKEHOLDER_CAP) {
     // Creator NEVER reduced. Pro-rate facilitator + outlier proportionally.
-    const remaining = MAX_STAKEHOLDER_CAP - CREATOR_AMOUNT;
+    const remaining = MAX_STAKEHOLDER_CAP - creatorAmount;
     const combined = facilitatorAmount + outlierAmount;
     if (combined > 0) {
       facilitatorAmount = Math.floor(
@@ -238,18 +256,24 @@ function processBundleWaterfall(params: {
   facilitatorId?: string;
   geoVerified: boolean;
   facilitatorTier: FacilitatorTier;
+  isFoundingMember: boolean;
+  foundingMemberExpiresAt: Date | null;
 }): CommissionWaterfallResult {
   const splits: CommissionSplitRecord[] = [];
 
-  // Each creator gets $1.00 — ALWAYS
+  // Each creator gets $1.00 (or $1.25 for founding members) — ALWAYS
+  const perCreatorAmount = getCreatorCommission(
+    params.isFoundingMember,
+    params.foundingMemberExpiresAt
+  );
   let creatorAmount = 0;
   for (const id of params.creatorIds) {
     splits.push({
       recipientId: id,
       role: 'creator',
-      amount: CREATOR_AMOUNT,
+      amount: perCreatorAmount,
     });
-    creatorAmount += CREATOR_AMOUNT;
+    creatorAmount += perCreatorAmount;
   }
 
   // Facilitator: $0.50 amortized across the bundle (only if verified)
@@ -287,10 +311,46 @@ function processBundleWaterfall(params: {
 
   console.log(
     `[Commission Waterfall] Bundle | sub=${params.subscriptionId} ` +
-      `creators=${params.creatorIds.length}x$1.00=$${(creatorAmount / 100).toFixed(2)} ` +
+      `creators=${params.creatorIds.length}x$${(perCreatorAmount / 100).toFixed(2)}=$${(creatorAmount / 100).toFixed(2)} ` +
       `facilitator=$${(facilitatorAmount / 100).toFixed(2)} ` +
       `platform=$${(platformAmount / 100).toFixed(2)} ` +
       `totalStakeholder=$${(totalStakeholder / 100).toFixed(2)}`
+  );
+
+  return result;
+}
+
+// ─── Creator Studio ($16.00) ───
+
+/**
+ * Creator Studio is a tooling subscription — 100% platform revenue.
+ * No creator/facilitator/outlier split because the creator IS the subscriber.
+ */
+function processStudioWaterfall(params: {
+  subscriptionId: string;
+}): CommissionWaterfallResult {
+  const splits: CommissionSplitRecord[] = [];
+
+  const platformAmount = CREATOR_STUDIO_PRICE;
+
+  splits.push({
+    recipientId: 'platform',
+    role: 'platform',
+    amount: platformAmount,
+  });
+
+  const result: CommissionWaterfallResult = {
+    creatorAmount: 0,
+    facilitatorAmount: 0,
+    outlierAmount: 0,
+    platformAmount,
+    totalStakeholder: 0,
+    splits,
+  };
+
+  console.log(
+    `[Commission Waterfall] Studio | sub=${params.subscriptionId} ` +
+      `platform=$${(platformAmount / 100).toFixed(2)} (100% — tooling subscription)`
   );
 
   return result;

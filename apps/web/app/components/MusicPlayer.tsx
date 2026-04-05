@@ -30,6 +30,13 @@ const PlayerContext = createContext<PlayerState>({
 
 export const usePlayer = () => useContext(PlayerContext);
 
+// TODO: Enforce audio quality by subscription tier
+// Free → 128kbps only (serve audioUrl128)
+// Premium/Bundle → 320kbps (serve audioUrl320)
+// Creator (own tracks) → FLAC (serve audioUrlFlac)
+// Currently all tiers get the same quality — enforcement requires
+// signed streaming URLs from a quality-aware API endpoint
+
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const [track, setTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);

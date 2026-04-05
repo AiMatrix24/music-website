@@ -122,7 +122,7 @@ export function getMerchDiscount(tier: string): number {
  * Only available for standard (premium) and bundle subscribers.
  */
 export function canMessageArtist(tier: string): boolean {
-  return tier === 'premium' || tier === 'bundle';
+  return tier === 'premium' || tier === 'bundle' || tier === 'studio';
 }
 
 /**

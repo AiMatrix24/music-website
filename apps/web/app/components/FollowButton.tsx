@@ -9,10 +9,18 @@ interface FollowButtonProps {
   artistName?: string;
 }
 
+// Free tier follow limit — 5 artists max
+const FREE_FOLLOW_LIMIT = 5;
+
 export function FollowButton({ artistId, artistName }: FollowButtonProps) {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const { toast } = useToast();
   const utils = trpc.useUtils();
+
+  // Mock tier check: use session role to determine subscription tier
+  // TODO: Replace with actual subscription tier lookup from user profile/subscription query
+  const userRole = (session?.user as { role?: string })?.role;
+  const isFreeUser = !userRole || userRole === 'free';
 
   const { data: isFollowing, isLoading } = trpc.users.isFollowing.useQuery(
     { followeeId: artistId },
@@ -95,9 +103,25 @@ export function FollowButton({ artistId, artistName }: FollowButtonProps) {
     );
   }
 
+  const handleFollow = () => {
+    // Check follow limit for free-tier users before proceeding
+    // TODO: Replace mock count with actual followed-artist count from API
+    if (isFreeUser) {
+      const mockFollowedCount = 5; // Simulated current follow count for free user
+      if (mockFollowedCount >= FREE_FOLLOW_LIMIT) {
+        toast(
+          'Free accounts can follow up to 5 artists. Upgrade to Premium for unlimited follows.',
+          'error'
+        );
+        return;
+      }
+    }
+    followMutation.mutate({ followeeId: artistId });
+  };
+
   return (
     <button
-      onClick={() => followMutation.mutate({ followeeId: artistId })}
+      onClick={handleFollow}
       disabled={followMutation.isPending}
       className="inline-flex items-center gap-2 rounded-full bg-brand-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-brand-500"
     >

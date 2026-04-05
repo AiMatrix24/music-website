@@ -7,6 +7,13 @@ import { useState, Suspense } from 'react';
 import { useToast } from '@/app/components/Toast';
 import { trpc } from '@/lib/trpc/client';
 
+// Subscriber discount logic: Premium (10%), Bundle (15%), Free (0%)
+function getSubscriberDiscount(role?: string): { percent: number; label: string } {
+  if (role === 'subscriber') return { percent: 10, label: 'Premium' };
+  if (role === 'bundle') return { percent: 15, label: 'Bundle' };
+  return { percent: 0, label: '' };
+}
+
 function CheckoutContent() {
   const params = useSearchParams();
   const listingId = params.get('item') ?? '';
@@ -14,8 +21,12 @@ function CheckoutContent() {
     { id: listingId },
     { enabled: !!listingId }
   );
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const { toast } = useToast();
+
+  // Mock tier check using session role for subscriber discount
+  const userRole = (session?.user as { role?: string })?.role;
+  const discount = status === 'authenticated' ? getSubscriberDiscount(userRole) : { percent: 0, label: '' };
 
   const [quantity, setQuantity] = useState(1);
   const [payMethod, setPayMethod] = useState<'usdc' | 'card'>('usdc');
@@ -56,10 +67,12 @@ function CheckoutContent() {
 
   const unitPrice = listing.price / 100;
   const subtotal = unitPrice * quantity;
+  const discountAmount = subtotal * (discount.percent / 100);
+  const discountedSubtotal = subtotal - discountAmount;
   const shipping = listing.category === 'services' ? 0 : 4.99;
   const platformFee = 0;
-  const total = subtotal + shipping + platformFee;
-  const artistEarns = subtotal * 0.85;
+  const total = discountedSubtotal + shipping + platformFee;
+  const artistEarns = discountedSubtotal * 0.85;
   const needsShipping = listing.category !== 'services';
 
   const handleCheckout = () => {
@@ -192,13 +205,35 @@ function CheckoutContent() {
             <div className="sticky top-24 rounded-2xl bg-[#15151f] border border-brand-800/20 p-6">
               <h2 className="font-bold mb-4">Order Summary</h2>
               <div className="space-y-3 text-sm">
-                <div className="flex justify-between"><span className="text-gray-400">{listing.title} × {quantity}</span><span>${subtotal.toFixed(2)}</span></div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">{listing.title} x {quantity}</span>
+                  {discount.percent > 0 ? (
+                    <span>
+                      <span className="line-through text-gray-500 mr-2">${subtotal.toFixed(2)}</span>
+                      <span className="text-red-400">${discountedSubtotal.toFixed(2)}</span>
+                    </span>
+                  ) : (
+                    <span>${subtotal.toFixed(2)}</span>
+                  )}
+                </div>
+                {discount.percent > 0 && (
+                  <div className="flex justify-between text-green-400">
+                    <span>Subscriber Discount ({discount.percent}%)</span>
+                    <span>-${discountAmount.toFixed(2)}</span>
+                  </div>
+                )}
                 {needsShipping && <div className="flex justify-between"><span className="text-gray-400">Shipping</span><span>${shipping.toFixed(2)}</span></div>}
                 <div className="flex justify-between"><span className="text-gray-400">Platform fee</span><span className="text-green-400">$0.00</span></div>
                 <div className="border-t border-brand-800/20 pt-3 flex justify-between font-bold text-lg">
                   <span>Total</span><span className="text-red-400">${total.toFixed(2)}</span>
                 </div>
               </div>
+
+              {status === 'authenticated' && (
+                <p className="text-xs text-green-400/80 mt-3">
+                  Premium subscribers save 10% on all merch
+                </p>
+              )}
 
               <div className="mt-4 p-3 bg-brand-950/50 rounded-lg text-xs text-gray-400">
                 <p>Artist receives: <span className="text-red-400 font-bold">${artistEarns.toFixed(2)}</span> (85%)</p>

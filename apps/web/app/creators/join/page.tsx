@@ -162,9 +162,13 @@ export default function CreatorJoinPage() {
             Transparent, verifiable creator payouts
           </p>
 
+          {/* Fan subscription revenue */}
           <div className="bg-brand-950 rounded-xl p-6 mb-6">
+            <p className="text-xs font-semibold text-red-500 uppercase tracking-wider mb-4">
+              Fan Subscription Revenue
+            </p>
             <div className="flex items-center justify-between mb-4">
-              <span className="text-gray-400">Fan pays</span>
+              <span className="text-gray-400">Your fans pay</span>
               <span className="text-xl font-bold text-white">$8.73/mo</span>
             </div>
             <div className="w-full h-3 rounded-full bg-gray-800 overflow-hidden mb-4">
@@ -184,10 +188,26 @@ export default function CreatorJoinPage() {
             </div>
           </div>
 
+          {/* Creator Studio cost clarification */}
+          <div className="bg-brand-950 rounded-xl p-6 mb-6 border border-white/5">
+            <p className="text-xs font-semibold text-red-500 uppercase tracking-wider mb-3">
+              Your Tooling Subscription
+            </p>
+            <div className="flex items-center justify-between">
+              <span className="text-gray-400">Creator Studio</span>
+              <span className="text-xl font-bold text-white">$16.00/mo</span>
+            </div>
+            <p className="text-xs text-gray-500 mt-3">
+              This is what you pay for creator tools (uploads, analytics,
+              events, messaging). It is separate from fan revenue — your
+              $1.00 per subscriber earnings are not affected.
+            </p>
+          </div>
+
           <p className="text-center text-sm text-gray-500">
-            Your fans pay $8.73 per month. You receive $1.00 per subscriber,
-            settled monthly in USDC and verified on Polygon. No hidden fees,
-            no deductions.
+            Your fans pay $8.73/mo and you receive $1.00 per subscriber,
+            settled monthly in USDC on Polygon. Creator Studio ($16/mo) is
+            your tooling subscription — separate from fan revenue.
           </p>
         </div>
       </section>

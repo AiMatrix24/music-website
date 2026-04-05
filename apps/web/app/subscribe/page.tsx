@@ -221,7 +221,7 @@ function SubscribePage() {
             <p className="text-center text-xs text-gray-500">
               Payments settled on Polygon. Verifiable on-chain.
               <br />
-              Cancel anytime. 5-day grace period on renewal.
+              Cancel anytime. 7-day grace period on renewal.
             </p>
           </div>
         </div>
