@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, useRef, useEffect, type ReactNode } from 'react';
 
 interface Track {
   id: string;
@@ -35,10 +35,52 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
 
+  // Play count tracking: increment after 30s of continuous play
+  const playTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const elapsedSecondsRef = useRef(0);
+  const countedTracksRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    // Clear any existing timer
+    if (playTimerRef.current) {
+      clearInterval(playTimerRef.current);
+      playTimerRef.current = null;
+    }
+
+    if (isPlaying && track && !countedTracksRef.current.has(track.id)) {
+      playTimerRef.current = setInterval(() => {
+        elapsedSecondsRef.current += 1;
+        if (elapsedSecondsRef.current >= 30 && track && !countedTracksRef.current.has(track.id)) {
+          countedTracksRef.current.add(track.id);
+          // Fire and forget — don't block the UI
+          fetch('/api/tracks/play', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ trackId: track.id }),
+          }).catch(() => {
+            // Silently ignore errors to avoid disrupting playback
+          });
+          if (playTimerRef.current) {
+            clearInterval(playTimerRef.current);
+            playTimerRef.current = null;
+          }
+        }
+      }, 1000);
+    }
+
+    return () => {
+      if (playTimerRef.current) {
+        clearInterval(playTimerRef.current);
+        playTimerRef.current = null;
+      }
+    };
+  }, [isPlaying, track]);
+
   const play = (t: Track) => {
     setTrack(t);
     setIsPlaying(true);
     setProgress(0);
+    elapsedSecondsRef.current = 0; // Reset elapsed time for new track
   };
 
   const toggle = () => setIsPlaying((p) => !p);
@@ -46,6 +88,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setTrack(null);
     setIsPlaying(false);
     setProgress(0);
+    elapsedSecondsRef.current = 0;
   };
 
   return (

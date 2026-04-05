@@ -86,9 +86,38 @@ export default function TicketPurchasePage() {
     if (status !== 'authenticated') { toast('Please sign in', 'error'); return; }
     setPurchasing(true);
     try {
-      const ticket = await purchase.mutateAsync({ ticketTypeId: selectedType, eventId });
-      setPurchasedTicket(ticket);
-      toast('Ticket purchased!', 'success');
+      const res = await fetch('/api/tickets/purchase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticketTypeId: selectedType,
+          eventId,
+          quantity,
+          section: selectedSection,
+          addInsurance,
+          addVIPBundle,
+          needsADA,
+          companionTicket,
+          total,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Purchase failed');
+      }
+      if (data.paymentUrl) {
+        // Redirect to NOWPayments for crypto checkout
+        window.location.href = data.paymentUrl;
+      } else if (data.ticket) {
+        // Free ticket or direct purchase — show confirmation
+        setPurchasedTicket(data.ticket);
+        toast('Ticket purchased!', 'success');
+      } else {
+        // Fallback to tRPC mutation for backward compat
+        const ticket = await purchase.mutateAsync({ ticketTypeId: selectedType, eventId });
+        setPurchasedTicket(ticket);
+        toast('Ticket purchased!', 'success');
+      }
     } catch (err: any) { toast(err.message || 'Purchase failed', 'error'); }
     finally { setPurchasing(false); }
   };

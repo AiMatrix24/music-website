@@ -99,14 +99,29 @@ export const authConfig: NextAuthConfig = {
     DiscordProvider({
       clientId: process.env.DISCORD_CLIENT_ID ?? '',
       clientSecret: process.env.DISCORD_CLIENT_SECRET ?? '',
+      authorization: {
+        params: {
+          redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://opynx.com'}/api/auth/callback/discord`,
+        },
+      },
     }),
     TwitterProvider({
       clientId: process.env.TWITTER_CLIENT_ID ?? '',
       clientSecret: process.env.TWITTER_CLIENT_SECRET ?? '',
+      authorization: {
+        params: {
+          redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://opynx.com'}/api/auth/callback/twitter`,
+        },
+      },
     }),
     TwitchProvider({
       clientId: process.env.TWITCH_CLIENT_ID ?? '',
       clientSecret: process.env.TWITCH_CLIENT_SECRET ?? '',
+      authorization: {
+        params: {
+          redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://opynx.com'}/api/auth/callback/twitch`,
+        },
+      },
     }),
   ],
 

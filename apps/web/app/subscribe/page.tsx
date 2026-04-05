@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useToast } from '../components/Toast';
 
@@ -84,11 +84,20 @@ const tiers = [
 export default function SubscribePage() {
   const [selectedTier, setSelectedTier] = useState<TierId>('premium');
   const [step, setStep] = useState<'select' | 'checkout'>('select');
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
 
   const selected = tiers.find((t) => t.id === selectedTier)!;
+
+  // Show success message if redirected back from payment
+  useEffect(() => {
+    if (searchParams.get('success') === 'true') {
+      toast('Subscription activated! Welcome aboard.', 'success');
+    }
+  }, [searchParams, toast]);
 
   const handleContinue = () => {
     if (status === 'unauthenticated') {
@@ -98,11 +107,32 @@ export default function SubscribePage() {
     setStep('checkout');
   };
 
-  const handleCheckout = (method: 'usdc' | 'card') => {
-    toast(
-      `${selected.name} plan selected — ${method === 'usdc' ? 'USDC' : 'Card'} checkout coming soon!`,
-      'info'
-    );
+  const handleCheckout = async (method: 'usdc' | 'card') => {
+    setCheckoutLoading(true);
+    try {
+      const res = await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tier: selectedTier,
+          userId: session?.user?.id,
+          paymentMethod: method,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Subscription failed');
+      }
+      if (data.paymentUrl) {
+        window.location.href = data.paymentUrl;
+      } else {
+        toast('Subscription created, but no payment URL was returned.', 'error');
+      }
+    } catch (err: any) {
+      toast(err.message || 'Something went wrong. Please try again.', 'error');
+    } finally {
+      setCheckoutLoading(false);
+    }
   };
 
   if (step === 'checkout') {
@@ -168,15 +198,17 @@ export default function SubscribePage() {
           <div className="space-y-4">
             <button
               onClick={() => handleCheckout('usdc')}
-              className="w-full rounded-full bg-gradient-to-r from-brand-600 to-brand-500 py-4 font-semibold text-white text-lg transition hover:shadow-lg hover:shadow-brand-600/30"
+              disabled={checkoutLoading}
+              className="w-full rounded-full bg-gradient-to-r from-brand-600 to-brand-500 py-4 font-semibold text-white text-lg transition hover:shadow-lg hover:shadow-brand-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Pay with USDC (Helio)
+              {checkoutLoading ? 'Processing...' : 'Pay with USDC (Helio)'}
             </button>
             <button
               onClick={() => handleCheckout('card')}
-              className="w-full rounded-full border-2 border-white/20 py-4 font-semibold text-white transition hover:border-brand-500"
+              disabled={checkoutLoading}
+              className="w-full rounded-full border-2 border-white/20 py-4 font-semibold text-white transition hover:border-brand-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Pay with Card (Samiteon)
+              {checkoutLoading ? 'Processing...' : 'Pay with Card (Samiteon)'}
             </button>
             <p className="text-center text-xs text-gray-500">
               Payments settled on Polygon. Verifiable on-chain.
