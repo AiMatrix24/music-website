@@ -29,5 +29,8 @@
   "devDependencies": {
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.1"
+  },
+  "dependencies": {
+    "bullmq": "^5.73.5"
   }
 }

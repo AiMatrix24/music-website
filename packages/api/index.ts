@@ -849,6 +849,22 @@ const ticketsRouter = createRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Use atomic UPDATE to prevent overselling via race conditions.
+      // The WHERE clause ensures sold < quantity, and the UPDATE + check
+      // happen in a single atomic SQL statement.
+      const result = await db.execute(
+        sql`UPDATE ticket_types SET sold = sold + 1 WHERE id = ${input.ticketTypeId} AND sold < quantity`
+      );
+
+      // If no rows were affected, the ticket type is sold out
+      const rowsAffected = Number((result as any).rowCount ?? (result as any).count ?? result.length ?? 0);
+      if (rowsAffected === 0) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Tickets are sold out',
+        });
+      }
+
       const qrToken = `opynx_ticket_${Date.now()}_${ctx.session.user.id}`;
       const [ticket] = await db
         .insert(tickets)
@@ -860,12 +876,6 @@ const ticketsRouter = createRouter({
           status: 'valid',
         })
         .returning();
-
-      // Increment sold count
-      await db
-        .update(ticketTypes)
-        .set({ sold: sql`${ticketTypes.sold} + 1` })
-        .where(eq(ticketTypes.id, input.ticketTypeId));
 
       return ticket;
     }),

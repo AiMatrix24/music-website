@@ -76,15 +76,87 @@ export class NowPaymentsError extends Error {
   }
 }
 
+// ─── Circuit Breaker ───
+
+class CircuitBreaker {
+  private failures = 0;
+  private lastFailureTime = 0;
+  private state: 'closed' | 'open' | 'half-open' = 'closed';
+  private readonly failureThreshold: number;
+  private readonly resetTimeout: number;
+
+  constructor(failureThreshold = 5, resetTimeout = 60000) {
+    this.failureThreshold = failureThreshold;
+    this.resetTimeout = resetTimeout;
+  }
+
+  async execute<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.state === 'open') {
+      if (Date.now() - this.lastFailureTime > this.resetTimeout) {
+        this.state = 'half-open';
+      } else {
+        throw new NowPaymentsError(
+          'Circuit breaker is open — payment service unavailable',
+          503
+        );
+      }
+    }
+    try {
+      const result = await fn();
+      this.reset();
+      return result;
+    } catch (error) {
+      this.recordFailure();
+      throw error;
+    }
+  }
+
+  private recordFailure() {
+    this.failures++;
+    this.lastFailureTime = Date.now();
+    if (this.failures >= this.failureThreshold) this.state = 'open';
+  }
+
+  private reset() {
+    this.failures = 0;
+    this.state = 'closed';
+  }
+}
+
+// ─── Retry Helper ───
+
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  retries = 3,
+  baseDelayMs = 1000
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt < retries) {
+        const delay = baseDelayMs * Math.pow(2, attempt); // 1s, 2s, 4s
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+  throw lastError;
+}
+
 // ─── Client ───
 
 const BASE_URL = 'https://api.nowpayments.io/v1';
+const REQUEST_TIMEOUT_MS = 15000;
 
 export class NowPaymentsClient {
   private readonly apiKey: string;
+  private readonly circuitBreaker: CircuitBreaker;
 
   constructor(apiKey?: string) {
     this.apiKey = apiKey ?? process.env.NOWPAYMENTS_API_KEY ?? '';
+    this.circuitBreaker = new CircuitBreaker(5, 60000);
     if (!this.apiKey) {
       console.warn(
         '[NowPayments] No API key provided. Set NOWPAYMENTS_API_KEY env var.'
@@ -99,6 +171,16 @@ export class NowPaymentsClient {
     path: string,
     body?: Record<string, unknown>
   ): Promise<T> {
+    return this.circuitBreaker.execute(() =>
+      retryWithBackoff(() => this.rawRequest<T>(method, path, body))
+    );
+  }
+
+  private async rawRequest<T>(
+    method: 'GET' | 'POST',
+    path: string,
+    body?: Record<string, unknown>
+  ): Promise<T> {
     const url = `${BASE_URL}${path}`;
 
     const headers: Record<string, string> = {
@@ -106,9 +188,13 @@ export class NowPaymentsClient {
       'Content-Type': 'application/json',
     };
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
     const options: RequestInit = {
       method,
       headers,
+      signal: controller.signal,
     };
 
     if (body && method === 'POST') {
@@ -119,10 +205,18 @@ export class NowPaymentsClient {
     try {
       response = await fetch(url, options);
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new NowPaymentsError(
+          `NOWPayments API request timed out after ${REQUEST_TIMEOUT_MS}ms`,
+          408
+        );
+      }
       throw new NowPaymentsError(
         `Network error calling NOWPayments API: ${error instanceof Error ? error.message : String(error)}`,
         0
       );
+    } finally {
+      clearTimeout(timeout);
     }
 
     let data: unknown;

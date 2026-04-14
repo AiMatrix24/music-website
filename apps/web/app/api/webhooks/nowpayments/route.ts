@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { db, subscriptions, subEvents } from '@opynx/db';
 import { eq } from 'drizzle-orm';
 import { processCommissionWaterfall } from '@/lib/services/commissions';
+import { captureError, startTransaction } from '@/lib/services/monitoring';
 
 /**
  * NOWPayments IPN (Instant Payment Notification) Webhook Handler
@@ -273,6 +274,10 @@ function parseOrderMetadata(description: string): OrderMetadata {
   return metadata;
 }
 
+// ─── Idempotency ───
+// TODO: Replace with Redis SET + 48h TTL for distributed idempotency
+const processedPaymentIds = new Set<number>();
+
 // ─── Route Handler ───
 
 export async function POST(request: NextRequest) {
@@ -288,6 +293,14 @@ export async function POST(request: NextRequest) {
     payload = JSON.parse(rawBody) as NowPaymentsIPNPayload;
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+
+  // Idempotency check: skip duplicate payment_id processing
+  if (processedPaymentIds.has(payload.payment_id)) {
+    console.log(
+      `[NOWPayments Webhook] Duplicate payment_id=${payload.payment_id}, skipping`
+    );
+    return NextResponse.json({ status: 'already_processed' }, { status: 200 });
   }
 
   // Log every webhook event
@@ -313,6 +326,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Route by payment status
+  const txn = startTransaction('nowpayments-webhook', 'webhook.process');
   try {
     switch (payload.payment_status) {
       case 'waiting':
@@ -379,9 +393,24 @@ export async function POST(request: NextRequest) {
         );
     }
 
+    // Mark as processed after successful handling
+    processedPaymentIds.add(payload.payment_id);
+    txn.finish();
+
     // Always return 200 to acknowledge receipt
     return NextResponse.json({ status: 'ok' }, { status: 200 });
   } catch (error) {
+    txn.finish();
+    captureError(error, {
+      action: 'nowpayments-webhook',
+      metadata: {
+        paymentId: payload.payment_id,
+        orderId: payload.order_id,
+        paymentStatus: payload.payment_status,
+        payCurrency: payload.pay_currency,
+        actuallyPaid: payload.actually_paid,
+      },
+    });
     console.error('[NOWPayments Webhook] Error processing event:', error);
     // Return 200 anyway to prevent NOWPayments from retrying
     // (we log the error and can investigate manually)

@@ -1,9 +1,46 @@
-// Simple in-memory rate limiter for auth endpoints
-// Will be replaced with Redis sliding window in production
+import { redis } from '../redis';
+
+// ─── Redis-based Distributed Rate Limiter (sliding window) ───
+// Used in production with Redis available. Falls back to in-memory when Redis is down.
+
+export async function checkRateLimit(
+  key: string,
+  limit: number = 100,
+  windowMs: number = 60000
+): Promise<{ allowed: boolean; remaining: number; resetIn: number }> {
+  const redisKey = `ratelimit:${key}`;
+  const now = Date.now();
+  const windowStart = now - windowMs;
+
+  try {
+    // Use Redis sorted set for sliding window
+    const pipeline = redis.pipeline();
+    pipeline.zremrangebyscore(redisKey, 0, windowStart);
+    pipeline.zadd(redisKey, now, `${now}:${Math.random()}`);
+    pipeline.zcard(redisKey);
+    pipeline.pexpire(redisKey, windowMs);
+
+    const results = await pipeline.exec();
+    const count = (results?.[2]?.[1] as number) ?? 0;
+
+    return {
+      allowed: count <= limit,
+      remaining: Math.max(0, limit - count),
+      resetIn: windowMs,
+    };
+  } catch {
+    // Redis down — fail open using in-memory fallback
+    console.warn('[RateLimit] Redis unavailable, failing open with in-memory fallback');
+    return checkRateLimitInMemory(key, limit, windowMs);
+  }
+}
+
+// ─── In-Memory Fallback Rate Limiter ───
+// Used when Redis is unavailable. Only effective per-instance (not distributed).
 
 const requestCounts = new Map<string, { count: number; resetAt: number }>();
 
-export function checkRateLimit(
+function checkRateLimitInMemory(
   key: string,
   limit: number = 10,
   windowMs: number = 60000
@@ -23,7 +60,7 @@ export function checkRateLimit(
   return { allowed: entry.count <= limit, remaining, resetIn };
 }
 
-// Cleanup old entries every 5 minutes
+// Cleanup old in-memory entries every 5 minutes
 setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of requestCounts.entries()) {
