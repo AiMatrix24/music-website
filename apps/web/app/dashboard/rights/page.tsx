@@ -107,9 +107,9 @@ export default function RightsManagementPage() {
           <div className="bg-[#15151f] rounded-xl p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold">My Tracks</h2>
-              <button className="rounded-full bg-red-600 hover:bg-red-500 transition px-4 py-2 text-sm font-semibold">
+              <Link href="/dashboard/upload/rights" className="rounded-full bg-red-600 hover:bg-red-500 transition px-4 py-2 text-sm font-semibold">
                 + Add Rights to a Track
-              </button>
+              </Link>
             </div>
 
             <div className="overflow-x-auto">
@@ -142,14 +142,14 @@ export default function RightsManagementPage() {
                         </span>
                       </td>
                       <td className="py-3 pr-4">
-                        <Link href={`/dashboard/rights/${t.id}/splits`} className="text-red-400 hover:text-red-300">
+                        <Link href={`/dashboard/splits/${t.id}`} className="text-red-400 hover:text-red-300">
                           View splits
                         </Link>
                       </td>
                       <td className="py-3 pr-4">
-                        <button className="rounded-full bg-[#1d1d2a] hover:bg-[#26263a] transition px-3 py-1.5 text-xs font-semibold">
+                        <Link href={`/dashboard/splits/${t.id}`} className="inline-block rounded-full bg-[#1d1d2a] hover:bg-[#26263a] transition px-3 py-1.5 text-xs font-semibold">
                           Edit Rights
-                        </button>
+                        </Link>
                       </td>
                     </tr>
                   ))}
