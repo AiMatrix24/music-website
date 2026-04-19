@@ -67,6 +67,8 @@ export default function DashboardPage() {
           <QuickAction href="/dashboard/earnings" icon="💰" label="Earnings" />
           <QuickAction href="/dashboard/qr" icon="📱" label="QR Codes" />
           <QuickAction href="/dashboard/rights" icon="📜" label="Rights & Splits" />
+          <QuickAction href="/dashboard/compliance" icon="🛡️" label="Royalty Compliance" />
+          <QuickAction href="/marketplace/songwriting" icon="✏️" label="Songwriter Marketplace" />
         </div>
 
         {/* Recent Tracks */}

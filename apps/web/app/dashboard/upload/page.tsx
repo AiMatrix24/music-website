@@ -326,6 +326,22 @@ export default function UploadTrackPage() {
               </div>
             )}
 
+            {/* Rights & Splits link */}
+            <Link
+              href="/dashboard/upload/rights"
+              className="block rounded-xl border border-brand-800/30 bg-brand-950/50 p-4 hover:border-red-600 transition"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-sm">📜 Configure Rights & Splits</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Set songwriter splits, PRO affiliation, label permissions before publishing
+                  </p>
+                </div>
+                <span className="text-red-400 text-sm font-semibold">Configure →</span>
+              </div>
+            </Link>
+
             <div className="flex gap-4">
               <button
                 onClick={() => setStep('file')}
