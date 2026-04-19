@@ -212,9 +212,12 @@ export default function SongwritingMarketplacePage() {
                     <span>{l.samples} samples</span>
                     <span>{l.turnaround}</span>
                   </div>
-                  <button className="mt-auto w-full rounded-full bg-red-600 hover:bg-red-500 transition py-2 font-semibold text-sm">
+                  <Link
+                    href={`/messages?to=${l.id}&service=${encodeURIComponent(l.specialty)}`}
+                    className="mt-auto w-full rounded-full bg-red-600 hover:bg-red-500 transition py-2 font-semibold text-sm text-center"
+                  >
                     Hire
-                  </button>
+                  </Link>
                 </div>
               ))}
             </div>
