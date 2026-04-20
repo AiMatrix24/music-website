@@ -98,21 +98,26 @@ export default function CompliancePage() {
             <p className="text-sm text-gray-400 mb-5">Action items to stay compliant</p>
 
             <div className="space-y-3">
-              {OUTSTANDING.map((o) => (
-                <div key={o.id} className="bg-brand-950 rounded-lg px-4 py-3 flex items-center justify-between">
-                  <div className="min-w-0 pr-3">
-                    <p className="font-semibold">{o.text}</p>
-                    {o.dueDays !== undefined && (
-                      <p className={`text-xs ${o.urgent ? 'text-red-300' : 'text-gray-400'}`}>
-                        Due in {o.dueDays} days
-                      </p>
-                    )}
+              {OUTSTANDING.map((o) => {
+                const ctaUrl = o.id === 'mlc-register' ? '/dashboard/rights'
+                  : o.id === 'q4-ascap' ? 'https://www.ascap.com/help/payments'
+                  : '/dashboard/rights/verify';
+                return (
+                  <div key={o.id} className="bg-brand-950 rounded-lg px-4 py-3 flex items-center justify-between">
+                    <div className="min-w-0 pr-3">
+                      <p className="font-semibold">{o.text}</p>
+                      {o.dueDays !== undefined && (
+                        <p className={`text-xs ${o.urgent ? 'text-red-300' : 'text-gray-400'}`}>
+                          Due in {o.dueDays} days
+                        </p>
+                      )}
+                    </div>
+                    <Link href={ctaUrl} className="rounded-full bg-red-600 hover:bg-red-500 transition px-3 py-1.5 text-xs font-semibold whitespace-nowrap">
+                      {o.cta}
+                    </Link>
                   </div>
-                  <button className="rounded-full bg-red-600 hover:bg-red-500 transition px-3 py-1.5 text-xs font-semibold whitespace-nowrap">
-                    {o.cta}
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
 
@@ -137,9 +142,13 @@ export default function CompliancePage() {
                     <td className="py-3 pr-3 text-gray-400">{q.generated}</td>
                     <td className="py-3 pr-3 font-mono">${q.amount.toFixed(2)}</td>
                     <td className="py-3 pr-3 text-right">
-                      <button className="rounded-full bg-[#1d1d2a] hover:bg-[#26263a] transition px-3 py-1.5 text-xs font-semibold">
+                      <a
+                        href={`/api/statements/${q.period.replace(' ', '-')}.pdf`}
+                        download
+                        className="inline-block rounded-full bg-[#1d1d2a] hover:bg-[#26263a] transition px-3 py-1.5 text-xs font-semibold"
+                      >
                         Download
-                      </button>
+                      </a>
                     </td>
                   </tr>
                 ))}
@@ -161,16 +170,22 @@ export default function CompliancePage() {
                       {t.year} · {t.amount !== null ? `$${t.amount.toFixed(2)}` : 'Not yet generated'}
                     </p>
                   </div>
-                  <button
-                    disabled={!t.ready}
-                    className={`rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap ${
-                      t.ready
-                        ? 'bg-red-600 hover:bg-red-500 text-white'
-                        : 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    {t.ready ? 'Download' : 'Pending'}
-                  </button>
+                  {t.ready ? (
+                    <a
+                      href={`/api/tax-docs/${t.year}-${t.name.replace(/\s+/g, '-').toLowerCase()}.pdf`}
+                      download
+                      className="rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap bg-red-600 hover:bg-red-500 text-white"
+                    >
+                      Download
+                    </a>
+                  ) : (
+                    <button
+                      disabled
+                      className="rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap bg-gray-700 text-gray-400 cursor-not-allowed"
+                    >
+                      Pending
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -184,9 +199,9 @@ export default function CompliancePage() {
               <h2 className="text-xl font-bold">Settings</h2>
               <p className="text-sm text-gray-400">Your compliance affiliations</p>
             </div>
-            <button className="rounded-full bg-red-600 hover:bg-red-500 transition px-4 py-2 text-sm font-semibold">
+            <Link href="/settings" className="rounded-full bg-red-600 hover:bg-red-500 transition px-4 py-2 text-sm font-semibold">
               Edit Settings
-            </button>
+            </Link>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
