@@ -6,9 +6,9 @@ import { useState } from 'react';
 export default function EWYKPage() {
   // Revenue calculator state
   const [fans, setFans] = useState(1000);
-  const [streamsPerFan, setStreamsPerFan] = useState(50);
+  const [streamsPerFan, setStreamsPerFan] = useState(30); // realistic default: regular fan
   const [competitorName, setCompetitorName] = useState('Streaming Service');
-  const [competitorRate, setCompetitorRate] = useState(0.003); // $ per stream
+  const [competitorRate, setCompetitorRate] = useState(0.004); // $ per stream (industry avg 2026)
 
   // OPYNX math: $1.00 per subscriber × 12 months
   const opynxAnnual = fans * 12.00;
@@ -243,17 +243,47 @@ export default function EWYKPage() {
                 </label>
                 <input
                   type="range"
-                  min={5}
-                  max={500}
-                  step={5}
+                  min={1}
+                  max={200}
+                  step={1}
                   value={streamsPerFan}
                   onChange={(e) => setStreamsPerFan(parseInt(e.target.value))}
                   className="w-full accent-gray-500"
                 />
                 <div className="flex justify-between text-xs text-gray-500 mt-1">
-                  <span>5 (casual)</span>
-                  <span>500 (superfan)</span>
+                  <span>1 (casual)</span>
+                  <span>200 (superfan)</span>
                 </div>
+                {/* Quick preset buttons */}
+                <div className="flex gap-2 mt-3 flex-wrap">
+                  <button
+                    onClick={() => setStreamsPerFan(10)}
+                    className="text-xs px-3 py-1.5 rounded-full bg-brand-950 border border-brand-800/30 hover:border-red-600 transition text-gray-400"
+                  >
+                    Casual (10/mo)
+                  </button>
+                  <button
+                    onClick={() => setStreamsPerFan(30)}
+                    className="text-xs px-3 py-1.5 rounded-full bg-brand-950 border border-brand-800/30 hover:border-red-600 transition text-gray-400"
+                  >
+                    Regular (30/mo)
+                  </button>
+                  <button
+                    onClick={() => setStreamsPerFan(75)}
+                    className="text-xs px-3 py-1.5 rounded-full bg-brand-950 border border-brand-800/30 hover:border-red-600 transition text-gray-400"
+                  >
+                    Engaged (75/mo)
+                  </button>
+                  <button
+                    onClick={() => setStreamsPerFan(150)}
+                    className="text-xs px-3 py-1.5 rounded-full bg-brand-950 border border-brand-800/30 hover:border-red-600 transition text-gray-400"
+                  >
+                    Superfan (150/mo)
+                  </button>
+                </div>
+                <p className="text-xs text-gray-600 mt-2">
+                  Note: Industry average is 20–40 streams/month per listener per artist. Superfans rarely exceed 150.
+                </p>
               </div>
 
               {/* Competitor inputs */}
@@ -279,7 +309,9 @@ export default function EWYKPage() {
                     max="1"
                     className="w-full bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-sm text-white focus:border-red-600 outline-none font-mono"
                   />
-                  <p className="text-xs text-gray-600 mt-1">Typical range: $0.001 – $0.01 per stream</p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Industry rates: $0.003–$0.005 (most platforms), $0.008–$0.012 (premium-only platforms)
+                  </p>
                 </div>
               </div>
             </div>
