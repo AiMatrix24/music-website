@@ -6,19 +6,27 @@ import { useState } from 'react';
 export default function EWYKPage() {
   // Revenue calculator state
   const [fans, setFans] = useState(1000);
-  const [streamsPerFan, setStreamsPerFan] = useState(30); // realistic default: regular fan
+  const [streamsPerMonth, setStreamsPerMonth] = useState(100000); // total monthly streams (industry standard)
   const [competitorName, setCompetitorName] = useState('Streaming Service');
-  const [competitorRate, setCompetitorRate] = useState(0.004); // $ per stream (industry avg 2026)
+  const [competitorRatePerMillion, setCompetitorRatePerMillion] = useState(4000); // $ per 1M streams
 
   // OPYNX math: $1.00 per subscriber × 12 months
   const opynxAnnual = fans * 12.00;
 
-  // Competitor math: customizable rate per stream
-  const competitorAnnual = fans * streamsPerFan * 12 * competitorRate;
+  // Competitor math: rate per million streams (industry standard format)
+  // streamsPerMonth × 12 months = annual streams
+  // (annual streams / 1,000,000) × rate per million = annual revenue
+  const annualStreams = streamsPerMonth * 12;
+  const competitorAnnual = (annualStreams / 1_000_000) * competitorRatePerMillion;
 
   const opynxMonthly = opynxAnnual / 12;
   const competitorMonthly = competitorAnnual / 12;
   const multiplier = competitorAnnual > 0 ? (opynxAnnual / competitorAnnual).toFixed(1) : '∞';
+
+  // Streams needed per month to match OPYNX revenue (the "break-even" reality check)
+  const streamsToMatchOpynx = competitorRatePerMillion > 0
+    ? Math.round((opynxAnnual / 12) / (competitorRatePerMillion / 1_000_000))
+    : 0;
 
   return (
     <div className="min-h-screen">
@@ -210,7 +218,58 @@ export default function EWYKPage() {
               What Would <span className="text-red-500">You</span> Earn?
             </h2>
             <p className="text-lg text-gray-400 max-w-xl mx-auto">
-              Compare OPYNX direct-to-fan earnings vs. any pool-based streaming platform.
+              Compare OPYNX direct-to-fan earnings vs. any pool-based streaming platform&apos;s payout per million streams.
+            </p>
+          </div>
+
+          {/* Industry Reference Table */}
+          <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6 mb-6">
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">
+              Industry Reference: Average Payout per 1 Million Streams (2026)
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+              <button
+                onClick={() => setCompetitorRatePerMillion(2500)}
+                className="rounded-xl bg-brand-950 border border-brand-800/30 p-3 text-left hover:border-red-600 transition"
+              >
+                <p className="font-bold">Video-Audio Hybrid</p>
+                <p className="text-xs text-gray-500">$2,000 – $3,000 per 1M</p>
+              </button>
+              <button
+                onClick={() => setCompetitorRatePerMillion(4000)}
+                className="rounded-xl bg-brand-950 border border-brand-800/30 p-3 text-left hover:border-red-600 transition"
+              >
+                <p className="font-bold">Mass-Market Stream</p>
+                <p className="text-xs text-gray-500">$3,000 – $5,000 per 1M</p>
+              </button>
+              <button
+                onClick={() => setCompetitorRatePerMillion(4000)}
+                className="rounded-xl bg-brand-950 border border-brand-800/30 p-3 text-left hover:border-red-600 transition"
+              >
+                <p className="font-bold">Bundled-Service Stream</p>
+                <p className="text-xs text-gray-500">$4,000 per 1M</p>
+              </button>
+              <button
+                onClick={() => setCompetitorRatePerMillion(10000)}
+                className="rounded-xl bg-brand-950 border border-brand-800/30 p-3 text-left hover:border-red-600 transition"
+              >
+                <p className="font-bold">Premium Editorial</p>
+                <p className="text-xs text-gray-500">$10,000 per 1M</p>
+              </button>
+              <button
+                onClick={() => setCompetitorRatePerMillion(10500)}
+                className="rounded-xl bg-brand-950 border border-brand-800/30 p-3 text-left hover:border-red-600 transition"
+              >
+                <p className="font-bold">High-Fidelity</p>
+                <p className="text-xs text-gray-500">$8,000 – $13,000 per 1M</p>
+              </button>
+              <div className="rounded-xl bg-red-900/20 border border-red-600/30 p-3">
+                <p className="font-bold text-red-400">OPYNX (EWYK)</p>
+                <p className="text-xs text-red-400/70">$1.00 per subscriber/mo</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-600 mt-3">
+              Tap a category to use that rate in the calculator below.
             </p>
           </div>
 
@@ -218,7 +277,7 @@ export default function EWYKPage() {
             <div className="space-y-6">
               <div>
                 <label className="flex justify-between items-center mb-3">
-                  <span className="text-sm font-semibold">Your Fans / Subscribers</span>
+                  <span className="text-sm font-semibold">Your Subscribers / Fans</span>
                   <span className="text-2xl font-black text-red-400">{fans.toLocaleString()}</span>
                 </label>
                 <input
@@ -238,51 +297,52 @@ export default function EWYKPage() {
 
               <div>
                 <label className="flex justify-between items-center mb-3">
-                  <span className="text-sm font-semibold">Streams per fan per month</span>
-                  <span className="text-2xl font-black text-gray-400">{streamsPerFan}</span>
+                  <span className="text-sm font-semibold">Total Monthly Streams (across platforms)</span>
+                  <span className="text-2xl font-black text-gray-400">{streamsPerMonth.toLocaleString()}</span>
                 </label>
                 <input
                   type="range"
-                  min={1}
-                  max={200}
-                  step={1}
-                  value={streamsPerFan}
-                  onChange={(e) => setStreamsPerFan(parseInt(e.target.value))}
+                  min={1000}
+                  max={5000000}
+                  step={1000}
+                  value={streamsPerMonth}
+                  onChange={(e) => setStreamsPerMonth(parseInt(e.target.value))}
                   className="w-full accent-gray-500"
                 />
                 <div className="flex justify-between text-xs text-gray-500 mt-1">
-                  <span>1 (casual)</span>
-                  <span>200 (superfan)</span>
+                  <span>1K</span>
+                  <span>5M</span>
                 </div>
-                {/* Quick preset buttons */}
+                {/* Quick preset buttons for stream tiers */}
                 <div className="flex gap-2 mt-3 flex-wrap">
                   <button
-                    onClick={() => setStreamsPerFan(10)}
+                    onClick={() => setStreamsPerMonth(10000)}
                     className="text-xs px-3 py-1.5 rounded-full bg-brand-950 border border-brand-800/30 hover:border-red-600 transition text-gray-400"
                   >
-                    Casual (10/mo)
+                    10K/mo (Emerging)
                   </button>
                   <button
-                    onClick={() => setStreamsPerFan(30)}
+                    onClick={() => setStreamsPerMonth(100000)}
                     className="text-xs px-3 py-1.5 rounded-full bg-brand-950 border border-brand-800/30 hover:border-red-600 transition text-gray-400"
                   >
-                    Regular (30/mo)
+                    100K/mo (Mid-tier)
                   </button>
                   <button
-                    onClick={() => setStreamsPerFan(75)}
+                    onClick={() => setStreamsPerMonth(1000000)}
                     className="text-xs px-3 py-1.5 rounded-full bg-brand-950 border border-brand-800/30 hover:border-red-600 transition text-gray-400"
                   >
-                    Engaged (75/mo)
+                    1M/mo (Established)
                   </button>
                   <button
-                    onClick={() => setStreamsPerFan(150)}
+                    onClick={() => setStreamsPerMonth(5000000)}
                     className="text-xs px-3 py-1.5 rounded-full bg-brand-950 border border-brand-800/30 hover:border-red-600 transition text-gray-400"
                   >
-                    Superfan (150/mo)
+                    5M/mo (Top Tier)
                   </button>
                 </div>
                 <p className="text-xs text-gray-600 mt-2">
-                  Note: Industry average is 20–40 streams/month per listener per artist. Superfans rarely exceed 150.
+                  Per the 2024 platform data, an artist ranked #100,000 averages ~10K-30K streams/month.
+                  An artist at #10,000 averages ~1M streams/month.
                 </p>
               </div>
 
@@ -294,23 +354,23 @@ export default function EWYKPage() {
                     type="text"
                     value={competitorName}
                     onChange={(e) => setCompetitorName(e.target.value)}
-                    placeholder="e.g. Your Current Streaming Service"
+                    placeholder="Your current platform name"
                     className="w-full bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:border-red-600 outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold mb-2">Their Payout / Stream ($)</label>
+                  <label className="block text-sm font-semibold mb-2">Payout per 1 Million Streams ($)</label>
                   <input
                     type="number"
-                    value={competitorRate}
-                    onChange={(e) => setCompetitorRate(parseFloat(e.target.value) || 0)}
-                    step="0.0001"
+                    value={competitorRatePerMillion}
+                    onChange={(e) => setCompetitorRatePerMillion(parseFloat(e.target.value) || 0)}
+                    step="100"
                     min="0"
-                    max="1"
+                    max="50000"
                     className="w-full bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-sm text-white focus:border-red-600 outline-none font-mono"
                   />
                   <p className="text-xs text-gray-600 mt-1">
-                    Industry rates: $0.003–$0.005 (most platforms), $0.008–$0.012 (premium-only platforms)
+                    Equals ${(competitorRatePerMillion / 1_000_000).toFixed(4)} per stream
                   </p>
                 </div>
               </div>
@@ -320,11 +380,14 @@ export default function EWYKPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div className="rounded-2xl bg-gradient-to-br from-gray-900 to-gray-950 border-2 border-gray-800 p-6">
               <p className="text-xs text-gray-500 uppercase tracking-wider mb-2 truncate">{competitorName} (Pro-Rata Pool)</p>
-              <p className="text-xs text-gray-600 mb-3">${competitorRate.toFixed(4)}/stream</p>
+              <p className="text-xs text-gray-600 mb-3">${competitorRatePerMillion.toLocaleString()} per 1M streams</p>
               <p className="text-4xl font-black text-gray-400 mb-1">${competitorMonthly.toFixed(0)}</p>
               <p className="text-sm text-gray-500">/month</p>
               <p className="text-xs text-gray-600 mt-4">
                 = ${competitorAnnual.toFixed(0)} per year
+              </p>
+              <p className="text-xs text-gray-600 mt-1">
+                {annualStreams.toLocaleString()} annual streams
               </p>
             </div>
 
@@ -336,19 +399,65 @@ export default function EWYKPage() {
               <p className="text-xs text-red-400/70 mt-4">
                 = ${opynxAnnual.toFixed(0)} per year
               </p>
+              <p className="text-xs text-red-400/70 mt-1">
+                {fans.toLocaleString()} paying subscribers
+              </p>
             </div>
           </div>
 
-          <div className="rounded-2xl bg-gradient-to-r from-red-600/10 to-red-400/10 border border-red-600/30 p-6 text-center">
+          <div className="rounded-2xl bg-gradient-to-r from-red-600/10 to-red-400/10 border border-red-600/30 p-6 text-center mb-6">
             <p className="text-sm text-gray-400 mb-2">OPYNX pays you</p>
             <p className="text-5xl font-black text-red-400 mb-2">{multiplier}x</p>
             <p className="text-sm text-gray-400">
-              more than {competitorName} for the <span className="font-bold text-white">exact same audience</span>
+              more than {competitorName} at the values entered above
+            </p>
+          </div>
+
+          {/* Reality Check */}
+          <div className="rounded-2xl bg-[#15151f] border border-orange-900/40 p-6 mb-6">
+            <p className="text-xs font-bold uppercase tracking-widest text-orange-400 mb-3">Reality Check</p>
+            <p className="text-base mb-3">
+              To match your OPYNX revenue of <span className="text-red-400 font-bold">${opynxMonthly.toFixed(0)}/month</span> on {competitorName},
+              you would need <span className="font-bold text-white">{streamsToMatchOpynx.toLocaleString()} streams per month</span>.
+            </p>
+            <p className="text-sm text-gray-400">
+              That&apos;s {(streamsToMatchOpynx / fans).toFixed(0)} streams per fan per month — every single month, year after year.
+              On OPYNX, you just need them to subscribe.
+            </p>
+          </div>
+
+          {/* Artist Ranking Reality */}
+          <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6 mb-6">
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">
+              The Hard Truth: Artist Income by Platform Ranking (2024 Data)
+            </p>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between p-3 bg-brand-950/50 rounded-lg">
+                <span>Top 10,000 artists (top 0.1%)</span>
+                <span className="font-bold text-green-400">~$131,000/year</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-brand-950/50 rounded-lg">
+                <span>Top 100,000 artists (top 1%)</span>
+                <span className="font-bold text-yellow-400">~$6,000/year</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-brand-950/50 rounded-lg">
+                <span>Top 1,000,000 artists</span>
+                <span className="font-bold text-red-400">~$24/year</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-red-900/20 border border-red-600/30 rounded-lg">
+                <span className="font-bold">OPYNX with 500 subscribers</span>
+                <span className="font-bold text-red-400">$6,000/year guaranteed</span>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-4">
+              At #100,000 on a streaming platform, an artist makes $6K/year — below the survival
+              threshold in most developed economies. On OPYNX, just 500 subscribers gets you to
+              the same income level — predictably, every year.
             </p>
           </div>
 
           <p className="text-xs text-gray-500 text-center mt-6">
-            Enter any streaming platform&apos;s per-stream payout rate above to compare.
+            Use the &ldquo;Industry Reference&rdquo; cards above to load realistic per-million-stream rates.
             OPYNX rate is the guaranteed $1.00-per-subscriber-per-month creator payout, verifiable on Polygon.
           </p>
         </div>
