@@ -30,6 +30,7 @@ export function Footer() {
               <li><Link href="/community" className="text-gray-500 hover:text-brand-400 transition">Community</Link></li>
               <li><Link href="/charts" className="text-gray-500 hover:text-brand-400 transition">Charts</Link></li>
               <li><Link href="/live" className="text-gray-500 hover:text-brand-400 transition">Live</Link></li>
+              <li><Link href="/ewyk" className="text-red-400 hover:text-red-300 font-semibold transition">🎯 Eat What You Kill</Link></li>
               <li><Link href="/radio" className="text-gray-500 hover:text-brand-400 transition">📻 Radio Network</Link></li>
               <li><Link href="/radio/advertise" className="text-gray-500 hover:text-brand-400 transition">Advertise on Radio</Link></li>
               <li><Link href="/beats" className="text-gray-500 hover:text-brand-400 transition">Beat Store</Link></li>

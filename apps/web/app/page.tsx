@@ -44,10 +44,13 @@ export default function HomePage() {
             <br />
             No Middlemen.
           </h1>
-          <p className="text-lg text-gray-400 max-w-lg mx-auto mb-10">
+          <p className="text-lg text-gray-400 max-w-lg mx-auto mb-4">
             Subscribe directly to artists for $8.73/month. Every dollar is
             transparent, on-chain, and verifiable. Zero app store tax.
           </p>
+          <Link href="/ewyk" className="inline-block mb-10 text-sm font-semibold text-red-400 hover:text-red-300 transition border-b border-red-400/30 hover:border-red-300 pb-0.5">
+            🎯 Why OPYNX? &ldquo;Eat What You Kill&rdquo; →
+          </Link>
           <div className="flex gap-4 justify-center flex-wrap">
             <Link
               href="/subscribe"

@@ -60,6 +60,9 @@ export function Navbar() {
             <Link href="/showcase" className="text-sm text-gray-400 hover:text-white transition">
               Showcase
             </Link>
+            <Link href="/ewyk" className="text-sm text-red-400 hover:text-red-300 font-semibold transition">
+              Why OPYNX
+            </Link>
             <Link href="/subscribe" className="text-sm text-gray-400 hover:text-white transition">
               Subscribe
             </Link>
