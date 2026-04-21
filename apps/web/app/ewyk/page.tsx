@@ -7,16 +7,18 @@ export default function EWYKPage() {
   // Revenue calculator state
   const [fans, setFans] = useState(1000);
   const [streamsPerFan, setStreamsPerFan] = useState(50);
+  const [competitorName, setCompetitorName] = useState('Streaming Service');
+  const [competitorRate, setCompetitorRate] = useState(0.003); // $ per stream
 
   // OPYNX math: $1.00 per subscriber × 12 months
   const opynxAnnual = fans * 12.00;
 
-  // Spotify math: ~$0.003 per stream (2026 estimated rate)
-  const spotifyAnnual = fans * streamsPerFan * 12 * 0.003;
+  // Competitor math: customizable rate per stream
+  const competitorAnnual = fans * streamsPerFan * 12 * competitorRate;
 
   const opynxMonthly = opynxAnnual / 12;
-  const spotifyMonthly = spotifyAnnual / 12;
-  const multiplier = spotifyAnnual > 0 ? (opynxAnnual / spotifyAnnual).toFixed(1) : '∞';
+  const competitorMonthly = competitorAnnual / 12;
+  const multiplier = competitorAnnual > 0 ? (opynxAnnual / competitorAnnual).toFixed(1) : '∞';
 
   return (
     <div className="min-h-screen">
@@ -60,24 +62,24 @@ export default function EWYKPage() {
               <div className="text-4xl mb-4">🎛️</div>
               <h3 className="text-xl font-bold mb-3">Algorithmic Gating</h3>
               <p className="text-gray-400">
-                Spotify and TikTok decide who sees your content. Even your own followers
-                don&apos;t see your posts unless you pay to boost them.
+                Streaming platforms and social networks decide who sees your content.
+                Even your own followers don&apos;t see your posts unless you pay to boost them.
               </p>
             </div>
             <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-8">
               <div className="text-4xl mb-4">💸</div>
               <h3 className="text-xl font-bold mb-3">Pro-Rata Dilution</h3>
               <p className="text-gray-400">
-                Your streams go into a global pool. Taylor Swift&apos;s 100M streams
-                literally reduce the payout rate for independent artists.
+                Your streams go into a global pool. A top artist&apos;s 100M streams
+                literally reduce the payout rate for independent artists sharing the same pool.
               </p>
             </div>
             <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-8">
               <div className="text-4xl mb-4">🎯</div>
               <h3 className="text-xl font-bold mb-3">Pay to Play</h3>
               <p className="text-gray-400">
-                Want your followers to actually see your new release? Pay Instagram.
-                Want ticket sales? Pay Facebook. Want discovery? Pay Spotify.
+                Want your followers to actually see your new release? Pay the social network.
+                Want ticket sales? Pay the ad platform. Want discovery? Pay the streaming service.
               </p>
             </div>
           </div>
@@ -144,7 +146,7 @@ export default function EWYKPage() {
                   <th className="text-left p-6 font-bold text-gray-400 text-sm uppercase tracking-wider">Feature</th>
                   <th className="text-left p-6 font-bold text-gray-400 text-sm uppercase tracking-wider">
                     Legacy Apps
-                    <br /><span className="text-xs font-normal normal-case text-gray-500">Spotify / Ticketmaster / TikTok</span>
+                    <br /><span className="text-xs font-normal normal-case text-gray-500">Streaming Services / Social Networks / Ticket Platforms</span>
                   </th>
                   <th className="text-left p-6 font-bold text-red-400 text-sm uppercase tracking-wider">
                     OPYNX
@@ -208,7 +210,7 @@ export default function EWYKPage() {
               What Would <span className="text-red-500">You</span> Earn?
             </h2>
             <p className="text-lg text-gray-400 max-w-xl mx-auto">
-              Compare OPYNX direct-to-fan earnings vs. Spotify&apos;s pool-based payouts.
+              Compare OPYNX direct-to-fan earnings vs. any pool-based streaming platform.
             </p>
           </div>
 
@@ -236,7 +238,7 @@ export default function EWYKPage() {
 
               <div>
                 <label className="flex justify-between items-center mb-3">
-                  <span className="text-sm font-semibold">Streams per fan per month (Spotify)</span>
+                  <span className="text-sm font-semibold">Streams per fan per month</span>
                   <span className="text-2xl font-black text-gray-400">{streamsPerFan}</span>
                 </label>
                 <input
@@ -253,17 +255,44 @@ export default function EWYKPage() {
                   <span>500 (superfan)</span>
                 </div>
               </div>
+
+              {/* Competitor inputs */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-brand-800/20">
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Competing Platform Name</label>
+                  <input
+                    type="text"
+                    value={competitorName}
+                    onChange={(e) => setCompetitorName(e.target.value)}
+                    placeholder="e.g. Your Current Streaming Service"
+                    className="w-full bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:border-red-600 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Their Payout / Stream ($)</label>
+                  <input
+                    type="number"
+                    value={competitorRate}
+                    onChange={(e) => setCompetitorRate(parseFloat(e.target.value) || 0)}
+                    step="0.0001"
+                    min="0"
+                    max="1"
+                    className="w-full bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-sm text-white focus:border-red-600 outline-none font-mono"
+                  />
+                  <p className="text-xs text-gray-600 mt-1">Typical range: $0.001 – $0.01 per stream</p>
+                </div>
+              </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div className="rounded-2xl bg-gradient-to-br from-gray-900 to-gray-950 border-2 border-gray-800 p-6">
-              <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Spotify (Pro-Rata Pool)</p>
-              <p className="text-xs text-gray-600 mb-3">$0.003/stream average</p>
-              <p className="text-4xl font-black text-gray-400 mb-1">${spotifyMonthly.toFixed(0)}</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wider mb-2 truncate">{competitorName} (Pro-Rata Pool)</p>
+              <p className="text-xs text-gray-600 mb-3">${competitorRate.toFixed(4)}/stream</p>
+              <p className="text-4xl font-black text-gray-400 mb-1">${competitorMonthly.toFixed(0)}</p>
               <p className="text-sm text-gray-500">/month</p>
               <p className="text-xs text-gray-600 mt-4">
-                = ${spotifyAnnual.toFixed(0)} per year
+                = ${competitorAnnual.toFixed(0)} per year
               </p>
             </div>
 
@@ -282,13 +311,13 @@ export default function EWYKPage() {
             <p className="text-sm text-gray-400 mb-2">OPYNX pays you</p>
             <p className="text-5xl font-black text-red-400 mb-2">{multiplier}x</p>
             <p className="text-sm text-gray-400">
-              more than Spotify for the <span className="font-bold text-white">exact same audience</span>
+              more than {competitorName} for the <span className="font-bold text-white">exact same audience</span>
             </p>
           </div>
 
           <p className="text-xs text-gray-500 text-center mt-6">
-            Note: Spotify rate based on 2026 pro-rata estimate. OPYNX rate is the guaranteed
-            $1.00-per-subscriber-per-month creator payout, verifiable on Polygon.
+            Enter any streaming platform&apos;s per-stream payout rate above to compare.
+            OPYNX rate is the guaranteed $1.00-per-subscriber-per-month creator payout, verifiable on Polygon.
           </p>
         </div>
       </section>
