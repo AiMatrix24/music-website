@@ -97,14 +97,41 @@ export default function ScanPage() {
   }, [stopCamera]);
 
   // ─── Geolocation ───
-  const requestGeo = useCallback(() => {
+  const requestGeo = useCallback((venueId?: string) => {
     setGeoStatus('requesting');
     if (!navigator.geolocation) {
       setGeoStatus('error');
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      () => setGeoStatus('verified'),
+      async (position) => {
+        // If we have a venueId, verify geofence against venue location
+        if (venueId) {
+          try {
+            const res = await fetch('/api/geo/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userLat: position.coords.latitude,
+                userLng: position.coords.longitude,
+                venueId,
+              }),
+            });
+            const data = await res.json();
+            // Only mark as verified if within venue radius
+            if (data.geoVerified === true) {
+              setGeoStatus('verified');
+            } else {
+              setGeoStatus('error');
+            }
+          } catch {
+            setGeoStatus('error');
+          }
+        } else {
+          // No venue to check against — just confirm GPS works
+          setGeoStatus('verified');
+        }
+      },
       (err) => {
         if (err.code === err.PERMISSION_DENIED) setGeoStatus('denied');
         else setGeoStatus('error');
@@ -380,7 +407,7 @@ export default function ScanPage() {
         <div className="w-full max-w-sm mb-4">
           {geoStatus === 'idle' && (
             <button
-              onClick={requestGeo}
+              onClick={() => requestGeo(scanResult?.eventId)}
               className="w-full rounded-lg bg-[#15151f] border border-white/10 p-3 text-left hover:border-red-600/30 transition"
             >
               <div className="flex items-center gap-3">
