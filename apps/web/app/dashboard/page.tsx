@@ -69,6 +69,8 @@ export default function DashboardPage() {
           <QuickAction href="/dashboard/rights" icon="📜" label="Rights & Splits" />
           <QuickAction href="/dashboard/compliance" icon="🛡️" label="Royalty Compliance" />
           <QuickAction href="/marketplace/songwriting" icon="✏️" label="Songwriter Marketplace" />
+          <QuickAction href="/dashboard/radio/channel" icon="📻" label="My Radio Channel" />
+          <QuickAction href="/dashboard/radio/studio" icon="🎬" label="Go Live on Radio" />
         </div>
 
         {/* Recent Tracks */}

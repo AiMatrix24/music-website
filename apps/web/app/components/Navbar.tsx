@@ -53,6 +53,10 @@ export function Navbar() {
             <Link href="/venues/discover" className="text-sm text-gray-400 hover:text-white transition">
               Venues
             </Link>
+            <Link href="/radio" className="text-sm text-gray-400 hover:text-white transition flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+              Radio
+            </Link>
             <Link href="/showcase" className="text-sm text-gray-400 hover:text-white transition">
               Showcase
             </Link>
@@ -154,6 +158,14 @@ export function Navbar() {
                 className="text-sm text-gray-300 hover:text-white transition py-2"
               >
                 Library
+              </Link>
+              <Link
+                href="/radio"
+                onClick={() => setMobileOpen(false)}
+                className="text-sm text-gray-300 hover:text-white transition py-2 flex items-center gap-2"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                Radio Network
               </Link>
               <Link
                 href="/tickets"
