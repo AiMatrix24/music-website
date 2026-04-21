@@ -17,7 +17,7 @@ const tiers = [
     period: '/mo',
     features: [
       '320kbps streaming',
-      'No ads, unlimited skips',
+      'Artist directed ads and skips',
       'Offline listening (PWA)',
       'Pre-sale tickets',
       '10% merch discount',
