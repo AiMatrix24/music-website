@@ -54,6 +54,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Mirror current track into a ref so the timeupdate listener (set up once on
+  // mount) always reads the latest track without re-subscribing.
+  const trackRef = useRef<Track | null>(null);
 
   // Play count tracking: increment after 30s of continuous play
   const countedTracksRef = useRef<Set<string>>(new Set());
@@ -64,91 +67,123 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const audio = new Audio();
-    audio.preload = 'metadata';
+    // 'auto' so the file is ready to play the moment the user clicks — critical
+    // on iOS Safari where play() must be called synchronously in a gesture and
+    // can't wait for buffering.
+    audio.preload = 'auto';
+    // No crossOrigin — only needed for Web Audio / canvas, and breaks playback
+    // on CDNs that don't return Access-Control-Allow-Origin for media requests.
     audioRef.current = audio;
 
     const onTime = () => {
       setCurrentTime(audio.currentTime);
-      // Play count: track wall-clock seconds while playing
-      if (!audio.paused && track) {
+    };
+    const onMeta = () => {
+      if (Number.isFinite(audio.duration)) setAudioDuration(audio.duration);
+    };
+    const onPlay = () => {
+      setIsPlaying(true);
+      lastTickRef.current = performance.now();
+    };
+    const onPause = () => {
+      setIsPlaying(false);
+      lastTickRef.current = 0;
+    };
+    const onEnded = () => {
+      setIsPlaying(false);
+    };
+    const onTickAccrual = () => {
+      const t = trackRef.current;
+      if (!audio.paused && t) {
         const now = performance.now();
         if (lastTickRef.current > 0) {
           accumulatedRef.current += (now - lastTickRef.current) / 1000;
         }
         lastTickRef.current = now;
-        if (accumulatedRef.current >= 30 && !countedTracksRef.current.has(track.id)) {
-          countedTracksRef.current.add(track.id);
+        if (accumulatedRef.current >= 30 && !countedTracksRef.current.has(t.id)) {
+          countedTracksRef.current.add(t.id);
           fetch('/api/tracks/play', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ trackId: track.id }),
+            body: JSON.stringify({ trackId: t.id }),
           }).catch(() => {});
         }
       }
     };
-    const onMeta = () => {
-      if (Number.isFinite(audio.duration)) setAudioDuration(audio.duration);
-    };
-    const onEnded = () => setIsPlaying(false);
-    const onPause = () => {
-      lastTickRef.current = 0;
-    };
 
     audio.addEventListener('timeupdate', onTime);
+    audio.addEventListener('timeupdate', onTickAccrual);
     audio.addEventListener('loadedmetadata', onMeta);
-    audio.addEventListener('ended', onEnded);
+    audio.addEventListener('play', onPlay);
     audio.addEventListener('pause', onPause);
+    audio.addEventListener('ended', onEnded);
 
     return () => {
       audio.removeEventListener('timeupdate', onTime);
+      audio.removeEventListener('timeupdate', onTickAccrual);
       audio.removeEventListener('loadedmetadata', onMeta);
-      audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('play', onPlay);
       audio.removeEventListener('pause', onPause);
+      audio.removeEventListener('ended', onEnded);
       audio.pause();
       audio.src = '';
       audioRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sync play/pause state to the audio element
+  // Keep the ref in sync with track on every render
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || !track?.audioUrl) return;
-    if (isPlaying) {
-      audio.play().catch(() => setIsPlaying(false));
-    } else {
-      audio.pause();
-    }
-  }, [isPlaying, track?.audioUrl]);
+    trackRef.current = track;
+  }, [track]);
 
-  // Whenever a new track is selected with a URL, load it
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (track?.audioUrl) {
-      if (audio.src !== track.audioUrl) {
-        audio.src = track.audioUrl;
-        audio.load();
-        accumulatedRef.current = 0;
-        lastTickRef.current = 0;
-      }
-    } else {
-      audio.removeAttribute('src');
-      setAudioDuration(0);
-      setCurrentTime(0);
-    }
-  }, [track?.audioUrl]);
-
+  /**
+   * play() — must be called inside a user-gesture event handler (onClick).
+   * Sets src + invokes audio.play() synchronously so iOS Safari permits it.
+   */
   const play = (t: Track) => {
+    const audio = audioRef.current;
     setTrack(t);
-    setIsPlaying(true);
     setCurrentTime(0);
     accumulatedRef.current = 0;
     lastTickRef.current = 0;
+
+    if (!audio || !t.audioUrl) {
+      setIsPlaying(false);
+      return;
+    }
+
+    // Only re-load if the URL actually changed (preserves position when toggling)
+    if (audio.src !== t.audioUrl) {
+      audio.src = t.audioUrl;
+      audio.load();
+    }
+
+    // Synchronous play() inside the gesture — required for iOS / autoplay policies
+    const playPromise = audio.play();
+    if (playPromise && typeof playPromise.then === 'function') {
+      playPromise.catch(() => {
+        // Autoplay blocked or media error — surface state, don't crash
+        setIsPlaying(false);
+      });
+    }
   };
 
-  const toggle = () => setIsPlaying((p) => !p);
+  /**
+   * toggle() — pause/resume current track. Must also run synchronously inside
+   * a click handler so iOS unlocks audio if it hasn't already.
+   */
+  const toggle = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.paused) {
+      const p = audio.play();
+      if (p && typeof p.then === 'function') {
+        p.catch(() => setIsPlaying(false));
+      }
+    } else {
+      audio.pause();
+    }
+  };
 
   const seek = (percent: number) => {
     const audio = audioRef.current;
