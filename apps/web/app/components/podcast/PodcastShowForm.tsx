@@ -43,18 +43,57 @@ export function PodcastShowForm({ onCreated }: { onCreated: () => void }) {
   const [explicit, setExplicit] = useState(false);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverUrl, setCoverUrl] = useState<string>('');
+  const [coverError, setCoverError] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
 
   const { startUpload: uploadCover, isUploading: coverUploading } = useUploadThing('imageUpload', {
     onClientUploadComplete: (res) => {
-      const url = res?.[0]?.ufsUrl;
+      const url = res?.[0]?.ufsUrl ?? res?.[0]?.url;
       if (url) {
         setCoverUrl(url);
-        toast('Cover uploaded');
+        setCoverError('');
+        toast('Cover uploaded', 'success');
+      } else {
+        setCoverError('Upload completed but no URL returned. Try again.');
       }
     },
-    onUploadError: (err) => toast(err.message || 'Cover upload failed', 'error'),
+    onUploadError: (err) => {
+      const msg = err.message || 'Cover upload failed';
+      setCoverError(msg);
+      toast(msg, 'error');
+    },
   });
+
+  const handleCoverChange = async (file: File | null) => {
+    setCoverError('');
+    setCoverUrl('');
+    setCoverFile(file);
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      const msg = `File is ${(file.size / 1024 / 1024).toFixed(1)}MB — max is 8MB`;
+      setCoverError(msg);
+      toast(msg, 'error');
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      const msg = `File type "${file.type || 'unknown'}" is not an image`;
+      setCoverError(msg);
+      toast(msg, 'error');
+      return;
+    }
+    try {
+      const res = await uploadCover([file]);
+      // onClientUploadComplete callback handles success/state. If startUpload
+      // resolves with no result and no error, surface that.
+      if (!res || res.length === 0) {
+        setCoverError('Upload returned no result. UploadThing token may be missing.');
+      }
+    } catch (err: any) {
+      const msg = err?.message || 'Upload threw an error';
+      setCoverError(msg);
+      toast(msg, 'error');
+    }
+  };
 
   const createMutation = trpc.podcasts.create.useMutation({
     onSuccess: () => {
@@ -68,6 +107,7 @@ export function PodcastShowForm({ onCreated }: { onCreated: () => void }) {
       setExplicit(false);
       setCoverFile(null);
       setCoverUrl('');
+      setCoverError('');
       setSubmitting(false);
       onCreated();
     },
@@ -83,18 +123,11 @@ export function PodcastShowForm({ onCreated }: { onCreated: () => void }) {
       toast('Title is required', 'error');
       return;
     }
-    setSubmitting(true);
-
-    let finalCoverUrl = coverUrl;
-    if (coverFile && !coverUrl) {
-      const res = await uploadCover([coverFile]);
-      finalCoverUrl = res?.[0]?.ufsUrl ?? '';
-      if (!finalCoverUrl) {
-        toast('Cover upload failed', 'error');
-        setSubmitting(false);
-        return;
-      }
+    if (coverFile && !coverUrl && !coverError) {
+      toast('Cover is still uploading — wait for it to finish', 'error');
+      return;
     }
+    setSubmitting(true);
 
     createMutation.mutate({
       title: title.trim(),
@@ -104,7 +137,7 @@ export function PodcastShowForm({ onCreated }: { onCreated: () => void }) {
       author: author.trim() || undefined,
       ownerEmail: ownerEmail.trim() || undefined,
       explicit,
-      coverUrl: finalCoverUrl || undefined,
+      coverUrl: coverUrl || undefined,
     });
   };
 
@@ -137,20 +170,30 @@ export function PodcastShowForm({ onCreated }: { onCreated: () => void }) {
 
       <div>
         <label className="block text-sm text-gray-400 mb-1">Cover Art</label>
-        <input
-          type="file"
-          accept="image/jpeg,image/png"
-          onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)}
-          className="block w-full text-sm text-gray-400 file:mr-3 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-brand-600 file:text-white file:font-semibold hover:file:bg-brand-500"
-        />
-        {coverFile && (
-          <p className="text-xs text-gray-500 mt-1">
-            {coverFile.name} · {(coverFile.size / 1024).toFixed(0)} KB
-            {coverUploading && ' · uploading...'}
-            {coverUrl && ' · uploaded ✓'}
-          </p>
-        )}
-        <p className="text-xs text-gray-500 mt-1">Apple recommends 3000×3000px JPG/PNG, ≤8MB</p>
+        <div className="flex items-start gap-3">
+          {coverUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={coverUrl} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0" />
+          )}
+          <div className="flex-1">
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(e) => handleCoverChange(e.target.files?.[0] ?? null)}
+              disabled={coverUploading}
+              className="block w-full text-sm text-gray-400 file:mr-3 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-brand-600 file:text-white file:font-semibold hover:file:bg-brand-500 disabled:opacity-50"
+            />
+            {coverFile && (
+              <p className={`text-xs mt-1 ${coverError ? 'text-red-400' : coverUrl ? 'text-green-400' : 'text-gray-500'}`}>
+                {coverFile.name} · {(coverFile.size / 1024).toFixed(0)} KB
+                {coverUploading && ' · uploading...'}
+                {coverUrl && !coverError && ' · uploaded ✓'}
+                {coverError && ` · ${coverError}`}
+              </p>
+            )}
+            <p className="text-xs text-gray-500 mt-1">Apple recommends 3000×3000px JPG/PNG, ≤8MB</p>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
