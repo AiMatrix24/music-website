@@ -399,6 +399,7 @@ const tracksRouter = createRouter({
         visibility: z.enum(['public', 'private', 'unlisted', 'subscribers_only']).default('public'),
         price: z.number().int().min(0).optional(),
         audioUrl: z.string().url().optional(),
+        coverUrl: z.string().url().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -413,7 +414,10 @@ const tracksRouter = createRouter({
           duration: input.duration ?? null,
           visibility: input.visibility,
           price: input.price ?? null,
+          // Mirror to both quality tiers so the player COALESCE finds it
+          audioUrl128: input.audioUrl ?? null,
           audioUrl320: input.audioUrl ?? null,
+          coverUrl: input.coverUrl ?? null,
           status: 'published',
         })
         .returning();

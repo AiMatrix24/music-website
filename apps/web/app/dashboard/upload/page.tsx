@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useToast } from '@/app/components/Toast';
 import { useUploadThing } from '@/lib/uploadthing-client';
+import { CoverImageField } from '@/app/components/podcast/CoverImageField';
 
 const GENRES = [
   'Synthwave', 'Lo-fi Hip Hop', 'Electronic', 'Indie Rock', 'Post-Punk',
@@ -28,6 +29,7 @@ export default function UploadTrackPage() {
   const [visibility, setVisibility] = useState<'public' | 'private' | 'subscribers_only'>('public');
   const [price, setPrice] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [coverUrl, setCoverUrl] = useState<string>('');
   const [uploading, setUploading] = useState(false);
   const [step, setStep] = useState<'details' | 'file' | 'review'>('details');
 
@@ -70,6 +72,7 @@ export default function UploadTrackPage() {
         visibility,
         price: price ? Math.round(parseFloat(price) * 100) : undefined,
         audioUrl,
+        coverUrl: coverUrl || undefined,
       });
 
       toast('Track published successfully!', 'success');
@@ -193,6 +196,15 @@ export default function UploadTrackPage() {
               </div>
             </div>
 
+            <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-5">
+              <CoverImageField
+                label="Cover Art"
+                hint="Square JPG/PNG, 1500×1500+ recommended, ≤8MB"
+                value={coverUrl}
+                onChange={setCoverUrl}
+              />
+            </div>
+
             <button
               onClick={() => setStep('file')}
               disabled={!title}
@@ -284,9 +296,14 @@ export default function UploadTrackPage() {
           <div className="space-y-6">
             <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6">
               <div className="flex gap-4 mb-4">
-                <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-3xl shrink-0">
-                  {genre ? genre.charAt(0) : '♪'}
-                </div>
+                {coverUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={coverUrl} alt="" className="w-20 h-20 rounded-xl object-cover shrink-0" />
+                ) : (
+                  <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-3xl shrink-0">
+                    {genre ? genre.charAt(0) : '♪'}
+                  </div>
+                )}
                 <div>
                   <h2 className="text-xl font-bold">{title || 'Untitled'}</h2>
                   <p className="text-gray-400 text-sm">{genre || 'No genre'} {bpm ? `· ${bpm} BPM` : ''}</p>
