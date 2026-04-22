@@ -2,9 +2,8 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useMemo } from 'react';
-import DOMPurify from 'isomorphic-dompurify';
 import { trpc } from '@/lib/trpc/client';
+import { useSafeHtml } from '@/app/components/podcast/useSafeHtml';
 
 export default function PodcastDetailPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -12,6 +11,8 @@ export default function PodcastDetailPage() {
     { slug },
     { enabled: !!slug, retry: false }
   );
+  // Hooks must run unconditionally — sanitize before any early returns
+  const sanitizedDescription = useSafeHtml(show?.description);
 
   if (isLoading) {
     return (
@@ -20,14 +21,6 @@ export default function PodcastDetailPage() {
       </div>
     );
   }
-
-  const sanitizedDescription = useMemo(() => {
-    if (!show?.description) return '';
-    return DOMPurify.sanitize(show.description, {
-      ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'ul', 'ol', 'li', 'h2', 'h3', 'h4', 'blockquote', 'a', 'code', 'pre'],
-      ALLOWED_ATTR: ['href', 'target', 'rel'],
-    });
-  }, [show?.description]);
 
   if (isError || !show) {
     return (

@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useRef, useMemo } from 'react';
-import DOMPurify from 'isomorphic-dompurify';
+import { useRef } from 'react';
 import { trpc } from '@/lib/trpc/client';
+import { useSafeHtml } from '@/app/components/podcast/useSafeHtml';
 
 export default function EpisodeDetailPage() {
   const { slug, episodeSlug } = useParams<{ slug: string; episodeSlug: string }>();
@@ -15,6 +15,8 @@ export default function EpisodeDetailPage() {
 
   const recordDownload = trpc.podcastEpisodes.recordDownload.useMutation();
   const downloadFiredRef = useRef(false);
+  // Hooks must run unconditionally — sanitize before any early returns
+  const sanitizedDescription = useSafeHtml(data?.description);
 
   // Fire a single download/play event when audio first plays
   const handlePlay = () => {
@@ -47,13 +49,6 @@ export default function EpisodeDetailPage() {
   const ep = data;
   const show = data.podcast;
   const coverImage = ep.coverUrl ?? show.coverUrl;
-  const sanitizedDescription = useMemo(() => {
-    if (!ep.description) return '';
-    return DOMPurify.sanitize(ep.description, {
-      ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'ul', 'ol', 'li', 'h2', 'h3', 'h4', 'blockquote', 'a', 'code', 'pre'],
-      ALLOWED_ATTR: ['href', 'target', 'rel'],
-    });
-  }, [ep.description]);
 
   return (
     <div className="min-h-screen py-16 px-6">
