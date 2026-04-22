@@ -7,16 +7,16 @@ const FAQ_SECTIONS = [
   {
     title: 'Getting Started',
     items: [
-      { q: 'What is OPYNX?', a: 'OPYNX is the FanEngage Protocol — a direct-to-fan music platform where artists sell music, tickets, and merch with transparent on-chain revenue sharing. Every dollar is tracked and verifiable on Polygon.' },
+      { q: 'What is OPYNX?', a: 'OPYNX is the FanEngage Protocol — a direct-to-fan music platform where creators sell music, tickets, and merch with transparent on-chain revenue sharing. Every dollar is tracked and verifiable on Polygon.' },
       { q: 'How do I sign up?', a: 'Click "Sign In" in the top right and connect with Discord, Twitter, or Twitch. Your account is created instantly. No email/password needed.' },
-      { q: 'Is OPYNX free to use?', a: 'Browsing is free. The Free tier lets you explore tracks and follow up to 5 artists. Premium ($8.73/mo) unlocks 320kbps streaming, exclusive content, and pre-sale tickets.' },
+      { q: 'Is OPYNX free to use?', a: 'Browsing is free. The Free tier lets you explore tracks and follow up to 5 creators. Premium ($8.73/mo) unlocks 320kbps streaming, exclusive content, and pre-sale tickets.' },
     ],
   },
   {
-    title: 'For Artists',
+    title: 'For Creators',
     items: [
       { q: 'How do I upload music?', a: 'Go to Dashboard → Upload Track. Fill in the title, genre, BPM, and upload your audio file. Tracks are published instantly to all subscribers.' },
-      { q: 'How much do I earn per subscriber?', a: '$1.00 per Premium subscriber, guaranteed. This is verifiable on-chain via Polygon. Facilitators (venue staff) earn $0.25-$0.50, and the rest goes to platform infrastructure.' },
+      { q: 'How much do I earn per subscriber?', a: '$1.00 per active Premium subscriber per month, verifiable on-chain via Polygon. Facilitators (venue staff) earn $0.25-$0.50, and the rest goes to platform infrastructure. Actual payouts depend on active subscriber count and payment status.' },
       { q: 'How do payouts work?', a: 'Payouts are processed in USDC on Polygon. You can set your payout threshold in Settings. All transactions are transparent and verifiable on the blockchain.' },
       { q: 'Can I sell event tickets?', a: 'Yes! Go to Dashboard → Create Event. Set up ticket tiers (Free, Early Bird, General, VIP) with pricing. We handle anti-scalper protection, waitlists, and QR code verification.' },
     ],
@@ -24,7 +24,7 @@ const FAQ_SECTIONS = [
   {
     title: 'Tickets & Events',
     items: [
-      { q: 'How do anti-scalper protections work?', a: 'Tickets are non-transferable and tied to the buyer\'s identity. Each ticket has a unique QR code. Transfers require artist approval and the original ticket is voided.' },
+      { q: 'How do anti-scalper protections work?', a: 'Tickets are non-transferable and tied to the buyer\'s identity. Each ticket has a unique QR code. Transfers require creator approval and the original ticket is voided.' },
       { q: 'Can I transfer my ticket?', a: 'Yes, but only through our controlled transfer system. Go to My Tickets → Transfer. The event host must approve the transfer, and the recipient gets a new QR code.' },
       { q: 'What if an event sells out?', a: 'Join the waitlist! You\'ll be notified when tickets become available (from refunds or cancellations). Waitlisted tickets are sold at face value only — no markups.' },
       { q: 'Do you offer ticket insurance?', a: 'Coming soon! We\'re working on refund protection that lets you get a full refund up to 24 hours before the event.' },

@@ -41,7 +41,7 @@ const AVAILABILITY = [
 export default function BookingPage() {
   const { data: session, status } = useSession();
   const { toast } = useToast();
-  const [role, setRole] = useState<'venue' | 'artist'>('venue');
+  const [role, setRole] = useState<'venue' | 'creator'>('venue');
   const [inquiries, setInquiries] = useState(INQUIRIES);
   const [showInquiryModal, setShowInquiryModal] = useState(false);
   const [selectedArtist, setSelectedArtist] = useState<typeof BOOKABLE_ARTISTS[0] | null>(null);
@@ -52,8 +52,8 @@ export default function BookingPage() {
 
   const isAuth = status === 'authenticated';
 
-  const handleInquiry = (artist: typeof BOOKABLE_ARTISTS[0]) => {
-    setSelectedArtist(artist);
+  const handleInquiry = (creator: typeof BOOKABLE_ARTISTS[0]) => {
+    setSelectedArtist(creator);
     setShowInquiryModal(true);
   };
 
@@ -87,7 +87,7 @@ export default function BookingPage() {
             ← Home
           </Link>
           <h1 className="text-3xl font-bold">Booking Portal</h1>
-          <p className="text-gray-400 mt-1">Connect artists with venues and events</p>
+          <p className="text-gray-400 mt-1">Connect creators with venues and events</p>
         </div>
 
         {/* Role Toggle */}
@@ -101,12 +101,12 @@ export default function BookingPage() {
             I&apos;m a Venue
           </button>
           <button
-            onClick={() => setRole('artist')}
+            onClick={() => setRole('creator')}
             className={`rounded-full px-6 py-2.5 text-sm font-semibold transition ${
-              role === 'artist' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'
+              role === 'creator' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'
             }`}
           >
-            I&apos;m an Artist
+            I&apos;m an Creator
           </button>
         </div>
 
@@ -134,43 +134,43 @@ export default function BookingPage() {
               </select>
             </div>
 
-            <h2 className="text-lg font-bold mb-4">Find Artists to Book</h2>
+            <h2 className="text-lg font-bold mb-4">Find Creators to Book</h2>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-              {filteredArtists.map((artist) => (
-                <div key={artist.id} className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-5 hover:border-red-600/30 transition">
+              {filteredArtists.map((creator) => (
+                <div key={creator.id} className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-5 hover:border-red-600/30 transition">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-12 h-12 rounded-full bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center font-bold">
-                      {artist.name.charAt(0)}
+                      {creator.name.charAt(0)}
                     </div>
                     <div>
-                      <p className="font-bold text-sm">{artist.name}</p>
-                      <p className="text-xs text-gray-500">{artist.genre}</p>
+                      <p className="font-bold text-sm">{creator.name}</p>
+                      <p className="text-xs text-gray-500">{creator.genre}</p>
                     </div>
                   </div>
                   <div className="space-y-2 mb-4">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-500">Fee Range</span>
-                      <span className="font-medium">{artist.feeRange}</span>
+                      <span className="font-medium">{creator.feeRange}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-500">Rating</span>
-                      <span className="font-medium text-yellow-400">{'★'.repeat(Math.floor(artist.rating))} {artist.rating}</span>
+                      <span className="font-medium text-yellow-400">{'★'.repeat(Math.floor(creator.rating))} {creator.rating}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-500">Past Shows</span>
-                      <span className="font-medium">{artist.pastShows}</span>
+                      <span className="font-medium">{creator.pastShows}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-500">Availability</span>
-                      <span className={`flex items-center gap-1 font-medium ${artist.available ? 'text-green-400' : 'text-red-400'}`}>
-                        <span className={`w-2 h-2 rounded-full ${artist.available ? 'bg-green-400' : 'bg-red-400'}`} />
-                        {artist.available ? 'Available' : 'Booked'}
+                      <span className={`flex items-center gap-1 font-medium ${creator.available ? 'text-green-400' : 'text-red-400'}`}>
+                        <span className={`w-2 h-2 rounded-full ${creator.available ? 'bg-green-400' : 'bg-red-400'}`} />
+                        {creator.available ? 'Available' : 'Booked'}
                       </span>
                     </div>
                   </div>
                   <button
-                    onClick={() => handleInquiry(artist)}
-                    disabled={!artist.available}
+                    onClick={() => handleInquiry(creator)}
+                    disabled={!creator.available}
                     className="w-full rounded-full bg-red-600 py-2.5 text-sm font-semibold text-white hover:bg-red-500 transition disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     Send Inquiry
@@ -182,7 +182,7 @@ export default function BookingPage() {
         )}
 
         {/* =================== ARTIST VIEW =================== */}
-        {role === 'artist' && (
+        {role === 'creator' && (
           <>
             {!isAuth ? (
               <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-12 text-center">
@@ -415,7 +415,7 @@ export default function BookingPage() {
                   <textarea
                     value={inquiryForm.message}
                     onChange={(e) => setInquiryForm({ ...inquiryForm, message: e.target.value })}
-                    placeholder="Tell the artist about your event..."
+                    placeholder="Tell the creator about your event..."
                     rows={3}
                     className="w-full rounded-xl bg-brand-950 border border-brand-800/30 px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-red-600/50 resize-none"
                   />

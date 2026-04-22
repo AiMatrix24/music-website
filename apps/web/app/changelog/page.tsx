@@ -36,8 +36,8 @@ const versions: VersionEntry[] = [
     version: 'v2.5.0',
     date: 'March 27, 2026',
     changes: [
-      { type: 'feature', text: 'Live streaming support for artists with real-time chat and tipping' },
-      { type: 'feature', text: 'Merchandise designer tool for creating and selling custom merch directly from artist profiles' },
+      { type: 'feature', text: 'Live streaming support for creators with real-time chat and tipping' },
+      { type: 'feature', text: 'Merchandise designer tool for creating and selling custom merch directly from creator profiles' },
       { type: 'feature', text: 'Global and genre-specific charts with daily, weekly, and monthly rankings' },
       { type: 'improvement', text: 'Upgraded audio player with crossfade and gapless playback support' },
       { type: 'fix', text: 'Fixed playback interruption when switching between Wi-Fi and cellular networks' },
@@ -61,7 +61,7 @@ const versions: VersionEntry[] = [
     date: 'January 15, 2026',
     changes: [
       { type: 'feature', text: 'Push notifications for new releases, event announcements, and follower activity' },
-      { type: 'feature', text: 'Direct messaging between fans and artists with media attachment support' },
+      { type: 'feature', text: 'Direct messaging between fans and creators with media attachment support' },
       { type: 'feature', text: 'Marketplace checkout flow with cart, saved payment methods, and order history' },
       { type: 'improvement', text: 'Reduced initial page load time by 40% with optimized bundling' },
       { type: 'improvement', text: 'Added loading skeletons across all major views for better perceived performance' },
@@ -72,9 +72,9 @@ const versions: VersionEntry[] = [
     version: 'v2.2.0',
     date: 'December 8, 2025',
     changes: [
-      { type: 'feature', text: 'Artist analytics dashboard with stream counts, revenue breakdowns, and audience demographics' },
+      { type: 'feature', text: 'Creator analytics dashboard with stream counts, revenue breakdowns, and audience demographics' },
       { type: 'feature', text: 'Tour management tools for scheduling dates, venues, and ticket tiers' },
-      { type: 'feature', text: 'Collaboration invites allowing multiple artists to be credited on releases' },
+      { type: 'feature', text: 'Collaboration invites allowing multiple creators to be credited on releases' },
       { type: 'improvement', text: 'On-chain payout confirmations now display within the dashboard in real-time' },
       { type: 'fix', text: 'Fixed incorrect revenue split calculations for albums with more than 10 collaborators' },
       { type: 'fix', text: 'Resolved issue where album artwork was not displaying on shared social links' },
@@ -85,8 +85,8 @@ const versions: VersionEntry[] = [
     date: 'November 1, 2025',
     changes: [
       { type: 'feature', text: 'Explore page with personalized recommendations based on listening history' },
-      { type: 'feature', text: 'Full-text search across tracks, albums, artists, events, and playlists' },
-      { type: 'feature', text: 'Public artist profiles with bio, discography, upcoming events, and social links' },
+      { type: 'feature', text: 'Full-text search across tracks, albums, creators, events, and playlists' },
+      { type: 'feature', text: 'Public creator profiles with bio, discography, upcoming events, and social links' },
       { type: 'improvement', text: 'Migrated authentication flow to support Discord, Twitter/X, and Twitch OAuth' },
       { type: 'improvement', text: 'Improved mobile responsiveness across all pages' },
       { type: 'fix', text: 'Fixed audio playback failing on Safari when using private browsing mode' },

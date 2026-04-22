@@ -18,20 +18,20 @@ const plans: GiftPlan[] = [
     id: 'premium',
     name: 'Premium',
     monthlyPrice: 8.73,
-    features: ['Unlimited streaming', 'Offline downloads', 'High-quality audio', 'Direct artist support'],
+    features: ['Unlimited streaming', 'Offline downloads', 'High-quality audio', 'Direct creator support'],
   },
   {
     id: 'bundle',
     name: 'Bundle',
     monthlyPrice: 12.73,
-    features: ['Everything in Premium', 'Exclusive artist content', 'Early access to releases', 'Community features', 'Live session access'],
+    features: ['Everything in Premium', 'Exclusive creator content', 'Early access to releases', 'Community features', 'Live session access'],
     highlight: true,
   },
   {
     id: 'studio',
     name: 'Studio',
     monthlyPrice: 16.0,
-    features: ['Everything in Bundle', 'Studio-quality lossless', 'Artist collaboration tools', 'Priority support', 'Revenue analytics'],
+    features: ['Everything in Bundle', 'Studio-quality lossless', 'Creator collaboration tools', 'Priority support', 'Revenue analytics'],
   },
 ];
 
@@ -85,7 +85,7 @@ export default function GiftPage() {
             Gift the sound of <span className="text-red-500">independence</span>
           </h1>
           <p className="text-gray-400 max-w-xl mx-auto">
-            Give someone the gift of direct-to-artist music. Every dollar goes where it matters.
+            Give someone the gift of direct-to-creator music. Every dollar goes where it matters.
           </p>
         </div>
 
@@ -230,7 +230,7 @@ export default function GiftPage() {
                 <p className="text-4xl mb-3">&#127873;</p>
                 <p className="text-xs uppercase tracking-widest text-red-400 font-semibold mb-2">You&apos;ve been gifted</p>
                 <h3 className="text-2xl font-bold mb-1">OPYNX {plan.name}</h3>
-                <p className="text-gray-400 text-sm mb-4">{durationLabels[duration]} of direct-to-artist music</p>
+                <p className="text-gray-400 text-sm mb-4">{durationLabels[duration]} of direct-to-creator music</p>
                 {recipientName && (
                   <p className="text-sm text-gray-300 mb-2">
                     To: <span className="text-white font-semibold">{recipientName}</span>
@@ -263,7 +263,7 @@ export default function GiftPage() {
         <div className="bg-[#15151f] border border-gray-800 rounded-2xl p-6 text-center">
           <h3 className="font-bold mb-2">Revenue Transparency</h3>
           <p className="text-sm text-gray-400 max-w-lg mx-auto">
-            Every gift subscription follows our transparent revenue model. Artists receive the majority of subscription revenue,
+            Every gift subscription follows our transparent revenue model. Creators receive the majority of subscription revenue,
             with platform costs clearly broken down on-chain. No hidden fees, no opaque accounting.
           </p>
           <Link href="/calculator" className="inline-block mt-3 text-red-400 text-sm font-semibold hover:text-red-300 transition">

@@ -34,7 +34,7 @@ const TIERS: TierInfo[] = [
     features: [
       '128kbps streaming',
       'Ad-supported',
-      'Follow up to 5 artists',
+      'Follow up to 5 creators',
       '6 skips per hour',
     ],
   },
@@ -59,7 +59,7 @@ const TIERS: TierInfo[] = [
     features: [
       'Everything in Premium',
       '15% merch discount',
-      'Direct messaging to artists',
+      'Direct messaging to creators',
       'Exclusive content access',
       'Priority customer support',
     ],

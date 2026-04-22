@@ -5,7 +5,7 @@ import { createContext, useContext, useState, useRef, useEffect, type ReactNode 
 interface Track {
   id: string;
   title: string;
-  artist: string;
+  creator: string;
   genre: string;
   duration: number;
 }
@@ -130,7 +130,7 @@ export function MusicPlayerBar() {
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold truncate">{track.title}</p>
-            <p className="text-xs text-gray-400 truncate">{track.artist}</p>
+            <p className="text-xs text-gray-400 truncate">{track.creator}</p>
           </div>
         </div>
 

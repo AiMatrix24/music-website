@@ -273,7 +273,7 @@ export default function LabelVerifyPage() {
 
                 <div>
                   <label className="block text-sm font-semibold mb-2">
-                    Sample Artist Contract (redacted)
+                    Sample Creator Contract (redacted)
                   </label>
                   <div className="border-2 border-dashed border-gray-700 hover:border-red-500 transition rounded-lg p-6 text-center cursor-pointer">
                     <p className="text-2xl mb-1">📑</p>
@@ -317,7 +317,7 @@ export default function LabelVerifyPage() {
 
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="block text-sm font-semibold mb-2">Number of Artists</label>
+                  <label className="block text-sm font-semibold mb-2">Number of Creators</label>
                   <input
                     type="number"
                     min={0}
@@ -341,7 +341,7 @@ export default function LabelVerifyPage() {
               </div>
 
               <div className="mb-4">
-                <label className="block text-sm font-semibold mb-2">Sample Artist Names</label>
+                <label className="block text-sm font-semibold mb-2">Sample Creator Names</label>
                 <textarea
                   value={data.sampleArtists}
                   onChange={(e) => update('sampleArtists', e.target.value)}

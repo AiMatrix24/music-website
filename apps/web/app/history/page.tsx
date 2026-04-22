@@ -9,7 +9,7 @@ type FilterTab = 'all' | 'tracks' | 'podcasts';
 interface HistoryTrack {
   id: string;
   title: string;
-  artist: string;
+  creator: string;
   genre: string;
   playedAt: Date;
   playCount: number;
@@ -17,21 +17,21 @@ interface HistoryTrack {
 }
 
 const mockHistory: HistoryTrack[] = [
-  { id: '1', title: 'Neon Pulse', artist: 'SYNTHEX', genre: 'Synthwave', playedAt: new Date(Date.now() - 1000 * 60 * 20), playCount: 14, type: 'track' },
-  { id: '2', title: 'Midnight Protocol', artist: 'DataStream', genre: 'Electronic', playedAt: new Date(Date.now() - 1000 * 60 * 45), playCount: 8, type: 'track' },
-  { id: '3', title: 'The Future of Music Distribution', artist: 'Indie Talks', genre: 'Podcast', playedAt: new Date(Date.now() - 1000 * 60 * 90), playCount: 1, type: 'podcast' },
-  { id: '4', title: 'Dissolve', artist: 'Pale Waves', genre: 'Indie Rock', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 5), playCount: 22, type: 'track' },
-  { id: '5', title: 'Ghost Signal', artist: 'VoidRunner', genre: 'Post-Punk', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 8), playCount: 5, type: 'track' },
-  { id: '6', title: 'Lo-fi Beats Session #47', artist: 'ChillHop Collective', genre: 'Lo-fi', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 26), playCount: 3, type: 'track' },
-  { id: '7', title: 'Cascade', artist: 'Echofault', genre: 'Ambient', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 28), playCount: 11, type: 'track' },
-  { id: '8', title: 'Breaking Down Web3 Audio', artist: 'Decentralized FM', genre: 'Podcast', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 30), playCount: 2, type: 'podcast' },
-  { id: '9', title: 'Voltage', artist: 'Crimson Wire', genre: 'Electronic', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 50), playCount: 7, type: 'track' },
-  { id: '10', title: 'Paper Thin', artist: 'The Satellites', genre: 'Alternative', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 72), playCount: 19, type: 'track' },
-  { id: '11', title: 'Deep Focus Mix', artist: 'Ambient Works', genre: 'Ambient', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 96), playCount: 31, type: 'track' },
-  { id: '12', title: 'Rust & Gold', artist: 'Desert Haze', genre: 'Indie Rock', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 120), playCount: 4, type: 'track' },
-  { id: '13', title: 'Artist Rights Roundtable', artist: 'MusicBiz Pod', genre: 'Podcast', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 144), playCount: 1, type: 'podcast' },
-  { id: '14', title: 'Refraction', artist: 'Glasspoint', genre: 'Synthwave', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 168), playCount: 9, type: 'track' },
-  { id: '15', title: 'Tremor', artist: 'Bassweight', genre: 'Electronic', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 200), playCount: 16, type: 'track' },
+  { id: '1', title: 'Neon Pulse', creator: 'SYNTHEX', genre: 'Synthwave', playedAt: new Date(Date.now() - 1000 * 60 * 20), playCount: 14, type: 'track' },
+  { id: '2', title: 'Midnight Protocol', creator: 'DataStream', genre: 'Electronic', playedAt: new Date(Date.now() - 1000 * 60 * 45), playCount: 8, type: 'track' },
+  { id: '3', title: 'The Future of Music Distribution', creator: 'Indie Talks', genre: 'Podcast', playedAt: new Date(Date.now() - 1000 * 60 * 90), playCount: 1, type: 'podcast' },
+  { id: '4', title: 'Dissolve', creator: 'Pale Waves', genre: 'Indie Rock', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 5), playCount: 22, type: 'track' },
+  { id: '5', title: 'Ghost Signal', creator: 'VoidRunner', genre: 'Post-Punk', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 8), playCount: 5, type: 'track' },
+  { id: '6', title: 'Lo-fi Beats Session #47', creator: 'ChillHop Collective', genre: 'Lo-fi', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 26), playCount: 3, type: 'track' },
+  { id: '7', title: 'Cascade', creator: 'Echofault', genre: 'Ambient', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 28), playCount: 11, type: 'track' },
+  { id: '8', title: 'Breaking Down Web3 Audio', creator: 'Decentralized FM', genre: 'Podcast', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 30), playCount: 2, type: 'podcast' },
+  { id: '9', title: 'Voltage', creator: 'Crimson Wire', genre: 'Electronic', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 50), playCount: 7, type: 'track' },
+  { id: '10', title: 'Paper Thin', creator: 'The Satellites', genre: 'Alternative', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 72), playCount: 19, type: 'track' },
+  { id: '11', title: 'Deep Focus Mix', creator: 'Ambient Works', genre: 'Ambient', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 96), playCount: 31, type: 'track' },
+  { id: '12', title: 'Rust & Gold', creator: 'Desert Haze', genre: 'Indie Rock', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 120), playCount: 4, type: 'track' },
+  { id: '13', title: 'Creator Rights Roundtable', creator: 'MusicBiz Pod', genre: 'Podcast', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 144), playCount: 1, type: 'podcast' },
+  { id: '14', title: 'Refraction', creator: 'Glasspoint', genre: 'Synthwave', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 168), playCount: 9, type: 'track' },
+  { id: '15', title: 'Tremor', creator: 'Bassweight', genre: 'Electronic', playedAt: new Date(Date.now() - 1000 * 60 * 60 * 200), playCount: 16, type: 'track' },
 ];
 
 function timeAgo(date: Date): string {
@@ -200,7 +200,7 @@ export default function HistoryPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-white truncate group-hover:text-red-400 transition">{track.title}</p>
-                        <p className="text-sm text-gray-400 truncate">{track.artist}</p>
+                        <p className="text-sm text-gray-400 truncate">{track.creator}</p>
                       </div>
                       <span className="hidden sm:inline-block px-2.5 py-0.5 rounded-full bg-red-600/10 text-red-400 text-xs font-medium">
                         {track.genre}

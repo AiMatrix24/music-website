@@ -38,7 +38,7 @@ export default function LyricsPage() {
   // Mock track info
   const track = {
     title: 'Neon Horizons',
-    artist: 'Stellar Drift',
+    creator: 'Stellar Drift',
     genre: 'Synthwave',
     bpm: 128,
     duration: '3:42',
@@ -66,7 +66,7 @@ export default function LyricsPage() {
             {/* Track header */}
             <div className="mb-8">
               <h1 className="text-4xl font-black mb-2">{track.title}</h1>
-              <p className="text-xl text-gray-400">{track.artist}</p>
+              <p className="text-xl text-gray-400">{track.creator}</p>
             </div>
 
             {/* Synced lyrics toggle */}

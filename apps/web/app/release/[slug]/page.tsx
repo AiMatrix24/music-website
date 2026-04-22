@@ -29,7 +29,7 @@ function getReleaseData(slug: string) {
     ],
     artistId: 'luna-vega',
     artistBio:
-      'Luna Vega is an electronic artist and producer based in Los Angeles. With a distinctive sound that bridges ambient, house, and experimental music, Luna has built a global following across streaming platforms.',
+      'Luna Vega is an electronic creator and producer based in Los Angeles. With a distinctive sound that bridges ambient, house, and experimental music, Luna has built a global following across streaming platforms.',
   };
 }
 
@@ -114,7 +114,7 @@ export default function ReleaseCountdownPage() {
 
         {/* Hero Countdown Section */}
         <div className="flex flex-col items-center justify-center text-center px-6 pt-12 pb-16">
-          {/* Artist Name */}
+          {/* Creator Name */}
           <p className="text-sm font-medium text-red-500 tracking-widest uppercase mb-4">{release.artistName}</p>
 
           {/* Cover Art Placeholder */}
@@ -284,7 +284,7 @@ export default function ReleaseCountdownPage() {
             <p className="text-sm text-gray-400 leading-relaxed">{release.description}</p>
           </div>
 
-          {/* Artist Card */}
+          {/* Creator Card */}
           <Link
             href={`/artist/${release.artistId}`}
             className="block rounded-2xl bg-[#15151f] border border-brand-800/20 p-6 hover:border-red-600/30 transition group"

@@ -293,7 +293,7 @@ export default function CreateEventPage() {
 
                 {parseFloat(tier.price) > 0 && (
                   <div className="mt-3 p-3 bg-brand-950/50 rounded-lg text-xs text-gray-400">
-                    Artist receives: <span className="text-red-400 font-semibold">${(parseFloat(tier.price) * 0.85).toFixed(2)}</span> per ticket (85%)
+                    Creator receives: <span className="text-red-400 font-semibold">${(parseFloat(tier.price) * 0.85).toFixed(2)}</span> per ticket (85%)
                     {' · '}Revenue if sold out: <span className="text-white font-semibold">${(parseFloat(tier.price) * 0.85 * parseInt(tier.quantity || '0')).toFixed(2)}</span>
                   </div>
                 )}

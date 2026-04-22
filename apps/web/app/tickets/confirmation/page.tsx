@@ -56,7 +56,7 @@ function ConfirmationContent() {
             <p className="text-xs text-gray-500 mb-2 font-semibold uppercase tracking-wider">Where Your Money Goes</p>
             <div className="space-y-1 text-xs">
               <div className="flex justify-between">
-                <span className="text-gray-400">Artist (85%)</span>
+                <span className="text-gray-400">Creator (85%)</span>
                 <span className="text-red-400">${((parseFloat(total) / 100) * 0.85).toFixed(2)}</span>
               </div>
               <div className="flex justify-between">

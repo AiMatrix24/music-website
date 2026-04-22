@@ -16,7 +16,7 @@ const USER_STATS = {
 
 const EARN_ACTIVITIES = [
   { action: 'Listen to a track', xp: 5, icon: '&#9835;' },
-  { action: 'Follow an artist', xp: 20, icon: '&#10010;' },
+  { action: 'Follow an creator', xp: 20, icon: '&#10010;' },
   { action: 'Buy a ticket', xp: 100, icon: '&#127915;' },
   { action: 'Attend an event', xp: 200, icon: '&#127926;' },
   { action: 'Refer a friend', xp: 500, icon: '&#128101;' },
@@ -62,7 +62,7 @@ const LEADERBOARD = [
 
 const REWARDS_STORE = [
   { id: 1, name: 'Exclusive Track', description: 'Download an unreleased bonus track', cost: 2000, icon: '&#127925;' },
-  { id: 2, name: 'Meet & Greet Entry', description: 'Priority entry to artist meet & greets', cost: 5000, icon: '&#128075;' },
+  { id: 2, name: 'Meet & Greet Entry', description: 'Priority entry to creator meet & greets', cost: 5000, icon: '&#128075;' },
   { id: 3, name: 'Merch Discount', description: '25% off any merch item', cost: 1500, icon: '&#127873;' },
   { id: 4, name: 'Free Month Premium', description: 'One month of OPYNX Premium free', cost: 3000, icon: '&#128142;' },
 ];

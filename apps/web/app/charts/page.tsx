@@ -3,25 +3,25 @@
 import Link from 'next/link';
 import { useState } from 'react';
 
-type Tab = 'tracks' | 'artists' | 'trending';
+type Tab = 'tracks' | 'creators' | 'trending';
 type Period = 'today' | 'week' | 'month' | 'all';
 
 const topTracks = [
-  { id: 1, title: 'Midnight Protocol', artist: 'KAEL', genre: 'Electronic', plays: 2847193, change: 'NEW' },
-  { id: 2, title: 'Velvet Chains', artist: 'Luna Voss', genre: 'R&B', plays: 2103847, change: '↑3' },
-  { id: 3, title: 'Shatter', artist: 'DVRK MATTER', genre: 'Hip-Hop', plays: 1987234, change: '↑1' },
-  { id: 4, title: 'Neon Skyline', artist: 'Aria Frost', genre: 'Synthwave', plays: 1856002, change: '↓1' },
-  { id: 5, title: 'Burning Low', artist: 'The Koda', genre: 'Indie Rock', plays: 1743891, change: '—' },
-  { id: 6, title: 'Ghost Frequency', artist: 'KAEL', genre: 'Electronic', plays: 1698234, change: '↑2' },
-  { id: 7, title: 'Wildfire', artist: 'Sage & the Saints', genre: 'Alternative', plays: 1587112, change: '↓2' },
-  { id: 8, title: 'Paper Crowns', artist: 'Mira Chen', genre: 'Pop', plays: 1423098, change: '↑5' },
-  { id: 9, title: 'Low Tide', artist: 'Oceanic', genre: 'Lo-Fi', plays: 1389001, change: 'NEW' },
-  { id: 10, title: 'Fracture Point', artist: 'DVRK MATTER', genre: 'Hip-Hop', plays: 1298456, change: '↓3' },
-  { id: 11, title: 'Solar Flare', artist: 'Prism Collective', genre: 'Jazz Fusion', plays: 1187234, change: '↑1' },
-  { id: 12, title: 'Echoes of You', artist: 'Luna Voss', genre: 'R&B', plays: 1098712, change: '—' },
-  { id: 13, title: 'Static Bloom', artist: 'Hex Theory', genre: 'Post-Punk', plays: 987654, change: '↑4' },
-  { id: 14, title: 'Terminal Bliss', artist: 'Aria Frost', genre: 'Synthwave', plays: 923471, change: '↓1' },
-  { id: 15, title: 'Rust & Gold', artist: 'The Koda', genre: 'Indie Rock', plays: 876234, change: '↑2' },
+  { id: 1, title: 'Midnight Protocol', creator: 'KAEL', genre: 'Electronic', plays: 2847193, change: 'NEW' },
+  { id: 2, title: 'Velvet Chains', creator: 'Luna Voss', genre: 'R&B', plays: 2103847, change: '↑3' },
+  { id: 3, title: 'Shatter', creator: 'DVRK MATTER', genre: 'Hip-Hop', plays: 1987234, change: '↑1' },
+  { id: 4, title: 'Neon Skyline', creator: 'Aria Frost', genre: 'Synthwave', plays: 1856002, change: '↓1' },
+  { id: 5, title: 'Burning Low', creator: 'The Koda', genre: 'Indie Rock', plays: 1743891, change: '—' },
+  { id: 6, title: 'Ghost Frequency', creator: 'KAEL', genre: 'Electronic', plays: 1698234, change: '↑2' },
+  { id: 7, title: 'Wildfire', creator: 'Sage & the Saints', genre: 'Alternative', plays: 1587112, change: '↓2' },
+  { id: 8, title: 'Paper Crowns', creator: 'Mira Chen', genre: 'Pop', plays: 1423098, change: '↑5' },
+  { id: 9, title: 'Low Tide', creator: 'Oceanic', genre: 'Lo-Fi', plays: 1389001, change: 'NEW' },
+  { id: 10, title: 'Fracture Point', creator: 'DVRK MATTER', genre: 'Hip-Hop', plays: 1298456, change: '↓3' },
+  { id: 11, title: 'Solar Flare', creator: 'Prism Collective', genre: 'Jazz Fusion', plays: 1187234, change: '↑1' },
+  { id: 12, title: 'Echoes of You', creator: 'Luna Voss', genre: 'R&B', plays: 1098712, change: '—' },
+  { id: 13, title: 'Static Bloom', creator: 'Hex Theory', genre: 'Post-Punk', plays: 987654, change: '↑4' },
+  { id: 14, title: 'Terminal Bliss', creator: 'Aria Frost', genre: 'Synthwave', plays: 923471, change: '↓1' },
+  { id: 15, title: 'Rust & Gold', creator: 'The Koda', genre: 'Indie Rock', plays: 876234, change: '↑2' },
 ];
 
 const topArtists = [
@@ -40,16 +40,16 @@ const topArtists = [
 ];
 
 const trendingTracks = [
-  { id: 1, title: 'Paper Crowns', artist: 'Mira Chen', plays: 1423098, growth: 342 },
-  { id: 2, title: 'Midnight Protocol', artist: 'KAEL', plays: 2847193, growth: 278 },
-  { id: 3, title: 'Low Tide', artist: 'Oceanic', plays: 1389001, growth: 215 },
-  { id: 4, title: 'Static Bloom', artist: 'Hex Theory', plays: 987654, growth: 189 },
-  { id: 5, title: 'Velvet Chains', artist: 'Luna Voss', plays: 2103847, growth: 156 },
-  { id: 6, title: 'Ghost Frequency', artist: 'KAEL', plays: 1698234, growth: 134 },
-  { id: 7, title: 'Rust & Gold', artist: 'The Koda', plays: 876234, growth: 121 },
-  { id: 8, title: 'Shatter', artist: 'DVRK MATTER', plays: 1987234, growth: 98 },
-  { id: 9, title: 'Solar Flare', artist: 'Prism Collective', plays: 1187234, growth: 87 },
-  { id: 10, title: 'Burning Low', artist: 'The Koda', plays: 1743891, growth: 45 },
+  { id: 1, title: 'Paper Crowns', creator: 'Mira Chen', plays: 1423098, growth: 342 },
+  { id: 2, title: 'Midnight Protocol', creator: 'KAEL', plays: 2847193, growth: 278 },
+  { id: 3, title: 'Low Tide', creator: 'Oceanic', plays: 1389001, growth: 215 },
+  { id: 4, title: 'Static Bloom', creator: 'Hex Theory', plays: 987654, growth: 189 },
+  { id: 5, title: 'Velvet Chains', creator: 'Luna Voss', plays: 2103847, growth: 156 },
+  { id: 6, title: 'Ghost Frequency', creator: 'KAEL', plays: 1698234, growth: 134 },
+  { id: 7, title: 'Rust & Gold', creator: 'The Koda', plays: 876234, growth: 121 },
+  { id: 8, title: 'Shatter', creator: 'DVRK MATTER', plays: 1987234, growth: 98 },
+  { id: 9, title: 'Solar Flare', creator: 'Prism Collective', plays: 1187234, growth: 87 },
+  { id: 10, title: 'Burning Low', creator: 'The Koda', plays: 1743891, growth: 45 },
 ];
 
 function formatPlays(n: number): string {
@@ -91,7 +91,7 @@ export default function ChartsPage() {
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'tracks', label: 'Top Tracks' },
-    { key: 'artists', label: 'Top Artists' },
+    { key: 'creators', label: 'Top Creators' },
     { key: 'trending', label: 'Trending This Week' },
   ];
 
@@ -145,7 +145,7 @@ export default function ChartsPage() {
       </div>
 
       {activeTab === 'tracks' && <TopTracksSection />}
-      {activeTab === 'artists' && <TopArtistsSection />}
+      {activeTab === 'creators' && <TopArtistsSection />}
       {activeTab === 'trending' && <TrendingSection />}
     </div>
   );
@@ -175,7 +175,7 @@ function TopTracksSection() {
 
             <div className="flex-1 min-w-0">
               <p className="font-semibold truncate">{track.title}</p>
-              <p className="text-sm text-gray-400 truncate">{track.artist}</p>
+              <p className="text-sm text-gray-400 truncate">{track.creator}</p>
             </div>
 
             <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${genreColors[track.genre] ?? 'bg-gray-600/20 text-gray-400'}`}>
@@ -199,12 +199,12 @@ function TopTracksSection() {
 function TopArtistsSection() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {topArtists.map((artist, i) => {
+      {topArtists.map((creator, i) => {
         const rank = i + 1;
         return (
           <Link
-            key={artist.id}
-            href={`/artist/${artist.id}`}
+            key={creator.id}
+            href={`/artist/${creator.id}`}
             className="relative rounded-xl bg-[#15151f] p-6 transition hover:bg-[#1a1a2e] group"
           >
             {/* Rank Badge */}
@@ -218,19 +218,19 @@ function TopArtistsSection() {
             </div>
 
             <div className="w-16 h-16 rounded-full bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center text-2xl font-black text-white mb-4">
-              {artist.name.charAt(0)}
+              {creator.name.charAt(0)}
             </div>
 
-            <h3 className="font-bold text-lg mb-1">{artist.name}</h3>
-            <p className="text-sm text-gray-400 mb-3">{artist.genre}</p>
+            <h3 className="font-bold text-lg mb-1">{creator.name}</h3>
+            <p className="text-sm text-gray-400 mb-3">{creator.genre}</p>
 
             <div className="flex gap-4 text-sm">
               <span className="text-gray-300">
-                <span className="font-semibold text-white">{formatFollowers(artist.followers)}</span>{' '}
+                <span className="font-semibold text-white">{formatFollowers(creator.followers)}</span>{' '}
                 followers
               </span>
               <span className="text-gray-300">
-                <span className="font-semibold text-white">{artist.tracks}</span>{' '}
+                <span className="font-semibold text-white">{creator.tracks}</span>{' '}
                 tracks
               </span>
             </div>
@@ -266,7 +266,7 @@ function TrendingSection() {
 
             <div className="flex-1 min-w-0">
               <p className="font-semibold truncate">{track.title}</p>
-              <p className="text-sm text-gray-400 truncate">{track.artist}</p>
+              <p className="text-sm text-gray-400 truncate">{track.creator}</p>
             </div>
 
             <div className="text-right hidden sm:block">

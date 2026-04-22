@@ -273,7 +273,7 @@ export default function LabelTakedownPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold mb-2">Artist Name on OPYNX</label>
+                    <label className="block text-sm font-semibold mb-2">Creator Name on OPYNX</label>
                     <input
                       type="text"
                       value={data.artistName}

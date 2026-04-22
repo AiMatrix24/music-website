@@ -24,11 +24,11 @@ const SLIDE_GRADIENTS = [
 ];
 
 const TOP_TRACKS = [
-  { title: 'Midnight Signal', artist: 'Nova Synthwave', plays: 187 },
-  { title: 'Chrome Dreams', artist: 'PULSE', plays: 156 },
-  { title: 'Neon Rain', artist: 'Nova Synthwave', plays: 134 },
-  { title: 'Electric Dusk', artist: 'Velvet Circuit', plays: 121 },
-  { title: 'Vapor Trail', artist: 'Lo-fi Luna', plays: 98 },
+  { title: 'Midnight Signal', creator: 'Nova Synthwave', plays: 187 },
+  { title: 'Chrome Dreams', creator: 'PULSE', plays: 156 },
+  { title: 'Neon Rain', creator: 'Nova Synthwave', plays: 134 },
+  { title: 'Electric Dusk', creator: 'Velvet Circuit', plays: 121 },
+  { title: 'Vapor Trail', creator: 'Lo-fi Luna', plays: 98 },
 ];
 
 const GENRES = [
@@ -114,11 +114,11 @@ export default function WrappedPage() {
               </div>
             )}
 
-            {/* Slide 2 — Top Artist */}
+            {/* Slide 2 — Top Creator */}
             {current === 1 && (
               <div className="space-y-6">
                 <p className="text-red-400 font-semibold uppercase tracking-widest text-sm">
-                  Your Top Artist
+                  Your Top Creator
                 </p>
                 <h2 className="text-5xl sm:text-6xl font-black bg-gradient-to-r from-red-400 to-purple-400 bg-clip-text text-transparent">
                   Nova Synthwave
@@ -148,7 +148,7 @@ export default function WrappedPage() {
                       <span className="text-2xl font-black text-red-500 w-8">{i + 1}</span>
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold truncate">{track.title}</p>
-                        <p className="text-sm text-gray-400">{track.artist}</p>
+                        <p className="text-sm text-gray-400">{track.creator}</p>
                       </div>
                       <span className="text-sm text-gray-400 shrink-0">{track.plays} plays</span>
                     </div>
@@ -193,7 +193,7 @@ export default function WrappedPage() {
                   {[
                     { value: '2,847', label: 'Tracks Played' },
                     { value: '312', label: 'Hours Listened' },
-                    { value: '184', label: 'Artists Supported' },
+                    { value: '184', label: 'Creators Supported' },
                     { value: '7', label: 'Events Attended' },
                   ].map((stat) => (
                     <div
@@ -223,7 +223,7 @@ export default function WrappedPage() {
                   <p className="text-sm text-gray-400 mb-2">OPYNX Wrapped {year}</p>
                   <p className="text-xl font-bold">{userName}</p>
                   <p className="text-gray-400 text-sm mt-2">
-                    2,847 tracks &middot; 312 hours &middot; Top artist: Nova Synthwave
+                    2,847 tracks &middot; 312 hours &middot; Top creator: Nova Synthwave
                   </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">

@@ -10,7 +10,7 @@ const NOTIFICATIONS = [
   { id: '1', type: 'follow' as const, title: 'New Follower', message: 'Alex Rivera started following you', read: false, href: '/dashboard', createdAt: new Date(Date.now() - 1800000) },
   { id: '2', type: 'ticket' as const, title: 'Ticket Sold', message: 'Someone purchased a VIP ticket to Neon Nights Tour', read: false, href: '/dashboard/tickets', createdAt: new Date(Date.now() - 7200000) },
   { id: '3', type: 'milestone' as const, title: '🎉 Play Milestone!', message: 'Your track "Midnight Drive" hit 10,000 plays!', read: false, href: '/dashboard/analytics', createdAt: new Date(Date.now() - 14400000) },
-  { id: '4', type: 'broadcast' as const, title: 'Artist Update', message: 'Cipher posted: "New album dropping next week! Stay tuned."', read: true, createdAt: new Date(Date.now() - 86400000) },
+  { id: '4', type: 'broadcast' as const, title: 'Creator Update', message: 'Cipher posted: "New album dropping next week! Stay tuned."', read: true, createdAt: new Date(Date.now() - 86400000) },
   { id: '5', type: 'payout' as const, title: 'Payout Complete', message: '$42.50 USDC sent to your Polygon wallet (0x7a3...f2e1)', read: true, href: '/settings', createdAt: new Date(Date.now() - 172800000) },
   { id: '6', type: 'comment' as const, title: 'New Comment', message: 'Jordan Kim commented on "Neon Horizon": "This track is fire 🔥"', read: true, createdAt: new Date(Date.now() - 259200000) },
   { id: '7', type: 'ticket' as const, title: '3 Tickets Sold', message: '3 General Admission tickets sold for Wanderer Festival', read: true, href: '/dashboard/tickets', createdAt: new Date(Date.now() - 345600000) },

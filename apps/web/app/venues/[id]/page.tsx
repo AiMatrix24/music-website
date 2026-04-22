@@ -28,16 +28,16 @@ const AVAILABLE_SLOTS = [
 ];
 
 const UPCOMING_SHOWS = [
-  { id: 1, artist: 'Luna Vega', date: '2026-04-15', genre: 'Electronic', ticketsSold: 320 },
-  { id: 2, artist: 'The Drift', date: '2026-04-20', genre: 'Indie Rock', ticketsSold: 215 },
-  { id: 3, artist: 'Nadia Rose', date: '2026-05-01', genre: 'Pop', ticketsSold: 480 },
+  { id: 1, creator: 'Luna Vega', date: '2026-04-15', genre: 'Electronic', ticketsSold: 320 },
+  { id: 2, creator: 'The Drift', date: '2026-04-20', genre: 'Indie Rock', ticketsSold: 215 },
+  { id: 3, creator: 'Nadia Rose', date: '2026-05-01', genre: 'Pop', ticketsSold: 480 },
 ];
 
 const PAST_SHOWS = [
-  { artist: 'Echo Chamber', date: '2026-03-28', attendance: 410 },
-  { artist: 'DJ Koda', date: '2026-03-15', attendance: 495 },
-  { artist: 'Solstice', date: '2026-02-22', attendance: 380 },
-  { artist: 'Northern Lights', date: '2026-02-10', attendance: 350 },
+  { creator: 'Echo Chamber', date: '2026-03-28', attendance: 410 },
+  { creator: 'DJ Koda', date: '2026-03-15', attendance: 495 },
+  { creator: 'Solstice', date: '2026-02-22', attendance: 380 },
+  { creator: 'Northern Lights', date: '2026-02-10', attendance: 350 },
 ];
 
 const AMENITIES = [
@@ -63,7 +63,7 @@ export default function VenueProfilePage() {
 
   const stats = [
     { label: 'Total Shows', value: '312' },
-    { label: 'Artists Hosted', value: '185' },
+    { label: 'Creators Hosted', value: '185' },
     { label: 'Avg Attendance', value: `${Math.round(venue.capacity * 0.78)}` },
     { label: 'Rating', value: venue.rating.toString() },
   ];
@@ -163,7 +163,7 @@ export default function VenueProfilePage() {
             {UPCOMING_SHOWS.map((show) => (
               <div key={show.id} className="flex items-center justify-between rounded-lg border border-white/5 bg-brand-950/50 p-4">
                 <div>
-                  <p className="font-semibold">{show.artist}</p>
+                  <p className="font-semibold">{show.creator}</p>
                   <p className="text-sm text-gray-400">{show.date} &middot; {show.genre}</p>
                 </div>
                 <span className="text-sm text-gray-400">{show.ticketsSold} tickets sold</span>
@@ -179,7 +179,7 @@ export default function VenueProfilePage() {
             {PAST_SHOWS.map((show, i) => (
               <div key={i} className="flex items-center justify-between rounded-lg border border-white/5 bg-brand-950/50 p-4">
                 <div>
-                  <p className="font-semibold">{show.artist}</p>
+                  <p className="font-semibold">{show.creator}</p>
                   <p className="text-sm text-gray-400">{show.date}</p>
                 </div>
                 <span className="text-sm text-gray-400">{show.attendance} attended</span>

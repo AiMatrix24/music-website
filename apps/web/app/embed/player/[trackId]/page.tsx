@@ -59,7 +59,7 @@ export default async function EmbedPlayerPage({
         track={{
           id: track.id,
           title: track.title,
-          artistName: track.artistName ?? 'Unknown Artist',
+          artistName: track.artistName ?? 'Unknown Creator',
           artistId: track.artistId,
           duration: track.duration ?? 0,
           audioUrl: track.audioUrl320 ?? track.audioUrl128 ?? null,

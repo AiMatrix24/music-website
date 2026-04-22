@@ -10,7 +10,7 @@ type SortOption = 'recent' | 'alpha' | 'played';
 interface FavTrack {
   id: string;
   title: string;
-  artist: string;
+  creator: string;
   genre: string;
   addedAt: string;
   playCount: number;
@@ -36,14 +36,14 @@ interface FavListing {
 }
 
 const mockTracks: FavTrack[] = [
-  { id: '1', title: 'Neon Pulse', artist: 'SYNTHEX', genre: 'Synthwave', addedAt: '2 days ago', playCount: 14 },
-  { id: '2', title: 'Midnight Protocol', artist: 'DataStream', genre: 'Electronic', addedAt: '3 days ago', playCount: 8 },
-  { id: '3', title: 'Dissolve', artist: 'Pale Waves', genre: 'Indie Rock', addedAt: '5 days ago', playCount: 22 },
-  { id: '4', title: 'Ghost Signal', artist: 'VoidRunner', genre: 'Post-Punk', addedAt: '1 week ago', playCount: 5 },
-  { id: '5', title: 'Cascade', artist: 'Echofault', genre: 'Ambient', addedAt: '1 week ago', playCount: 11 },
-  { id: '6', title: 'Voltage', artist: 'Crimson Wire', genre: 'Electronic', addedAt: '2 weeks ago', playCount: 7 },
-  { id: '7', title: 'Paper Thin', artist: 'The Satellites', genre: 'Alternative', addedAt: '2 weeks ago', playCount: 19 },
-  { id: '8', title: 'Refraction', artist: 'Glasspoint', genre: 'Synthwave', addedAt: '3 weeks ago', playCount: 9 },
+  { id: '1', title: 'Neon Pulse', creator: 'SYNTHEX', genre: 'Synthwave', addedAt: '2 days ago', playCount: 14 },
+  { id: '2', title: 'Midnight Protocol', creator: 'DataStream', genre: 'Electronic', addedAt: '3 days ago', playCount: 8 },
+  { id: '3', title: 'Dissolve', creator: 'Pale Waves', genre: 'Indie Rock', addedAt: '5 days ago', playCount: 22 },
+  { id: '4', title: 'Ghost Signal', creator: 'VoidRunner', genre: 'Post-Punk', addedAt: '1 week ago', playCount: 5 },
+  { id: '5', title: 'Cascade', creator: 'Echofault', genre: 'Ambient', addedAt: '1 week ago', playCount: 11 },
+  { id: '6', title: 'Voltage', creator: 'Crimson Wire', genre: 'Electronic', addedAt: '2 weeks ago', playCount: 7 },
+  { id: '7', title: 'Paper Thin', creator: 'The Satellites', genre: 'Alternative', addedAt: '2 weeks ago', playCount: 19 },
+  { id: '8', title: 'Refraction', creator: 'Glasspoint', genre: 'Synthwave', addedAt: '3 weeks ago', playCount: 9 },
 ];
 
 const mockEvents: FavEvent[] = [
@@ -159,7 +159,7 @@ export default function FavoritesPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-white truncate group-hover:text-red-400 transition">{track.title}</p>
-                      <p className="text-sm text-gray-400 truncate">{track.artist}</p>
+                      <p className="text-sm text-gray-400 truncate">{track.creator}</p>
                     </div>
                     <span className="hidden sm:inline-block px-2.5 py-0.5 rounded-full bg-red-600/10 text-red-400 text-xs font-medium">
                       {track.genre}

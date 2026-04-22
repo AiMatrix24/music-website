@@ -67,7 +67,7 @@ export default function LoginPage() {
           <p className="text-gray-400">
             {role === 'fan' && 'Sign in to start listening and discovering.'}
             {role === 'creator' && 'Sign in to upload music and grow your fanbase.'}
-            {role === 'venue' && 'Sign in to book artists and manage events.'}
+            {role === 'venue' && 'Sign in to book creators and manage events.'}
           </p>
         </div>
 

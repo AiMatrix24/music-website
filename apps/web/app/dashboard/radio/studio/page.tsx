@@ -5,16 +5,16 @@ import { useSession } from 'next-auth/react';
 import { useEffect, useRef, useState } from 'react';
 import { useToast } from '@/app/components/Toast';
 
-type Track = { id: string; title: string; artist: string; duration: string };
+type Track = { id: string; title: string; creator: string; duration: string };
 type Caller = { id: string; name: string; avatar: string; status: 'screening' | 'on-air' | 'approved' };
 type ChatMsg = { id: string; user: string; msg: string; color: string };
 
 const UPCOMING: Track[] = [
-  { id: 't1', title: 'Neon Drift', artist: 'Cipher', duration: '3:42' },
-  { id: 't2', title: 'Midnight Run', artist: 'Kairo', duration: '4:18' },
-  { id: 't3', title: 'Electric Dreams', artist: 'VHS Glow', duration: '3:56' },
-  { id: 't4', title: 'After Hours', artist: 'Nova Line', duration: '5:02' },
-  { id: 't5', title: 'Static Pulse', artist: 'Cipher', duration: '4:31' },
+  { id: 't1', title: 'Neon Drift', creator: 'Cipher', duration: '3:42' },
+  { id: 't2', title: 'Midnight Run', creator: 'Kairo', duration: '4:18' },
+  { id: 't3', title: 'Electric Dreams', creator: 'VHS Glow', duration: '3:56' },
+  { id: 't4', title: 'After Hours', creator: 'Nova Line', duration: '5:02' },
+  { id: 't5', title: 'Static Pulse', creator: 'Cipher', duration: '4:31' },
 ];
 
 const CALLERS: Caller[] = [
@@ -423,7 +423,7 @@ export default function RadioStudioPage() {
                       <span className="text-gray-500">⋮⋮</span>
                       <div className="flex-1 min-w-0">
                         <div className="text-sm truncate">{t.title}</div>
-                        <div className="text-xs text-gray-500 truncate">{t.artist}</div>
+                        <div className="text-xs text-gray-500 truncate">{t.creator}</div>
                       </div>
                       <span className="text-xs text-gray-500 tabular-nums">{t.duration}</span>
                     </div>

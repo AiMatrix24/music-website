@@ -12,7 +12,7 @@ import { useToast } from '@/app/components/Toast';
 interface NftDrop {
   id: string;
   title: string;
-  artist: string;
+  creator: string;
   artistId: string;
   edition: string;
   price: number;
@@ -26,7 +26,7 @@ const LIVE_DROPS: NftDrop[] = [
   {
     id: '1',
     title: 'Neon Skyline',
-    artist: 'ZVRA',
+    creator: 'ZVRA',
     artistId: 'a1',
     edition: '1 of 50',
     price: 25,
@@ -38,7 +38,7 @@ const LIVE_DROPS: NftDrop[] = [
   {
     id: '2',
     title: 'Ocean Protocol',
-    artist: 'Mira Solis',
+    creator: 'Mira Solis',
     artistId: 'a2',
     edition: '12 of 200',
     price: 8,
@@ -50,7 +50,7 @@ const LIVE_DROPS: NftDrop[] = [
   {
     id: '3',
     title: 'Concrete Waves',
-    artist: 'The Drift',
+    creator: 'The Drift',
     artistId: 'a3',
     edition: '89 of 500',
     price: 3,
@@ -62,14 +62,14 @@ const LIVE_DROPS: NftDrop[] = [
 ];
 
 const UPCOMING_DROPS = [
-  { id: 'u1', title: 'Phantom Signal', artist: 'KVLT', date: 'Apr 5, 2026', gradientFrom: 'from-purple-600', gradientTo: 'to-pink-600' },
-  { id: 'u2', title: 'Solar Drift', artist: 'Aether', date: 'Apr 12, 2026', gradientFrom: 'from-orange-500', gradientTo: 'to-yellow-500' },
-  { id: 'u3', title: 'Deep Currents', artist: 'Undertow', date: 'Apr 20, 2026', gradientFrom: 'from-teal-600', gradientTo: 'to-emerald-500' },
+  { id: 'u1', title: 'Phantom Signal', creator: 'KVLT', date: 'Apr 5, 2026', gradientFrom: 'from-purple-600', gradientTo: 'to-pink-600' },
+  { id: 'u2', title: 'Solar Drift', creator: 'Aether', date: 'Apr 12, 2026', gradientFrom: 'from-orange-500', gradientTo: 'to-yellow-500' },
+  { id: 'u3', title: 'Deep Currents', creator: 'Undertow', date: 'Apr 20, 2026', gradientFrom: 'from-teal-600', gradientTo: 'to-emerald-500' },
 ];
 
 const OWNED_NFTS = [
-  { id: 'o1', title: 'Midnight Protocol', artist: 'ZVRA', edition: '7 of 50', txHash: '0x1a2b3c' },
-  { id: 'o2', title: 'Static Dreams', artist: 'Mira Solis', edition: '34 of 100', txHash: '0x4d5e6f' },
+  { id: 'o1', title: 'Midnight Protocol', creator: 'ZVRA', edition: '7 of 50', txHash: '0x1a2b3c' },
+  { id: 'o2', title: 'Static Dreams', creator: 'Mira Solis', edition: '34 of 100', txHash: '0x4d5e6f' },
 ];
 
 const STATS = [
@@ -178,7 +178,7 @@ export default function NftDropsPage() {
                 </div>
                 <div className="p-5">
                   <h3 className="font-bold text-lg mb-1">{d.title}</h3>
-                  <p className="text-sm text-gray-400 mb-3">{d.artist}</p>
+                  <p className="text-sm text-gray-400 mb-3">{d.creator}</p>
                   <p className="text-xs text-gray-500 mb-4">Drops {d.date}</p>
                   <button
                     onClick={() => toast('You will be notified when this drops!', 'info')}
@@ -210,7 +210,7 @@ export default function NftDropsPage() {
                     &#9830;
                   </div>
                   <h3 className="font-bold">{nft.title}</h3>
-                  <p className="text-sm text-gray-400">{nft.artist} &middot; {nft.edition}</p>
+                  <p className="text-sm text-gray-400">{nft.creator} &middot; {nft.edition}</p>
                   <a
                     href={`https://polygonscan.com/tx/${nft.txHash}`}
                     target="_blank"
@@ -230,7 +230,7 @@ export default function NftDropsPage() {
           <h2 className="text-2xl font-bold mb-6 text-center">How It Works</h2>
           <div className="grid sm:grid-cols-3 gap-6">
             {[
-              { step: '1', title: 'Browse', desc: 'Explore live and upcoming drops from your favorite artists.' },
+              { step: '1', title: 'Browse', desc: 'Explore live and upcoming drops from your favorite creators.' },
               { step: '2', title: 'Collect', desc: 'Purchase limited-edition music collectibles with USDC.' },
               { step: '3', title: 'Own', desc: 'Your collectible is stored on-chain. Resell or hold forever.' },
             ].map((s) => (
@@ -293,7 +293,7 @@ function NftCard({ drop, onCollect }: { drop: NftDrop; onCollect: () => void }) 
       <div className="p-5">
         <h3 className="font-bold text-lg">{drop.title}</h3>
         <Link href={`/artist/${drop.artistId}`} className="text-sm text-gray-400 hover:text-red-400 transition">
-          {drop.artist}
+          {drop.creator}
         </Link>
         <p className="text-xs text-gray-500 mt-1">{drop.edition}</p>
 

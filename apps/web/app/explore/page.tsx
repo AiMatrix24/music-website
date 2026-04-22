@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { TrackListSkeleton, CardGridSkeleton, ArtistCardSkeleton, EventCardSkeleton } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
 
-type Tab = 'tracks' | 'artists' | 'events' | 'marketplace' | 'playlists' | 'articles';
+type Tab = 'tracks' | 'creators' | 'events' | 'marketplace' | 'playlists' | 'articles';
 
 export default function ExplorePage() {
   const [activeTab, setActiveTab] = useState<Tab>('tracks');
@@ -17,7 +17,7 @@ export default function ExplorePage() {
       <p className="text-gray-400 mb-8">Discover music, events, and more on OPYNX.</p>
 
       <div className="flex gap-2 mb-8 overflow-x-auto">
-        {(['tracks', 'artists', 'events', 'marketplace', 'playlists', 'articles'] as Tab[]).map((tab) => (
+        {(['tracks', 'creators', 'events', 'marketplace', 'playlists', 'articles'] as Tab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -33,7 +33,7 @@ export default function ExplorePage() {
       </div>
 
       {activeTab === 'tracks' && <TracksSection />}
-      {activeTab === 'artists' && <ArtistsSection />}
+      {activeTab === 'creators' && <ArtistsSection />}
       {activeTab === 'events' && <EventsSection />}
       {activeTab === 'marketplace' && <MarketplaceSection />}
       {activeTab === 'playlists' && <PlaylistsSection />}
@@ -62,7 +62,7 @@ function TracksSection() {
           <div className="flex-1 min-w-0">
             <p className="font-semibold truncate">{track.title}</p>
             <p className="text-sm text-gray-400 truncate">
-              {track.artistName ?? 'Unknown artist'} · {track.genre ?? 'Unknown genre'}
+              {track.artistName ?? 'Unknown creator'} · {track.genre ?? 'Unknown genre'}
             </p>
           </div>
           <div className="text-right hidden sm:block">
@@ -79,7 +79,7 @@ function TracksSection() {
 }
 
 function ArtistsSection() {
-  const { data: artists, isLoading } = trpc.users.listCreators.useQuery({ limit: 20 });
+  const { data: creators, isLoading } = trpc.users.listCreators.useQuery({ limit: 20 });
 
   if (isLoading) return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -89,23 +89,23 @@ function ArtistsSection() {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-      {artists?.map((artist) => (
+      {creators?.map((creator) => (
         <Link
-          key={artist.id}
-          href={`/artist/${artist.id}`}
+          key={creator.id}
+          href={`/artist/${creator.id}`}
           className="rounded-2xl bg-[#15151f] p-6 transition hover:bg-[#1a1a2e] flex flex-col items-center text-center"
         >
           <div className="w-20 h-20 rounded-full bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-2xl font-black mb-4">
-            {artist.name?.charAt(0)?.toUpperCase() ?? '?'}
+            {creator.name?.charAt(0)?.toUpperCase() ?? '?'}
           </div>
-          <h3 className="font-bold text-lg mb-1">{artist.name}</h3>
+          <h3 className="font-bold text-lg mb-1">{creator.name}</h3>
           <span className="text-xs bg-brand-600/20 text-brand-400 px-3 py-1 rounded-full">
-            {artist.role}
+            {creator.role}
           </span>
         </Link>
       ))}
-      {(!artists || artists.length === 0) && (
-        <p className="text-gray-500 text-center py-8 col-span-3">No artists yet.</p>
+      {(!creators || creators.length === 0) && (
+        <p className="text-gray-500 text-center py-8 col-span-3">No creators yet.</p>
       )}
     </div>
   );

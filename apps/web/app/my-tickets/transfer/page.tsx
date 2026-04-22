@@ -46,7 +46,7 @@ function TransferContent() {
     setTimeout(() => {
       setProcessing(false);
       setSubmitted(true);
-      toast('Transfer request submitted for artist approval', 'success');
+      toast('Transfer request submitted for creator approval', 'success');
     }, 1500);
   };
 

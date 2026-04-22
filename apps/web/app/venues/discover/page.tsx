@@ -57,7 +57,7 @@ export default function VenuesDiscoverPage() {
             <span className="mr-3">🏟️</span>Find Your Stage
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-gray-300">
-            Browse venues looking for artists. From intimate jazz clubs to massive arenas, find the perfect stage for your next performance.
+            Browse venues looking for creators. From intimate jazz clubs to massive arenas, find the perfect stage for your next performance.
           </p>
         </div>
       </div>
@@ -168,7 +168,7 @@ export default function VenuesDiscoverPage() {
         <div className="mt-16 rounded-2xl border border-white/10 bg-gradient-to-r from-red-950/50 to-brand-900 p-8 text-center">
           <h2 className="text-2xl font-bold">Own a Venue?</h2>
           <p className="mx-auto mt-2 max-w-lg text-gray-300">
-            List your venue on OPYNX and connect with thousands of artists looking for their next stage. Post available time slots and manage bookings effortlessly.
+            List your venue on OPYNX and connect with thousands of creators looking for their next stage. Post available time slots and manage bookings effortlessly.
           </p>
           <Link
             href="/venues/post-slot"

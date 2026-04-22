@@ -82,7 +82,7 @@ export default function PlaylistDetailPage() {
                     play({
                       id: playlistTracks[0].track.id,
                       title: playlistTracks[0].track.title,
-                      artist: 'Unknown',
+                      creator: 'Unknown',
                       genre: playlistTracks[0].track.genre ?? '',
                       duration: playlistTracks[0].track.duration ?? 0,
                     });
@@ -102,7 +102,7 @@ export default function PlaylistDetailPage() {
                     play({
                       id: pt.track.id,
                       title: pt.track.title,
-                      artist: 'Unknown',
+                      creator: 'Unknown',
                       genre: pt.track.genre ?? '',
                       duration: pt.track.duration ?? 0,
                     })

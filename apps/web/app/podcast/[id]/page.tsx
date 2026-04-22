@@ -9,7 +9,7 @@ import { usePlayer } from '@/app/components/MusicPlayer';
 const MOCK_PODCAST = {
   id: '1',
   title: 'The OPYNX Show',
-  description: 'Weekly conversations with independent artists about creativity, business, and the future of music.',
+  description: 'Weekly conversations with independent creators about creativity, business, and the future of music.',
   host: 'Nova Synthwave',
   coverArt: null,
   episodeCount: 24,
@@ -17,9 +17,9 @@ const MOCK_PODCAST = {
 };
 
 const MOCK_EPISODES = [
-  { id: 'ep1', title: 'Ep. 24 — How to Tour Without a Label', description: 'Cipher shares his approach to booking venues, managing logistics, and making tour profitable as an independent artist.', duration: 2520, publishedAt: new Date('2026-03-20'), seasonNumber: 2, episodeNumber: 12 },
+  { id: 'ep1', title: 'Ep. 24 — How to Tour Without a Label', description: 'Cipher shares his approach to booking venues, managing logistics, and making tour profitable as an independent creator.', duration: 2520, publishedAt: new Date('2026-03-20'), seasonNumber: 2, episodeNumber: 12 },
   { id: 'ep2', title: 'Ep. 23 — Building a Superfan Community', description: 'Luna Beats talks about growing from 0 to 10K followers using direct-to-fan strategies.', duration: 1980, publishedAt: new Date('2026-03-13'), seasonNumber: 2, episodeNumber: 11 },
-  { id: 'ep3', title: 'Ep. 22 — Transparent Revenue: Why It Matters', description: 'A deep dive into on-chain payouts and why artists deserve to see where every dollar goes.', duration: 2340, publishedAt: new Date('2026-03-06'), seasonNumber: 2, episodeNumber: 10 },
+  { id: 'ep3', title: 'Ep. 22 — Transparent Revenue: Why It Matters', description: 'A deep dive into on-chain payouts and why creators deserve to see where every dollar goes.', duration: 2340, publishedAt: new Date('2026-03-06'), seasonNumber: 2, episodeNumber: 10 },
   { id: 'ep4', title: 'Ep. 21 — Lo-fi Production Masterclass', description: 'Luna Beats walks through her DAW setup and shows how she creates the signature Moonlit Frequencies sound.', duration: 3600, publishedAt: new Date('2026-02-27'), seasonNumber: 2, episodeNumber: 9 },
   { id: 'ep5', title: 'Ep. 20 — Merch That Actually Sells', description: 'Tips on designing, pricing, and selling merchandise that fans actually want.', duration: 1800, publishedAt: new Date('2026-02-20'), seasonNumber: 2, episodeNumber: 8 },
 ];
@@ -36,7 +36,7 @@ export default function PodcastDetailPage() {
     play({
       id: ep.id,
       title: ep.title,
-      artist: podcast.host,
+      creator: podcast.host,
       genre: 'Podcast',
       duration: ep.duration,
     });

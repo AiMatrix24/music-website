@@ -49,7 +49,7 @@ export default function LabelClaimPortalPage() {
           <p className="text-5xl mb-3">🏢</p>
           <h1 className="text-4xl md:text-5xl font-bold mb-3">Label Rights Portal</h1>
           <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-            Verify your label, claim ownership, manage artist roster
+            Verify your label, claim ownership, manage creator roster
           </p>
         </div>
 
@@ -89,7 +89,7 @@ export default function LabelClaimPortalPage() {
                   className="block bg-brand-950 hover:bg-[#1d1d2a] transition rounded-lg px-4 py-3"
                 >
                   <p className="font-semibold">Roster Management</p>
-                  <p className="text-xs text-gray-400">View and manage your artist roster</p>
+                  <p className="text-xs text-gray-400">View and manage your creator roster</p>
                 </Link>
                 <Link
                   href="/labels/takedown"
@@ -102,9 +102,9 @@ export default function LabelClaimPortalPage() {
             </div>
           </section>
 
-          {/* For Artists */}
+          {/* For Creators */}
           <section className="bg-[#15151f] rounded-xl p-6">
-            <h2 className="text-2xl font-bold mb-1">For Artists</h2>
+            <h2 className="text-2xl font-bold mb-1">For Creators</h2>
             <p className="text-sm text-gray-400 mb-5">Respond to claims and protect your work</p>
 
             <div className="space-y-2">

@@ -107,7 +107,7 @@ const MOCK_STORIES: Story[] = [
 ];
 
 const DISCOVERY_OPTIONS: DiscoveryMethod[] = ['Concert', 'Playlist', 'Friend', 'OPYNX Discover', 'Social Media', 'Other'];
-const FILTER_TABS = ['All', 'Most Liked', 'Recent', 'By Artist'] as const;
+const FILTER_TABS = ['All', 'Most Liked', 'Recent', 'By Creator'] as const;
 
 const METHOD_COLORS: Record<DiscoveryMethod, string> = {
   Concert: 'bg-red-600/20 text-red-400',
@@ -159,7 +159,7 @@ export default function StoriesPage() {
 
   const filteredStories = [...stories].sort((a, b) => {
     if (activeTab === 'Most Liked') return b.likes - a.likes;
-    return 0; // 'All', 'Recent', 'By Artist' keep default order for mock
+    return 0; // 'All', 'Recent', 'By Creator' keep default order for mock
   });
 
   const handleSubmit = () => {
@@ -197,7 +197,7 @@ export default function StoriesPage() {
             </span>
           </h1>
           <p className="text-gray-400 max-w-lg mx-auto">
-            Share how music changed your life. Tell the world how you discovered your favorite artist.
+            Share how music changed your life. Tell the world how you discovered your favorite creator.
           </p>
         </section>
 
@@ -282,15 +282,15 @@ export default function StoriesPage() {
 
           {session && (
             <div className="space-y-5">
-              {/* Artist select */}
+              {/* Creator select */}
               <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-2">Select Artist</label>
+                <label className="block text-sm font-semibold text-gray-300 mb-2">Select Creator</label>
                 <select
                   value={selectedArtist}
                   onChange={(e) => setSelectedArtist(e.target.value)}
                   className="w-full bg-brand-950 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:border-red-600 focus:outline-none transition"
                 >
-                  <option value="">Choose an artist...</option>
+                  <option value="">Choose an creator...</option>
                   {['ZVRA', 'Mira Solis', 'The Drift', 'KVLT', 'Aether', 'Undertow'].map((a) => (
                     <option key={a} value={a}>{a}</option>
                   ))}
@@ -330,7 +330,7 @@ export default function StoriesPage() {
                 <textarea
                   value={storyText}
                   onChange={(e) => setStoryText(e.target.value.slice(0, 500))}
-                  placeholder="Tell us how this artist changed your life..."
+                  placeholder="Tell us how this creator changed your life..."
                   rows={4}
                   className="w-full bg-brand-950 border border-white/10 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-red-600 focus:outline-none transition resize-none"
                 />

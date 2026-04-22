@@ -23,14 +23,14 @@ interface AttrParams {
 // ─── Mock Data (replace with API calls in production) ───
 
 function getMockArtistName(creatorId: string | null): string {
-  if (!creatorId) return 'Artist';
+  if (!creatorId) return 'Creator';
   // Mock lookup — in production, fetch from API
   const mockNames: Record<string, string> = {
     artist_001: 'Luna Wave',
     artist_002: 'DJ Cryptex',
     artist_003: 'The Velvet Keys',
   };
-  return mockNames[creatorId] ?? 'Artist';
+  return mockNames[creatorId] ?? 'Creator';
 }
 
 function getMockEventName(eventId: string | null): string {
@@ -56,7 +56,7 @@ function getMockFacilitatorName(facilitatorId: string | null): string {
 
 function buildSubscribeUrl(params: AttrParams): string {
   const query = new URLSearchParams();
-  if (params.creatorId) query.set('artist', params.creatorId);
+  if (params.creatorId) query.set('creator', params.creatorId);
   if (params.facilitatorId) query.set('ref', params.facilitatorId);
   if (params.eventId) query.set('event', params.eventId);
   if (params.ctx) query.set('ctx', params.ctx);
@@ -135,12 +135,12 @@ function AttrPageContent() {
         &larr; OPYNX Home
       </Link>
 
-      {/* Artist Avatar (mock) */}
+      {/* Creator Avatar (mock) */}
       <div className="w-24 h-24 rounded-full bg-gradient-to-br from-red-600 to-pink-700 flex items-center justify-center text-4xl mb-6 ring-4 ring-red-600/20">
         🎤
       </div>
 
-      {/* Artist Name */}
+      {/* Creator Name */}
       <h1 className="text-3xl font-black text-white mb-1 text-center">{artistName}</h1>
 
       {/* Verified at Event badge */}
@@ -234,8 +234,8 @@ function AttrPageContent() {
             {[
               'Ad-free listening experience',
               'High-quality 320kbps audio',
-              'Exclusive artist content & drops',
-              'Direct messaging with artists',
+              'Exclusive creator content & drops',
+              'Direct messaging with creators',
               'Merch discounts up to 15%',
             ].map((item) => (
               <li key={item} className="flex items-center gap-2 text-sm text-gray-400">

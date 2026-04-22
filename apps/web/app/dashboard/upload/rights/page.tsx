@@ -162,7 +162,7 @@ export default function UploadRightsStepPage() {
               onSelect={() => setRightsStatus('independent')}
               icon="✅"
               title="Independent — I own all rights"
-              subtitle="Recommended for indie artists"
+              subtitle="Recommended for indie creators"
               tone="good"
             />
             <RadioCard
@@ -446,7 +446,7 @@ export default function UploadRightsStepPage() {
             <li className="flex gap-2">
               <span className="text-red-400">•</span>
               <span>
-                <strong>50%</strong> to publisher (if separate from artist)
+                <strong>50%</strong> to publisher (if separate from creator)
               </span>
             </li>
           </ul>

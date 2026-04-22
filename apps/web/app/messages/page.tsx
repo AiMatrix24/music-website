@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 
 interface Message {
   id: string;
-  from: 'me' | 'artist';
+  from: 'me' | 'creator';
   text: string;
   timestamp: Date;
 }
@@ -21,24 +21,24 @@ interface ArtistConvo {
   unread: number;
 }
 
-// Welcome messages per artist — sent when fan first subscribes
+// Welcome messages per creator — sent when fan first subscribes
 function generateWelcomeMessages(artistName: string, artistId: string): Message[] {
   return [
     {
       id: `welcome-${artistId}-1`,
-      from: 'artist',
+      from: 'creator',
       text: `Hey! 👋 Welcome to my inner circle on OPYNX! I'm so glad you're here.`,
       timestamp: new Date(Date.now() - 86400000 * 3),
     },
     {
       id: `welcome-${artistId}-2`,
-      from: 'artist',
+      from: 'creator',
       text: `As a subscriber, you get early access to new tracks, exclusive behind-the-scenes content, and you can message me directly right here. I read every message!`,
       timestamp: new Date(Date.now() - 86400000 * 3 + 5000),
     },
     {
       id: `welcome-${artistId}-3`,
-      from: 'artist',
+      from: 'creator',
       text: `Got any questions, feedback, or just want to say hi? I'm here. 🎶`,
       timestamp: new Date(Date.now() - 86400000 * 3 + 10000),
     },
@@ -48,7 +48,7 @@ function generateWelcomeMessages(artistName: string, artistId: string): Message[
 export default function MessagesPage() {
   const { data: session, status } = useSession();
 
-  // Fetch artists the fan follows (these are the artists they can message)
+  // Fetch creators the fan follows (these are the creators they can message)
   const { data: follows } = trpc.users.listCreators.useQuery(
     { limit: 50 },
     { enabled: status === 'authenticated' }
@@ -58,19 +58,19 @@ export default function MessagesPage() {
   const [newMessage, setNewMessage] = useState('');
   const [conversations, setConversations] = useState<ArtistConvo[]>([]);
 
-  // Build conversations from followed/subscribed artists
+  // Build conversations from followed/subscribed creators
   useEffect(() => {
     if (!follows || follows.length === 0) return;
 
     // Only show creator-role users as message targets
-    const artists = follows.filter((u) => u.role === 'creator');
+    const creators = follows.filter((u) => u.role === 'creator');
 
-    const convos: ArtistConvo[] = artists.map((artist) => ({
-      artistId: artist.id,
-      artistName: artist.name ?? 'Unknown Artist',
-      avatar: artist.name?.charAt(0)?.toUpperCase() ?? '?',
+    const convos: ArtistConvo[] = creators.map((creator) => ({
+      artistId: creator.id,
+      artistName: creator.name ?? 'Unknown Creator',
+      avatar: creator.name?.charAt(0)?.toUpperCase() ?? '?',
       tier: 'subscribed',
-      messages: generateWelcomeMessages(artist.name ?? 'Artist', artist.id),
+      messages: generateWelcomeMessages(creator.name ?? 'Creator', creator.id),
       unread: 1,
     }));
 
@@ -81,7 +81,7 @@ export default function MessagesPage() {
       avatar: 'O',
       tier: 'system',
       messages: [
-        { id: 'sys-1', from: 'artist', text: 'Welcome to OPYNX! 🎉 If you have any questions about the platform, billing, or need help, just send us a message here.', timestamp: new Date(Date.now() - 86400000 * 7) },
+        { id: 'sys-1', from: 'creator', text: 'Welcome to OPYNX! 🎉 If you have any questions about the platform, billing, or need help, just send us a message here.', timestamp: new Date(Date.now() - 86400000 * 7) },
       ],
       unread: 0,
     });
@@ -93,7 +93,7 @@ export default function MessagesPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
         <p className="text-5xl mb-2">💬</p>
-        <p className="text-gray-400 text-lg">Sign in to message your artists</p>
+        <p className="text-gray-400 text-lg">Sign in to message your creators</p>
         <Link href="/auth/login" className="rounded-full bg-red-600 px-6 py-3 font-semibold text-white hover:bg-red-500 transition">
           Sign In
         </Link>
@@ -105,14 +105,14 @@ export default function MessagesPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6">
         <p className="text-5xl mb-2">💬</p>
-        <h2 className="text-2xl font-bold">No Artists Yet</h2>
+        <h2 className="text-2xl font-bold">No Creators Yet</h2>
         <p className="text-gray-400 text-center max-w-md">
-          Subscribe to artists to unlock direct messaging. Your messages go straight to
-          the artist — no middlemen, no gatekeepers.
+          Subscribe to creators to unlock direct messaging. Your messages go straight to
+          the creator — no middlemen, no gatekeepers.
         </p>
         <div className="flex gap-3 mt-4">
           <Link href="/explore" className="rounded-full bg-red-600 px-6 py-3 font-semibold text-white hover:bg-red-500 transition">
-            Explore Artists
+            Explore Creators
           </Link>
           <Link href="/subscribe" className="rounded-full border border-brand-800/30 px-6 py-3 font-semibold hover:border-red-600 transition">
             Subscribe
@@ -154,7 +154,7 @@ export default function MessagesPage() {
             Messages {totalUnread > 0 && <span className="text-red-400 text-lg">({totalUnread})</span>}
           </h1>
           <div className="text-xs text-gray-500 bg-[#15151f] px-3 py-1.5 rounded-full">
-            🔒 Direct to artist — no middlemen
+            🔒 Direct to creator — no middlemen
           </div>
         </div>
 
@@ -163,20 +163,20 @@ export default function MessagesPage() {
           <span className="text-lg">💎</span>
           <div className="flex-1">
             <p className="text-sm font-semibold">
-              You can message {conversations.filter((c) => c.tier !== 'system').length} artist{conversations.filter((c) => c.tier !== 'system').length !== 1 ? 's' : ''} directly
+              You can message {conversations.filter((c) => c.tier !== 'system').length} creator{conversations.filter((c) => c.tier !== 'system').length !== 1 ? 's' : ''} directly
             </p>
             <p className="text-xs text-gray-400">
-              Premium: 1 artist · Superfan Bundle: up to 4 artists · Studio: unlimited
+              Premium: 1 creator · Superfan Bundle: up to 4 creators · Studio: unlimited
             </p>
           </div>
         </div>
 
         <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 overflow-hidden" style={{ height: 'calc(100vh - 280px)', minHeight: '500px' }}>
           <div className="flex h-full">
-            {/* Artist conversation list */}
+            {/* Creator conversation list */}
             <div className={`w-full sm:w-80 border-r border-brand-800/20 flex flex-col ${selectedArtist ? 'hidden sm:flex' : 'flex'}`}>
               <div className="p-3 border-b border-brand-800/20">
-                <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold px-1">Your Artists</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold px-1">Your Creators</p>
               </div>
               <div className="flex-1 overflow-y-auto">
                 {conversations.map((convo) => {
@@ -201,7 +201,7 @@ export default function MessagesPage() {
                           <div className="flex items-center gap-1.5">
                             <p className="font-semibold text-sm truncate">{convo.artistName}</p>
                             {convo.tier !== 'system' && (
-                              <span className="text-[10px] bg-red-600/20 text-red-400 px-1.5 py-0.5 rounded-full">artist</span>
+                              <span className="text-[10px] bg-red-600/20 text-red-400 px-1.5 py-0.5 rounded-full">creator</span>
                             )}
                           </div>
                           {lastMsg && <span className="text-xs text-gray-600 shrink-0">{shortTimeAgo(lastMsg.timestamp)}</span>}
@@ -235,7 +235,7 @@ export default function MessagesPage() {
                       <div>
                         <p className="font-semibold text-sm">{activeConvo.artistName}</p>
                         <p className="text-xs text-gray-500">
-                          {activeConvo.tier === 'system' ? 'Support Team' : 'Direct message — only you and the artist'}
+                          {activeConvo.tier === 'system' ? 'Support Team' : 'Direct message — only you and the creator'}
                         </p>
                       </div>
                     </div>
@@ -259,7 +259,7 @@ export default function MessagesPage() {
 
                     {activeConvo.messages.map((msg) => (
                       <div key={msg.id} className={`flex ${msg.from === 'me' ? 'justify-end' : 'justify-start'}`}>
-                        {msg.from === 'artist' && (
+                        {msg.from === 'creator' && (
                           <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black mr-2 shrink-0 mt-1 ${
                             activeConvo.tier === 'system' ? 'bg-gradient-to-br from-gray-600 to-gray-800' : 'bg-gradient-to-br from-red-600 to-red-800'
                           }`}>
@@ -305,11 +305,11 @@ export default function MessagesPage() {
                 <div className="flex-1 flex items-center justify-center">
                   <div className="text-center px-6">
                     <p className="text-5xl mb-4">💬</p>
-                    <h2 className="text-xl font-bold mb-2">Direct Artist Messages</h2>
+                    <h2 className="text-xl font-bold mb-2">Direct Creator Messages</h2>
                     <p className="text-gray-400 text-sm max-w-sm">
-                      Select an artist to start a private conversation.
-                      Messages go directly to the artist you subscribe to — whether
-                      you support 1 artist or 4.
+                      Select an creator to start a private conversation.
+                      Messages go directly to the creator you subscribe to — whether
+                      you support 1 creator or 4.
                     </p>
                   </div>
                 </div>

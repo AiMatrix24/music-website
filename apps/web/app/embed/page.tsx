@@ -4,11 +4,11 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 const EXAMPLE_TRACKS = [
-  { id: 'trk_001', title: 'Midnight Drive', artist: 'NeonWave' },
-  { id: 'trk_002', title: 'Digital Rain', artist: 'SynthPulse' },
-  { id: 'trk_003', title: 'Ghost Signal', artist: 'VoidEcho' },
-  { id: 'trk_004', title: 'Solar Flare', artist: 'AstroBeats' },
-  { id: 'trk_005', title: 'Crystal Cavern', artist: 'LoopMachine' },
+  { id: 'trk_001', title: 'Midnight Drive', creator: 'NeonWave' },
+  { id: 'trk_002', title: 'Digital Rain', creator: 'SynthPulse' },
+  { id: 'trk_003', title: 'Ghost Signal', creator: 'VoidEcho' },
+  { id: 'trk_004', title: 'Solar Flare', creator: 'AstroBeats' },
+  { id: 'trk_005', title: 'Crystal Cavern', creator: 'LoopMachine' },
 ];
 
 const SIZES = {
@@ -61,7 +61,7 @@ export default function EmbedPage() {
                 >
                   {EXAMPLE_TRACKS.map((track) => (
                     <option key={track.id} value={track.id}>
-                      {track.title} &mdash; {track.artist}
+                      {track.title} &mdash; {track.creator}
                     </option>
                   ))}
                 </select>
@@ -161,7 +161,7 @@ export default function EmbedPage() {
                           {selectedTrack.title}
                         </p>
                         <p className={`text-xs truncate ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-                          {selectedTrack.artist}
+                          {selectedTrack.creator}
                         </p>
                       </div>
                     </div>

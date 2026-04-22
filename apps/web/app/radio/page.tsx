@@ -12,7 +12,7 @@ interface CreatorChannel {
   avatar: string;
   genre: string;
   isLive: boolean;
-  nowPlaying: { track: string; artist: string };
+  nowPlaying: { track: string; creator: string };
   privacy: 'public' | 'subscribers' | 'invite';
   listeners: number;
   gradient: string;
@@ -85,7 +85,7 @@ const CHANNELS: CreatorChannel[] = [
     avatar: 'NS',
     genre: 'Synthwave',
     isLive: true,
-    nowPlaying: { track: 'Neon Cascade', artist: 'Nova Synth' },
+    nowPlaying: { track: 'Neon Cascade', creator: 'Nova Synth' },
     privacy: 'public',
     listeners: 3482,
     gradient: 'from-purple-600 to-pink-600',
@@ -97,7 +97,7 @@ const CHANNELS: CreatorChannel[] = [
     avatar: 'BB',
     genre: 'Hip Hop',
     isLive: true,
-    nowPlaying: { track: 'Analog Heart', artist: 'Maya K' },
+    nowPlaying: { track: 'Analog Heart', creator: 'Maya K' },
     privacy: 'public',
     listeners: 2194,
     gradient: 'from-amber-600 to-red-600',
@@ -109,7 +109,7 @@ const CHANNELS: CreatorChannel[] = [
     avatar: 'LA',
     genre: 'Lo-fi',
     isLive: false,
-    nowPlaying: { track: 'Sunday Window', artist: 'Otter Moon' },
+    nowPlaying: { track: 'Sunday Window', creator: 'Otter Moon' },
     privacy: 'public',
     listeners: 841,
     gradient: 'from-amber-500 to-orange-400',
@@ -121,7 +121,7 @@ const CHANNELS: CreatorChannel[] = [
     avatar: 'GG',
     genre: 'Rock',
     isLive: true,
-    nowPlaying: { track: 'Static Bloom', artist: 'The Breaklines' },
+    nowPlaying: { track: 'Static Bloom', creator: 'The Breaklines' },
     privacy: 'subscribers',
     listeners: 612,
     gradient: 'from-red-600 to-rose-500',
@@ -133,7 +133,7 @@ const CHANNELS: CreatorChannel[] = [
     avatar: 'BR',
     genre: 'Jazz',
     isLive: false,
-    nowPlaying: { track: 'Midnight Passage', artist: 'Avery Quartet' },
+    nowPlaying: { track: 'Midnight Passage', creator: 'Avery Quartet' },
     privacy: 'public',
     listeners: 403,
     gradient: 'from-indigo-700 to-blue-500',
@@ -145,7 +145,7 @@ const CHANNELS: CreatorChannel[] = [
     avatar: 'VS',
     genre: 'Electronic',
     isLive: true,
-    nowPlaying: { track: 'Subharmonic', artist: 'Kraze' },
+    nowPlaying: { track: 'Subharmonic', creator: 'Kraze' },
     privacy: 'invite',
     listeners: 289,
     gradient: 'from-cyan-500 to-teal-600',
@@ -157,7 +157,7 @@ const CHANNELS: CreatorChannel[] = [
     avatar: 'UG',
     genre: 'Electronic',
     isLive: true,
-    nowPlaying: { track: 'Foghorn 4AM', artist: 'Nocturne' },
+    nowPlaying: { track: 'Foghorn 4AM', creator: 'Nocturne' },
     privacy: 'subscribers',
     listeners: 1108,
     gradient: 'from-gray-700 to-zinc-500',
@@ -169,7 +169,7 @@ const CHANNELS: CreatorChannel[] = [
     avatar: 'SS',
     genre: 'Indie',
     isLive: false,
-    nowPlaying: { track: 'Driftwood', artist: 'Cedar Lane' },
+    nowPlaying: { track: 'Driftwood', creator: 'Cedar Lane' },
     privacy: 'public',
     listeners: 527,
     gradient: 'from-emerald-500 to-teal-600',
@@ -256,7 +256,7 @@ export default function RadioNetworkHomePage() {
             OPYNX <span className="text-red-500">Radio Network</span>
           </h1>
           <p className="text-lg text-gray-300 max-w-2xl">
-            The first direct-to-fan radio network. 24/7 curated music, live shows, and exclusive artist channels.
+            The first direct-to-fan radio network. 24/7 curated music, live shows, and exclusive creator channels.
           </p>
         </div>
       </div>
@@ -355,7 +355,7 @@ export default function RadioNetworkHomePage() {
           <div className="flex items-baseline justify-between mb-5">
             <div>
               <h2 className="text-2xl font-bold">Featured Creator Channels</h2>
-              <p className="text-sm text-gray-400 mt-1">Independent artists broadcasting their own radio stations</p>
+              <p className="text-sm text-gray-400 mt-1">Independent creators broadcasting their own radio stations</p>
             </div>
           </div>
 
@@ -406,7 +406,7 @@ export default function RadioNetworkHomePage() {
                     <div className="rounded-lg bg-black/30 p-2 mb-3">
                       <p className="text-[10px] uppercase tracking-wider text-gray-500">Now Playing</p>
                       <p className="text-sm font-medium truncate">{c.nowPlaying.track}</p>
-                      <p className="text-xs text-gray-400 truncate">{c.nowPlaying.artist}</p>
+                      <p className="text-xs text-gray-400 truncate">{c.nowPlaying.creator}</p>
                     </div>
                     <div className="flex items-center justify-between mb-3">
                       <span className={`text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded border ${badge.cls}`}>

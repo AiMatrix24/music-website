@@ -40,7 +40,7 @@ export default function ArtistDashboard() {
     return (
       <div className="min-h-screen flex items-center justify-center p-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold mb-4">Sign in to access Artist Dashboard</h1>
+          <h1 className="text-3xl font-bold mb-4">Sign in to access Creator Dashboard</h1>
           <Link
             href="/auth/login"
             className="rounded-full bg-brand-600 px-8 py-3 font-semibold text-white"
@@ -59,7 +59,7 @@ export default function ArtistDashboard() {
   return (
     <div className="min-h-screen p-8 max-w-5xl mx-auto">
       <h1 className="text-3xl font-bold mb-6">
-        Artist <span className="text-brand-500">Dashboard</span>
+        Creator <span className="text-brand-500">Dashboard</span>
       </h1>
 
       {/* Stats */}
@@ -599,7 +599,7 @@ function EventsTab({ events, onRefresh }: { events: Array<{ id: string; title: s
                 <li>• 4 ticket max per buyer</li>
                 <li>• Non-transferable QR tickets with ID verification</li>
                 <li>• Refunds go back to buyer, never resold</li>
-                <li>• Revenue breakdown: 70% Artist / 10% Venue / 15% Platform / 5% Processing</li>
+                <li>• Revenue breakdown: 70% Creator / 10% Venue / 15% Platform / 5% Processing</li>
               </ul>
             </div>
 

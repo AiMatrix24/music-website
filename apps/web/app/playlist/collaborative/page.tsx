@@ -15,7 +15,7 @@ interface Contributor {
 interface PlaylistTrack {
   id: string;
   title: string;
-  artist: string;
+  creator: string;
   addedBy: string;
   duration: string;
   upvotes: number;
@@ -63,18 +63,18 @@ const PLAYLISTS: CollabPlaylist[] = [
 ];
 
 const ACTIVE_TRACKS: PlaylistTrack[] = [
-  { id: 'ct1', title: 'Midnight Drive', artist: 'ChromeVox', addedBy: 'You', duration: '4:12', upvotes: 8, downvotes: 1 },
-  { id: 'ct2', title: 'Neon Skyline', artist: 'SynthLord', addedBy: 'ChromeVox', duration: '3:45', upvotes: 12, downvotes: 0 },
-  { id: 'ct3', title: 'Crystal Waves', artist: 'DeepSea', addedBy: 'NightBloom', duration: '5:30', upvotes: 6, downvotes: 2 },
-  { id: 'ct4', title: 'Low Frequency', artist: 'SubZero', addedBy: 'You', duration: '3:58', upvotes: 10, downvotes: 1 },
-  { id: 'ct5', title: 'Velvet Echo', artist: 'DreamWeaver', addedBy: 'ChromeVox', duration: '4:48', upvotes: 5, downvotes: 0 },
-  { id: 'ct6', title: 'Ghost Signal', artist: 'VoidWalker', addedBy: 'NightBloom', duration: '3:22', upvotes: 3, downvotes: 3 },
+  { id: 'ct1', title: 'Midnight Drive', creator: 'ChromeVox', addedBy: 'You', duration: '4:12', upvotes: 8, downvotes: 1 },
+  { id: 'ct2', title: 'Neon Skyline', creator: 'SynthLord', addedBy: 'ChromeVox', duration: '3:45', upvotes: 12, downvotes: 0 },
+  { id: 'ct3', title: 'Crystal Waves', creator: 'DeepSea', addedBy: 'NightBloom', duration: '5:30', upvotes: 6, downvotes: 2 },
+  { id: 'ct4', title: 'Low Frequency', creator: 'SubZero', addedBy: 'You', duration: '3:58', upvotes: 10, downvotes: 1 },
+  { id: 'ct5', title: 'Velvet Echo', creator: 'DreamWeaver', addedBy: 'ChromeVox', duration: '4:48', upvotes: 5, downvotes: 0 },
+  { id: 'ct6', title: 'Ghost Signal', creator: 'VoidWalker', addedBy: 'NightBloom', duration: '3:22', upvotes: 3, downvotes: 3 },
 ];
 
 const SEARCH_RESULTS = [
-  { id: 's1', title: 'Solar Wind', artist: 'CosmicDrift' },
-  { id: 's2', title: 'Pixel Rain', artist: 'BitCrush' },
-  { id: 's3', title: 'Concrete Garden', artist: 'UrbanFlora' },
+  { id: 's1', title: 'Solar Wind', creator: 'CosmicDrift' },
+  { id: 's2', title: 'Pixel Rain', creator: 'BitCrush' },
+  { id: 's3', title: 'Concrete Garden', creator: 'UrbanFlora' },
 ];
 
 const CONTRIBUTORS: Contributor[] = [
@@ -341,7 +341,7 @@ export default function CollaborativePlaylistPage() {
                     >
                       <div>
                         <p className="font-semibold text-sm">{result.title}</p>
-                        <p className="text-xs text-gray-400">{result.artist}</p>
+                        <p className="text-xs text-gray-400">{result.creator}</p>
                       </div>
                       <span className="text-xs text-red-500 font-semibold">+ Add</span>
                     </button>
@@ -361,7 +361,7 @@ export default function CollaborativePlaylistPage() {
                       <Link href={`/track/${track.id}`} className="font-semibold truncate hover:text-red-500 transition block">
                         {track.title}
                       </Link>
-                      <p className="text-sm text-gray-400 truncate">{track.artist}</p>
+                      <p className="text-sm text-gray-400 truncate">{track.creator}</p>
                       <p className="text-xs text-gray-500">Added by {track.addedBy}</p>
                     </div>
                     <div className="flex items-center gap-2">

@@ -15,11 +15,11 @@ const REGIONS = [
 ];
 
 const NOW_PLAYING = [
-  { title: 'Midnight Hour', artist: 'You', listeners: 14, trend: 'up' },
-  { title: 'Neon Nights', artist: 'You', listeners: 11, trend: 'up' },
-  { title: 'Broken Glass', artist: 'You', listeners: 9, trend: 'down' },
-  { title: 'Echoes', artist: 'You', listeners: 7, trend: 'stable' },
-  { title: 'Summertime Blues', artist: 'You', listeners: 6, trend: 'up' },
+  { title: 'Midnight Hour', creator: 'You', listeners: 14, trend: 'up' },
+  { title: 'Neon Nights', creator: 'You', listeners: 11, trend: 'up' },
+  { title: 'Broken Glass', creator: 'You', listeners: 9, trend: 'down' },
+  { title: 'Echoes', creator: 'You', listeners: 7, trend: 'stable' },
+  { title: 'Summertime Blues', creator: 'You', listeners: 6, trend: 'up' },
 ];
 
 const HOURLY_PEAKS = [
@@ -158,7 +158,7 @@ export default function LiveListenersPage() {
                   </div>
                   <div>
                     <p className="font-semibold text-sm">{track.title}</p>
-                    <p className="text-xs text-gray-500">{track.artist}</p>
+                    <p className="text-xs text-gray-500">{track.creator}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">

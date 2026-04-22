@@ -167,7 +167,7 @@ export function TipJar({ artistName, artistId, isOpen: controlledOpen, onClose, 
                   <div className="text-center">
                     <span className="inline-flex items-center gap-1.5 text-[10px] text-green-400 font-semibold bg-green-600/10 px-3 py-1 rounded-full border border-green-600/20">
                       <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                      100% goes to the artist
+                      100% goes to the creator
                     </span>
                   </div>
                 </div>

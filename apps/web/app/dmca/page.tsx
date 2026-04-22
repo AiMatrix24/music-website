@@ -18,7 +18,7 @@ export default function DMCAPage() {
           <div>
             <h2 className="text-xl font-bold text-white mb-3">1. Our Commitment to Copyright</h2>
             <p>
-              OPYNX respects the intellectual property rights of artists, creators, and all rights
+              OPYNX respects the intellectual property rights of creators, creators, and all rights
               holders. We are committed to complying with the Digital Millennium Copyright Act
               (DMCA) and other applicable copyright laws. We expect all users of our platform to
               respect these rights as well.
@@ -127,7 +127,7 @@ export default function DMCAPage() {
                 OPYNX is developing an automated Content ID system that will scan uploaded audio
                 against a database of registered works. This system will help identify potential
                 copyright issues before content goes live, protecting both rights holders and
-                uploading artists.
+                uploading creators.
               </p>
               <p className="mt-2">
                 Rights holders will be able to register their catalogs with our Content ID system

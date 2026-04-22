@@ -43,7 +43,7 @@ const ALL_COURSES: Course[] = [
   { id: 10, title: 'Building Your Label', instructor: 'VenueKing', lessons: 15, duration: '5h', difficulty: 'Advanced', rating: 4.8, gradient: GRADIENTS[1], category: 'Business' },
   { id: 11, title: 'Sync Licensing Basics', instructor: 'ChillProducer', lessons: 8, duration: '2h 20m', difficulty: 'Intermediate', rating: 4.5, gradient: GRADIENTS[2], category: 'Business' },
   { id: 12, title: 'Negotiating Contracts', instructor: 'Cipher', lessons: 6, duration: '2h', difficulty: 'Intermediate', rating: 4.7, gradient: GRADIENTS[3], category: 'Business' },
-  { id: 13, title: 'Revenue Streams for Artists', instructor: 'NeonWave', lessons: 12, duration: '4h', difficulty: 'Beginner', rating: 4.4, gradient: GRADIENTS[4], category: 'Business' },
+  { id: 13, title: 'Revenue Streams for Creators', instructor: 'NeonWave', lessons: 12, duration: '4h', difficulty: 'Beginner', rating: 4.4, gradient: GRADIENTS[4], category: 'Business' },
   { id: 14, title: 'Music Publishing 101', instructor: 'IndieStar', lessons: 9, duration: '3h', difficulty: 'Beginner', rating: 4.6, gradient: GRADIENTS[5], category: 'Business' },
   { id: 15, title: 'Touring Economics', instructor: 'VenueKing', lessons: 7, duration: '2h 15m', difficulty: 'Advanced', rating: 4.3, gradient: GRADIENTS[6], category: 'Business' },
   { id: 16, title: 'Crowdfunding Your Album', instructor: 'BeatDropper', lessons: 5, duration: '1h 30m', difficulty: 'Beginner', rating: 4.5, gradient: GRADIENTS[7], category: 'Business' },
@@ -160,7 +160,7 @@ export default function EducationPage() {
             Level Up Your <span className="text-red-500">Craft</span>
           </h1>
           <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-            Learn from the best OPYNX artists. Courses, masterclasses, and resources to take your music career to the next level.
+            Learn from the best OPYNX creators. Courses, masterclasses, and resources to take your music career to the next level.
           </p>
         </div>
 

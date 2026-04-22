@@ -9,7 +9,7 @@ const playlists = [
   { id: 'synthwave-essentials', title: 'Synthwave Essentials', tracks: 42, gradient: 'from-purple-600 to-pink-500', description: 'The definitive synthwave collection' },
   { id: 'lofi-study', title: 'Lo-fi Study Session', tracks: 65, gradient: 'from-teal-600 to-cyan-400', description: 'Focus-friendly beats for deep work' },
   { id: 'underground-gems', title: 'Underground Gems', tracks: 38, gradient: 'from-amber-600 to-orange-400', description: 'Hidden tracks from emerging talent' },
-  { id: 'new-artist-spotlight', title: 'New Artist Spotlight', tracks: 24, gradient: 'from-green-600 to-emerald-400', description: 'Fresh faces making waves' },
+  { id: 'new-creator-spotlight', title: 'New Creator Spotlight', tracks: 24, gradient: 'from-green-600 to-emerald-400', description: 'Fresh faces making waves' },
   { id: 'festival-warmup', title: 'Festival Warm-Up', tracks: 55, gradient: 'from-red-600 to-rose-400', description: 'Get hyped for festival season' },
   { id: 'late-night-vibes', title: 'Late Night Vibes', tracks: 48, gradient: 'from-indigo-600 to-violet-400', description: 'Smooth sounds for after hours' },
 ];

@@ -9,7 +9,7 @@ interface FollowButtonProps {
   artistName?: string;
 }
 
-// Free tier follow limit — 5 artists max
+// Free tier follow limit — 5 creators max
 const FREE_FOLLOW_LIMIT = 5;
 
 export function FollowButton({ artistId, artistName }: FollowButtonProps) {
@@ -41,7 +41,7 @@ export function FollowButton({ artistId, artistName }: FollowButtonProps) {
       toast('Failed to follow. Please try again.');
     },
     onSuccess: () => {
-      toast(`Following ${artistName ?? 'artist'}`);
+      toast(`Following ${artistName ?? 'creator'}`);
     },
     onSettled: () => {
       utils.users.isFollowing.invalidate({ followeeId: artistId });
@@ -63,7 +63,7 @@ export function FollowButton({ artistId, artistName }: FollowButtonProps) {
       toast('Failed to unfollow. Please try again.');
     },
     onSuccess: () => {
-      toast(`Unfollowed ${artistName ?? 'artist'}`);
+      toast(`Unfollowed ${artistName ?? 'creator'}`);
     },
     onSettled: () => {
       utils.users.isFollowing.invalidate({ followeeId: artistId });
@@ -105,12 +105,12 @@ export function FollowButton({ artistId, artistName }: FollowButtonProps) {
 
   const handleFollow = () => {
     // Check follow limit for free-tier users before proceeding
-    // TODO: Replace mock count with actual followed-artist count from API
+    // TODO: Replace mock count with actual followed-creator count from API
     if (isFreeUser) {
       const mockFollowedCount = 5; // Simulated current follow count for free user
       if (mockFollowedCount >= FREE_FOLLOW_LIMIT) {
         toast(
-          'Free accounts can follow up to 5 artists. Upgrade to Premium for unlimited follows.',
+          'Free accounts can follow up to 5 creators. Upgrade to Premium for unlimited follows.',
           'error'
         );
         return;

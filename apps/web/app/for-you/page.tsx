@@ -22,52 +22,52 @@ const BECAUSE_YOU_LISTENED = [
   {
     trigger: 'Midnight Drive',
     tracks: [
-      { id: 't1', title: 'Neon Highway', artist: 'SynthLord', genre: 'Synthwave', duration: '3:42' },
-      { id: 't2', title: 'City Pulse', artist: 'RetroWave', genre: 'Synthwave', duration: '4:15' },
-      { id: 't3', title: 'Night Rider', artist: 'ChromeVox', genre: 'Electronic', duration: '3:58' },
-      { id: 't4', title: 'Electric Dusk', artist: 'NeonGlow', genre: 'Synthwave', duration: '4:30' },
+      { id: 't1', title: 'Neon Highway', creator: 'SynthLord', genre: 'Synthwave', duration: '3:42' },
+      { id: 't2', title: 'City Pulse', creator: 'RetroWave', genre: 'Synthwave', duration: '4:15' },
+      { id: 't3', title: 'Night Rider', creator: 'ChromeVox', genre: 'Electronic', duration: '3:58' },
+      { id: 't4', title: 'Electric Dusk', creator: 'NeonGlow', genre: 'Synthwave', duration: '4:30' },
     ],
   },
   {
     trigger: 'Crystal Waves',
     tracks: [
-      { id: 't5', title: 'Ocean Floor', artist: 'DeepSea', genre: 'Ambient', duration: '5:12' },
-      { id: 't6', title: 'Tidal Motion', artist: 'AquaSound', genre: 'Ambient', duration: '4:48' },
-      { id: 't7', title: 'Reef Echo', artist: 'CoralMind', genre: 'Chillout', duration: '6:01' },
-      { id: 't8', title: 'Drift Away', artist: 'WaveForm', genre: 'Ambient', duration: '5:33' },
+      { id: 't5', title: 'Ocean Floor', creator: 'DeepSea', genre: 'Ambient', duration: '5:12' },
+      { id: 't6', title: 'Tidal Motion', creator: 'AquaSound', genre: 'Ambient', duration: '4:48' },
+      { id: 't7', title: 'Reef Echo', creator: 'CoralMind', genre: 'Chillout', duration: '6:01' },
+      { id: 't8', title: 'Drift Away', creator: 'WaveForm', genre: 'Ambient', duration: '5:33' },
     ],
   },
   {
     trigger: 'Ghost Signal',
     tracks: [
-      { id: 't9', title: 'Static Dreams', artist: 'HauntedFM', genre: 'Post-Punk', duration: '3:22' },
-      { id: 't10', title: 'Dark Frequency', artist: 'VoidWalker', genre: 'Industrial', duration: '4:05' },
-      { id: 't11', title: 'Shadow Play', artist: 'NightShift', genre: 'Post-Punk', duration: '3:47' },
-      { id: 't12', title: 'Phantom Wire', artist: 'EtherDust', genre: 'Electronic', duration: '4:20' },
+      { id: 't9', title: 'Static Dreams', creator: 'HauntedFM', genre: 'Post-Punk', duration: '3:22' },
+      { id: 't10', title: 'Dark Frequency', creator: 'VoidWalker', genre: 'Industrial', duration: '4:05' },
+      { id: 't11', title: 'Shadow Play', creator: 'NightShift', genre: 'Post-Punk', duration: '3:47' },
+      { id: 't12', title: 'Phantom Wire', creator: 'EtherDust', genre: 'Electronic', duration: '4:20' },
     ],
   },
 ];
 
 const DISCOVER_WEEKLY = [
-  { id: 'dw1', title: 'Velvet Horizon', artist: 'Aurora Beats', genre: 'Electronic', duration: '3:45' },
-  { id: 'dw2', title: 'Broken Compass', artist: 'Nomad Sound', genre: 'Indie', duration: '4:12' },
-  { id: 'dw3', title: 'Concrete Garden', artist: 'UrbanFlora', genre: 'Lo-fi', duration: '3:28' },
-  { id: 'dw4', title: 'Pixel Rain', artist: 'BitCrush', genre: 'Chiptune', duration: '2:55' },
-  { id: 'dw5', title: 'Solar Wind', artist: 'CosmicDrift', genre: 'Ambient', duration: '5:40' },
-  { id: 'dw6', title: 'Rust & Gold', artist: 'IronMelody', genre: 'Post-Rock', duration: '6:18' },
-  { id: 'dw7', title: 'Lucid State', artist: 'DreamWeaver', genre: 'Downtempo', duration: '4:33' },
-  { id: 'dw8', title: 'Voltage', artist: 'ShockWire', genre: 'Electro', duration: '3:15' },
-  { id: 'dw9', title: 'Moonlit Path', artist: 'NightBloom', genre: 'Chillwave', duration: '4:50' },
-  { id: 'dw10', title: 'Fracture Point', artist: 'GlitchCore', genre: 'IDM', duration: '3:38' },
+  { id: 'dw1', title: 'Velvet Horizon', creator: 'Aurora Beats', genre: 'Electronic', duration: '3:45' },
+  { id: 'dw2', title: 'Broken Compass', creator: 'Nomad Sound', genre: 'Indie', duration: '4:12' },
+  { id: 'dw3', title: 'Concrete Garden', creator: 'UrbanFlora', genre: 'Lo-fi', duration: '3:28' },
+  { id: 'dw4', title: 'Pixel Rain', creator: 'BitCrush', genre: 'Chiptune', duration: '2:55' },
+  { id: 'dw5', title: 'Solar Wind', creator: 'CosmicDrift', genre: 'Ambient', duration: '5:40' },
+  { id: 'dw6', title: 'Rust & Gold', creator: 'IronMelody', genre: 'Post-Rock', duration: '6:18' },
+  { id: 'dw7', title: 'Lucid State', creator: 'DreamWeaver', genre: 'Downtempo', duration: '4:33' },
+  { id: 'dw8', title: 'Voltage', creator: 'ShockWire', genre: 'Electro', duration: '3:15' },
+  { id: 'dw9', title: 'Moonlit Path', creator: 'NightBloom', genre: 'Chillwave', duration: '4:50' },
+  { id: 'dw10', title: 'Fracture Point', creator: 'GlitchCore', genre: 'IDM', duration: '3:38' },
 ];
 
 const NEW_RELEASES = [
-  { id: 'nr1', title: 'Sunrise Protocol', artist: 'DayBreak', genre: 'Electronic', released: '2 hours ago' },
-  { id: 'nr2', title: 'Underworld Bass', artist: 'SubZero', genre: 'Dubstep', released: '5 hours ago' },
-  { id: 'nr3', title: 'Paper Planes', artist: 'FoldedWings', genre: 'Indie', released: '1 day ago' },
-  { id: 'nr4', title: 'Hologram', artist: 'LightBend', genre: 'Synthwave', released: '1 day ago' },
-  { id: 'nr5', title: 'Quiet Riot', artist: 'SilentStorm', genre: 'Post-Punk', released: '2 days ago' },
-  { id: 'nr6', title: 'Cloudbreak', artist: 'SkyDiver', genre: 'Ambient', released: '3 days ago' },
+  { id: 'nr1', title: 'Sunrise Protocol', creator: 'DayBreak', genre: 'Electronic', released: '2 hours ago' },
+  { id: 'nr2', title: 'Underworld Bass', creator: 'SubZero', genre: 'Dubstep', released: '5 hours ago' },
+  { id: 'nr3', title: 'Paper Planes', creator: 'FoldedWings', genre: 'Indie', released: '1 day ago' },
+  { id: 'nr4', title: 'Hologram', creator: 'LightBend', genre: 'Synthwave', released: '1 day ago' },
+  { id: 'nr5', title: 'Quiet Riot', creator: 'SilentStorm', genre: 'Post-Punk', released: '2 days ago' },
+  { id: 'nr6', title: 'Cloudbreak', creator: 'SkyDiver', genre: 'Ambient', released: '3 days ago' },
 ];
 
 const RISING_ARTISTS = [
@@ -163,7 +163,7 @@ export default function ForYouPage() {
                         <span className="text-3xl opacity-0 group-hover:opacity-100 transition">&#9654;</span>
                       </div>
                       <p className="font-semibold truncate">{track.title}</p>
-                      <p className="text-sm text-gray-400 truncate">{track.artist} &middot; {track.genre}</p>
+                      <p className="text-sm text-gray-400 truncate">{track.creator} &middot; {track.genre}</p>
                       <p className="text-xs text-gray-500 mt-1">{track.duration}</p>
                     </Link>
                   ))}
@@ -197,7 +197,7 @@ export default function ForYouPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold truncate">{track.title}</p>
-                  <p className="text-sm text-gray-400 truncate">{track.artist}</p>
+                  <p className="text-sm text-gray-400 truncate">{track.creator}</p>
                 </div>
                 <span className="text-xs text-gray-500 hidden sm:block">{track.genre}</span>
                 <span className="text-sm text-gray-400 w-12 text-right">{track.duration}</span>
@@ -220,31 +220,31 @@ export default function ForYouPage() {
                   <span className="text-3xl opacity-0 group-hover:opacity-100 transition">&#9654;</span>
                 </div>
                 <p className="font-semibold truncate">{track.title}</p>
-                <p className="text-sm text-gray-400 truncate">{track.artist} &middot; {track.genre}</p>
+                <p className="text-sm text-gray-400 truncate">{track.creator} &middot; {track.genre}</p>
                 <p className="text-xs text-green-400 mt-1">{track.released}</p>
               </Link>
             ))}
           </div>
         </section>
 
-        {/* Rising Artists */}
+        {/* Rising Creators */}
         <section className="mb-12">
-          <h2 className="text-2xl font-bold mb-6">Rising Artists</h2>
+          <h2 className="text-2xl font-bold mb-6">Rising Creators</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {RISING_ARTISTS.map((artist) => (
+            {RISING_ARTISTS.map((creator) => (
               <Link
-                key={artist.id}
-                href={`/artist/${artist.id}`}
+                key={creator.id}
+                href={`/artist/${creator.id}`}
                 className="rounded-xl bg-[#15151f] p-5 hover:bg-[#1a1a2e] transition text-center"
               >
                 <div className="w-20 h-20 rounded-full bg-gradient-to-br from-red-600 to-pink-600 mx-auto mb-4 flex items-center justify-center text-2xl font-bold">
-                  {artist.name.charAt(0)}
+                  {creator.name.charAt(0)}
                 </div>
-                <p className="font-bold text-lg">{artist.name}</p>
-                <p className="text-sm text-gray-400 mb-2">{artist.genre}</p>
-                <p className="text-sm text-gray-500">{artist.followers.toLocaleString()} followers</p>
+                <p className="font-bold text-lg">{creator.name}</p>
+                <p className="text-sm text-gray-400 mb-2">{creator.genre}</p>
+                <p className="text-sm text-gray-500">{creator.followers.toLocaleString()} followers</p>
                 <span className="inline-block mt-2 px-3 py-1 rounded-full bg-green-600/20 text-green-400 text-xs font-semibold">
-                  +{artist.growth}% this month
+                  +{creator.growth}% this month
                 </span>
               </Link>
             ))}

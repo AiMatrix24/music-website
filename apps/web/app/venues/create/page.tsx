@@ -158,7 +158,7 @@ export default function CreateVenuePage() {
           </button>
 
           <p className="text-xs text-gray-500 text-center">
-            Venues are reviewed within 24 hours. Once approved, you can start posting available slots and receiving artist applications.
+            Venues are reviewed within 24 hours. Once approved, you can start posting available slots and receiving creator applications.
           </p>
         </div>
       </div>

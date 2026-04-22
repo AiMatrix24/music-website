@@ -6,7 +6,7 @@ interface PlayButtonProps {
   track: {
     id: string;
     title: string;
-    artist?: string;
+    creator?: string;
     genre?: string;
     duration?: number;
   };
@@ -28,7 +28,7 @@ export function PlayButton({ track, size = 'md', className = '' }: PlayButtonPro
       play({
         id: track.id,
         title: track.title,
-        artist: track.artist ?? 'Unknown artist',
+        creator: track.creator ?? 'Unknown creator',
         genre: track.genre ?? 'Music',
         duration: track.duration ?? 0,
       });

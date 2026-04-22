@@ -17,14 +17,14 @@ const tiers = [
     period: '/mo',
     features: [
       '320kbps streaming',
-      'Artist directed ads and skips',
+      'Creator directed ads and skips',
       'Offline listening (PWA)',
       'Pre-sale tickets',
       '10% merch discount',
       'Digital backstage access',
     ],
     breakdown: {
-      artist: '$1.00',
+      creator: '$1.00',
       artistPct: '11.5%',
       facilitator: '$0.25–$0.50',
       facilitatorPct: '2.9–5.7%',
@@ -48,7 +48,7 @@ const tiers = [
       'Verified Superfan badge',
     ],
     breakdown: {
-      artist: '$4.00',
+      creator: '$4.00',
       artistPct: '31.4%',
       facilitator: '$0.50–$1.00',
       facilitatorPct: '3.9–7.9%',
@@ -71,7 +71,7 @@ const tiers = [
       'All Premium features',
     ],
     breakdown: {
-      artist: '$3.00',
+      creator: '$3.00',
       artistPct: '18.8%',
       facilitator: '$0.50–$1.00',
       facilitatorPct: '3.1–6.3%',
@@ -236,7 +236,7 @@ function SubscribePage() {
           Choose Your <span className="text-brand-500">Plan</span>
         </h1>
         <p className="text-center text-gray-400 mb-12 max-w-lg mx-auto">
-          Every dollar is transparent. Your subscription directly supports artists
+          Every dollar is transparent. Your subscription directly supports creators
           with verifiable on-chain payouts.
         </p>
 
@@ -297,7 +297,7 @@ function SubscribePage() {
           </h3>
           <p className="text-center text-xs text-gray-500 mb-4">{selected.name} plan</p>
           <div className="space-y-3">
-            <WaterfallRow label="Artist" amount={selected.breakdown.artist} pct={selected.breakdown.artistPct} color="text-brand-400" />
+            <WaterfallRow label="Creator" amount={selected.breakdown.creator} pct={selected.breakdown.artistPct} color="text-brand-400" />
             <WaterfallRow label="Facilitator" amount={selected.breakdown.facilitator} pct={selected.breakdown.facilitatorPct} color="text-pink-400" />
             <WaterfallRow label="Platform" amount={selected.breakdown.platform} pct={selected.breakdown.platformPct} color="text-cyan-400" />
             <div className="border-t border-brand-800/30 pt-3 flex justify-between font-bold">
@@ -307,7 +307,7 @@ function SubscribePage() {
           </div>
           {selected.id === 'bundle' && (
             <p className="text-xs text-brand-400 text-center mt-3">
-              Bundle splits $4.00 across 4 artists — $1.00 each
+              Bundle splits $4.00 across 4 creators — $1.00 each
             </p>
           )}
         </div>

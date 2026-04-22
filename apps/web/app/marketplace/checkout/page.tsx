@@ -94,7 +94,7 @@ function CheckoutContent() {
         <div className="max-w-lg mx-auto text-center">
           <div className="w-24 h-24 rounded-full bg-green-600/20 flex items-center justify-center text-5xl mx-auto mb-6">✅</div>
           <h1 className="text-3xl font-black mb-2">Order Confirmed!</h1>
-          <p className="text-gray-400 mb-8">Your order has been placed and the artist has been notified.</p>
+          <p className="text-gray-400 mb-8">Your order has been placed and the creator has been notified.</p>
 
           <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6 text-left mb-8">
             <h2 className="font-bold mb-4">Order Summary</h2>
@@ -105,7 +105,7 @@ function CheckoutContent() {
               <div className="flex justify-between font-bold border-t border-brand-800/20 pt-3"><span>Total</span><span className="text-red-400">${total.toFixed(2)}</span></div>
             </div>
             <div className="mt-4 p-3 bg-brand-950/50 rounded-lg text-xs text-gray-400">
-              Artist receives: <span className="text-red-400 font-bold">${artistEarns.toFixed(2)}</span> (85%) — verified on Polygon
+              Creator receives: <span className="text-red-400 font-bold">${artistEarns.toFixed(2)}</span> (85%) — verified on Polygon
             </div>
           </div>
 
@@ -236,7 +236,7 @@ function CheckoutContent() {
               )}
 
               <div className="mt-4 p-3 bg-brand-950/50 rounded-lg text-xs text-gray-400">
-                <p>Artist receives: <span className="text-red-400 font-bold">${artistEarns.toFixed(2)}</span> (85%)</p>
+                <p>Creator receives: <span className="text-red-400 font-bold">${artistEarns.toFixed(2)}</span> (85%)</p>
                 <p className="mt-1">Verified on Polygon. No middlemen.</p>
               </div>
 

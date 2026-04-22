@@ -417,7 +417,7 @@ export default function SplitSheetEditorPage() {
               {master.type === 'coowned' && (
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <label className="text-xs text-gray-400">
-                    Artist share %
+                    Creator share %
                     <input
                       type="number"
                       min="0"

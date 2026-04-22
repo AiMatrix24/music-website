@@ -262,7 +262,7 @@ export function Navbar() {
                 autoFocus
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search tracks, artists, events..."
+                placeholder="Search tracks, creators, events..."
                 className="flex-1 bg-transparent py-4 text-white placeholder:text-gray-500 outline-none text-lg"
               />
               <button

@@ -264,17 +264,17 @@ export default function StemPlayerPage() {
             Export Mix
           </button>
           <button
-            onClick={() => toast('Request sent to the artist!', 'success')}
+            onClick={() => toast('Request sent to the creator!', 'success')}
             className="px-5 py-3 bg-white/10 hover:bg-white/15 rounded-lg font-medium transition"
           >
-            Request Stems from Artist
+            Request Stems from Creator
           </button>
         </div>
 
         {/* Warning */}
         <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 text-sm text-yellow-400/80">
           <span className="font-semibold">Note:</span> AI-powered stem separation. Results may vary.
-          For best quality, request original stems directly from the artist.
+          For best quality, request original stems directly from the creator.
         </div>
       </div>
     </div>

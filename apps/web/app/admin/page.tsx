@@ -6,9 +6,9 @@ import Link from 'next/link';
 
 /* ─── Mock Data ─── */
 const MOCK_USERS = [
-  { id: '1', name: 'Alice Rivera', email: 'alice@opynx.com', role: 'artist', status: 'active', joined: '2025-08-12' },
+  { id: '1', name: 'Alice Rivera', email: 'alice@opynx.com', role: 'creator', status: 'active', joined: '2025-08-12' },
   { id: '2', name: 'Marcus Chen', email: 'marcus@gmail.com', role: 'fan', status: 'active', joined: '2025-09-01' },
-  { id: '3', name: 'DJ Phantom', email: 'phantom@proton.me', role: 'artist', status: 'active', joined: '2025-10-15' },
+  { id: '3', name: 'DJ Phantom', email: 'phantom@proton.me', role: 'creator', status: 'active', joined: '2025-10-15' },
   { id: '4', name: 'Sara Kim', email: 'sara.k@yahoo.com', role: 'fan', status: 'suspended', joined: '2025-11-03' },
   { id: '5', name: 'Leo Beats', email: 'leo@opynx.com', role: 'facilitator', status: 'active', joined: '2025-12-20' },
 ];
@@ -16,7 +16,7 @@ const MOCK_USERS = [
 const MOCK_FLAGGED = [
   { id: 'f1', type: 'track', title: 'Explicit Untitled Demo', reporter: 'auto-mod', reason: 'Explicit content not tagged', date: '2026-03-28' },
   { id: 'f2', type: 'comment', title: 'Spam link in comments', reporter: 'marcus@gmail.com', reason: 'Spam / phishing link', date: '2026-03-30' },
-  { id: 'f3', type: 'profile', title: 'Fake artist profile "Drake"', reporter: 'sara.k@yahoo.com', reason: 'Impersonation', date: '2026-04-01' },
+  { id: 'f3', type: 'profile', title: 'Fake creator profile "Drake"', reporter: 'sara.k@yahoo.com', reason: 'Impersonation', date: '2026-04-01' },
 ];
 
 const MOCK_MRR_DATA = [
@@ -33,10 +33,10 @@ const MOCK_REVENUE_TIERS = [
 ];
 
 const MOCK_PAYOUTS = [
-  { id: 'p1', artist: 'Alice Rivera', amount: 342.50, status: 'pending', date: '2026-04-03' },
-  { id: 'p2', artist: 'DJ Phantom', amount: 218.75, status: 'pending', date: '2026-04-03' },
-  { id: 'p3', artist: 'Leo Beats', amount: 156.30, status: 'completed', txHash: '0x7a3f...e92b', date: '2026-03-28' },
-  { id: 'p4', artist: 'Alice Rivera', amount: 298.10, status: 'completed', txHash: '0x1b8c...4d3a', date: '2026-03-21' },
+  { id: 'p1', creator: 'Alice Rivera', amount: 342.50, status: 'pending', date: '2026-04-03' },
+  { id: 'p2', creator: 'DJ Phantom', amount: 218.75, status: 'pending', date: '2026-04-03' },
+  { id: 'p3', creator: 'Leo Beats', amount: 156.30, status: 'completed', txHash: '0x7a3f...e92b', date: '2026-03-28' },
+  { id: 'p4', creator: 'Alice Rivera', amount: 298.10, status: 'completed', txHash: '0x1b8c...4d3a', date: '2026-03-21' },
 ];
 
 const SERVICES = [
@@ -172,7 +172,7 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                       <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        user.role === 'artist' ? 'bg-purple-600/20 text-purple-400' :
+                        user.role === 'creator' ? 'bg-purple-600/20 text-purple-400' :
                         user.role === 'facilitator' ? 'bg-blue-600/20 text-blue-400' :
                         'bg-gray-600/20 text-gray-400'
                       }`}>{user.role}</span>
@@ -262,7 +262,7 @@ export default function AdminDashboard() {
                             className="bg-transparent border border-white/10 rounded px-2 py-1 text-xs text-gray-300 outline-none focus:border-red-600/50"
                           >
                             <option value="fan">Fan</option>
-                            <option value="artist">Artist</option>
+                            <option value="creator">Creator</option>
                             <option value="facilitator">Facilitator</option>
                             <option value="admin">Admin</option>
                           </select>
@@ -373,7 +373,7 @@ export default function AdminDashboard() {
                 {MOCK_PAYOUTS.filter(p => p.status === 'pending').map(payout => (
                   <div key={payout.id} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
                     <div>
-                      <p className="text-sm font-medium">{payout.artist}</p>
+                      <p className="text-sm font-medium">{payout.creator}</p>
                       <p className="text-xs text-gray-500">{payout.date}</p>
                     </div>
                     <span className="font-bold text-red-400">${payout.amount.toFixed(2)}</span>
@@ -389,7 +389,7 @@ export default function AdminDashboard() {
                 {MOCK_PAYOUTS.filter(p => p.status === 'completed').map(payout => (
                   <div key={payout.id} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
                     <div>
-                      <p className="text-sm font-medium">{payout.artist}</p>
+                      <p className="text-sm font-medium">{payout.creator}</p>
                       <p className="text-xs text-gray-500">{payout.date}</p>
                     </div>
                     <div className="text-right">

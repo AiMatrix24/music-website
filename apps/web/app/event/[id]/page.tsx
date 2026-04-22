@@ -132,7 +132,7 @@ export default function EventDetailPage() {
               </h3>
               <div className="space-y-3">
                 <WaterfallRow
-                  label="Artist"
+                  label="Creator"
                   amount={`$${((selected.price * quantity * 0.70) / 100).toFixed(2)}`}
                   pct="70%"
                   color="text-brand-400"
@@ -293,7 +293,7 @@ export default function EventDetailPage() {
                 Where Your Money Goes
               </h3>
               <div className="space-y-2">
-                <RevenueBar label="Artist" pct={70} color="bg-brand-500" />
+                <RevenueBar label="Creator" pct={70} color="bg-brand-500" />
                 <RevenueBar label="Venue" pct={10} color="bg-pink-500" />
                 <RevenueBar label="Platform" pct={15} color="bg-cyan-500" />
                 <RevenueBar label="Processing" pct={5} color="bg-gray-500" />
@@ -457,7 +457,7 @@ export default function EventDetailPage() {
                 </div>
                 <div>
                   <h3 className="font-bold text-sm">Fan-First Ticket Sales</h3>
-                  <p className="text-xs text-gray-400">Direct from artist. No scalpers. No markups.</p>
+                  <p className="text-xs text-gray-400">Direct from creator. No scalpers. No markups.</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 text-xs text-gray-300">
@@ -480,7 +480,7 @@ export default function EventDetailPage() {
             <div className="rounded-2xl bg-[#15151f] p-5">
               <h3 className="font-bold mb-4">Where Your Ticket Money Goes</h3>
               <div className="space-y-3">
-                <RevenueBar label="Artist" pct={70} color="bg-brand-500" />
+                <RevenueBar label="Creator" pct={70} color="bg-brand-500" />
                 <RevenueBar label="Venue" pct={10} color="bg-pink-500" />
                 <RevenueBar label="Platform (OPYNX)" pct={15} color="bg-cyan-500" />
                 <RevenueBar label="Payment processing" pct={5} color="bg-gray-500" />
@@ -497,7 +497,7 @@ export default function EventDetailPage() {
               <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 overflow-hidden">
                 <div className="bg-gradient-to-r from-brand-700 to-brand-600 px-5 py-4">
                   <h2 className="font-bold text-lg">Get Tickets</h2>
-                  <p className="text-sm text-white/70">Direct from the artist</p>
+                  <p className="text-sm text-white/70">Direct from the creator</p>
                 </div>
 
                 <div className="p-4 space-y-3">

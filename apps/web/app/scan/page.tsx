@@ -501,10 +501,10 @@ export default function ScanPage() {
             </div>
 
             <Link
-              href={scanResult.creatorId ? `/subscribe?artist=${scanResult.creatorId}` : '/subscribe'}
+              href={scanResult.creatorId ? `/subscribe?creator=${scanResult.creatorId}` : '/subscribe'}
               className="block w-full rounded-full bg-red-600 py-4 font-semibold text-white text-center hover:bg-red-700 transition mb-3"
             >
-              Subscribe to this Artist
+              Subscribe to this Creator
             </Link>
             <button
               onClick={resetAll}

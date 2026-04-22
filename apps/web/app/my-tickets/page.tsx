@@ -61,7 +61,7 @@ export default function MyTicketsPage() {
           <div className="rounded-2xl bg-[#15151f] p-16 text-center">
             <p className="text-5xl mb-4">🎫</p>
             <h2 className="text-xl font-bold mb-2">No tickets yet</h2>
-            <p className="text-gray-400 mb-6">Browse upcoming events and grab your tickets direct from artists.</p>
+            <p className="text-gray-400 mb-6">Browse upcoming events and grab your tickets direct from creators.</p>
             <Link
               href="/tickets"
               className="inline-block rounded-full bg-red-600 px-6 py-3 font-semibold text-white hover:bg-red-500 transition"

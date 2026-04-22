@@ -12,7 +12,7 @@ const NEXT_PAYOUT = 'Apr 15, 2026';
 
 const WATERFALL_SPLIT = {
   fanPayment: 8.73,
-  artist: 1.00,
+  creator: 1.00,
   facilitator: 0.33,
   platform: 7.40,
 };
@@ -147,13 +147,13 @@ export default function WaterfallPage() {
             <div className="space-y-4">
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-sm font-semibold text-green-400">Artist</span>
-                  <span className="text-sm font-bold text-green-400">${WATERFALL_SPLIT.artist.toFixed(2)}</span>
+                  <span className="text-sm font-semibold text-green-400">Creator</span>
+                  <span className="text-sm font-bold text-green-400">${WATERFALL_SPLIT.creator.toFixed(2)}</span>
                 </div>
                 <div className="w-full h-8 rounded-lg bg-brand-950 overflow-hidden">
                   <div
                     className="h-full rounded-lg bg-green-600 transition-all duration-1000"
-                    style={{ width: `${(WATERFALL_SPLIT.artist / WATERFALL_SPLIT.fanPayment) * 100}%` }}
+                    style={{ width: `${(WATERFALL_SPLIT.creator / WATERFALL_SPLIT.fanPayment) * 100}%` }}
                   />
                 </div>
               </div>

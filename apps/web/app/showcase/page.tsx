@@ -29,10 +29,10 @@ const RISING_STARS = [
   { id: 8, name: 'Cipher Ghost', avatar: 'C', genre: 'Synthwave', city: 'Chicago, IL', joinedDaysAgo: 10, topTrack: 'Binary Sunset', trackPlays: 4600, growth: '+380%', tags: ['synthwave', 'cinematic', 'dark'] },
 ];
 
-const GENRE_SPOTLIGHTS: { genre: string; artists: { name: string; plays: number; id: number }[] }[] = [
+const GENRE_SPOTLIGHTS: { genre: string; creators: { name: string; plays: number; id: number }[] }[] = [
   {
     genre: 'Synthwave',
-    artists: [
+    creators: [
       { name: 'Phantom Freq', plays: 5500, id: 4 },
       { name: 'Cipher Ghost', plays: 4600, id: 8 },
       { name: 'Retro Pulse', plays: 3200, id: 20 },
@@ -40,7 +40,7 @@ const GENRE_SPOTLIGHTS: { genre: string; artists: { name: string; plays: number;
   },
   {
     genre: 'Lo-fi',
-    artists: [
+    creators: [
       { name: 'Sable Moon', plays: 4200, id: 1 },
       { name: 'Daze Theory', plays: 2900, id: 5 },
       { name: 'Mellow Craft', plays: 2100, id: 21 },
@@ -48,7 +48,7 @@ const GENRE_SPOTLIGHTS: { genre: string; artists: { name: string; plays: number;
   },
   {
     genre: 'Electronic',
-    artists: [
+    creators: [
       { name: 'Nyx Orbital', plays: 7200, id: 6 },
       { name: 'VXTR', plays: 6800, id: 2 },
       { name: 'Static Bloom', plays: 3900, id: 22 },
@@ -56,7 +56,7 @@ const GENRE_SPOTLIGHTS: { genre: string; artists: { name: string; plays: number;
   },
   {
     genre: 'Indie',
-    artists: [
+    creators: [
       { name: 'Alma Verde', plays: 3100, id: 3 },
       { name: 'Rio Sunsets', plays: 3800, id: 7 },
       { name: 'Fern & Ivy', plays: 1800, id: 23 },
@@ -65,10 +65,10 @@ const GENRE_SPOTLIGHTS: { genre: string; artists: { name: string; plays: number;
 ];
 
 const PAST_SHOWCASES = [
-  { date: 'Mar 29, 2026', artist: 'DJ Koda', genre: 'Hip-Hop' },
-  { date: 'Mar 22, 2026', artist: 'Luna Vega', genre: 'Electronic' },
-  { date: 'Mar 15, 2026', artist: 'Solstice', genre: 'R&B / Soul' },
-  { date: 'Mar 8, 2026', artist: 'The Drift', genre: 'Indie Rock' },
+  { date: 'Mar 29, 2026', creator: 'DJ Koda', genre: 'Hip-Hop' },
+  { date: 'Mar 22, 2026', creator: 'Luna Vega', genre: 'Electronic' },
+  { date: 'Mar 15, 2026', creator: 'Solstice', genre: 'R&B / Soul' },
+  { date: 'Mar 8, 2026', creator: 'The Drift', genre: 'Indie Rock' },
 ];
 
 const HOW_TO_STEPS = [
@@ -231,19 +231,19 @@ export default function ShowcasePage() {
               <div key={section.genre} className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-5">
                 <h3 className="font-bold text-sm mb-3 text-red-400">{section.genre}</h3>
                 <div className="space-y-2.5">
-                  {section.artists.map((artist) => (
-                    <div key={artist.id} className="flex items-center justify-between">
+                  {section.creators.map((creator) => (
+                    <div key={creator.id} className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-600/60 to-red-800/60 flex items-center justify-center text-xs font-bold shrink-0">
-                          {artist.name.charAt(0)}
+                          {creator.name.charAt(0)}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">{artist.name}</p>
-                          <p className="text-xs text-gray-500">{artist.plays.toLocaleString()} plays</p>
+                          <p className="text-sm font-medium truncate">{creator.name}</p>
+                          <p className="text-xs text-gray-500">{creator.plays.toLocaleString()} plays</p>
                         </div>
                       </div>
                       <Link
-                        href={`/artist/${artist.id}`}
+                        href={`/artist/${creator.id}`}
                         className="text-xs text-red-400 hover:text-red-300 transition font-medium shrink-0"
                       >
                         Listen
@@ -324,7 +324,7 @@ export default function ShowcasePage() {
                   className="w-full flex items-center justify-between p-4 text-left hover:bg-brand-800/5 transition"
                 >
                   <div>
-                    <p className="text-sm font-semibold">{showcase.artist}</p>
+                    <p className="text-sm font-semibold">{showcase.creator}</p>
                     <p className="text-xs text-gray-500">{showcase.date}</p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -335,7 +335,7 @@ export default function ShowcasePage() {
                 {expandedShowcase === i && (
                   <div className="px-4 pb-4 pt-0 border-t border-brand-800/10">
                     <p className="text-sm text-gray-400 mt-3">
-                      {showcase.artist} was featured for their exceptional growth and unique sound in the {showcase.genre} space.
+                      {showcase.creator} was featured for their exceptional growth and unique sound in the {showcase.genre} space.
                     </p>
                     <Link
                       href={`/artist/${i + 10}`}

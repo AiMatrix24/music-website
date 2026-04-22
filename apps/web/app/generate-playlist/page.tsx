@@ -7,7 +7,7 @@ import { useToast } from '@/app/components/Toast';
 
 interface Track {
   title: string;
-  artist: string;
+  creator: string;
   genre: string;
   duration: string;
 }
@@ -27,31 +27,31 @@ const PLAYLIST_BANK: Record<string, { name: string; tracks: Track[] }> = {
   'Rainy Sunday': {
     name: 'Rainy Sunday Vibes',
     tracks: [
-      { title: 'Petrichor Dreams', artist: 'Lo-fi Luna', genre: 'Lo-fi', duration: '3:24' },
-      { title: 'Window Pane', artist: 'Cloudsinger', genre: 'Ambient', duration: '4:12' },
-      { title: 'Soft Drizzle', artist: 'Haze Collective', genre: 'Chill', duration: '3:48' },
-      { title: 'Grey Skies', artist: 'Mellow Drift', genre: 'Indie', duration: '3:55' },
-      { title: 'Blanket Fort', artist: 'Cozy Beats', genre: 'Lo-fi', duration: '2:58' },
-      { title: 'Puddle Reflections', artist: 'Rain Theory', genre: 'Ambient', duration: '4:30' },
-      { title: 'Misty Morning', artist: 'Dew Point', genre: 'Chill', duration: '3:15' },
-      { title: 'Overcast', artist: 'Nimbus', genre: 'Electronic', duration: '3:42' },
-      { title: 'Tea & Thunder', artist: 'Storm Lounge', genre: 'Lo-fi', duration: '4:01' },
-      { title: 'Gentle Rain', artist: 'Nature Pulse', genre: 'Ambient', duration: '5:10' },
+      { title: 'Petrichor Dreams', creator: 'Lo-fi Luna', genre: 'Lo-fi', duration: '3:24' },
+      { title: 'Window Pane', creator: 'Cloudsinger', genre: 'Ambient', duration: '4:12' },
+      { title: 'Soft Drizzle', creator: 'Haze Collective', genre: 'Chill', duration: '3:48' },
+      { title: 'Grey Skies', creator: 'Mellow Drift', genre: 'Indie', duration: '3:55' },
+      { title: 'Blanket Fort', creator: 'Cozy Beats', genre: 'Lo-fi', duration: '2:58' },
+      { title: 'Puddle Reflections', creator: 'Rain Theory', genre: 'Ambient', duration: '4:30' },
+      { title: 'Misty Morning', creator: 'Dew Point', genre: 'Chill', duration: '3:15' },
+      { title: 'Overcast', creator: 'Nimbus', genre: 'Electronic', duration: '3:42' },
+      { title: 'Tea & Thunder', creator: 'Storm Lounge', genre: 'Lo-fi', duration: '4:01' },
+      { title: 'Gentle Rain', creator: 'Nature Pulse', genre: 'Ambient', duration: '5:10' },
     ],
   },
   'Late Night Drive': {
     name: 'Midnight Highway Mix',
     tracks: [
-      { title: 'Neon Highway', artist: 'Nova Synthwave', genre: 'Synthwave', duration: '4:15' },
-      { title: 'City Lights Blur', artist: 'PULSE', genre: 'Electronic', duration: '3:52' },
-      { title: 'Midnight Cruise', artist: 'Velvet Circuit', genre: 'Synthwave', duration: '4:33' },
-      { title: 'Empty Lanes', artist: 'Ghost Driver', genre: 'Darkwave', duration: '3:44' },
-      { title: 'Dashboard Glow', artist: 'Retro Flux', genre: 'Synthwave', duration: '4:08' },
-      { title: 'Tunnel Vision', artist: 'Deep Current', genre: 'Electronic', duration: '3:28' },
-      { title: 'Exit Signs', artist: 'Roadside', genre: 'Indie Electronic', duration: '3:55' },
-      { title: 'Afterglow Drive', artist: 'Sunset Rogue', genre: 'Chillwave', duration: '4:22' },
-      { title: 'Red Taillights', artist: 'Brake Light', genre: 'Synthwave', duration: '3:17' },
-      { title: 'AM Radio Static', artist: 'Lost Signal', genre: 'Ambient', duration: '5:01' },
+      { title: 'Neon Highway', creator: 'Nova Synthwave', genre: 'Synthwave', duration: '4:15' },
+      { title: 'City Lights Blur', creator: 'PULSE', genre: 'Electronic', duration: '3:52' },
+      { title: 'Midnight Cruise', creator: 'Velvet Circuit', genre: 'Synthwave', duration: '4:33' },
+      { title: 'Empty Lanes', creator: 'Ghost Driver', genre: 'Darkwave', duration: '3:44' },
+      { title: 'Dashboard Glow', creator: 'Retro Flux', genre: 'Synthwave', duration: '4:08' },
+      { title: 'Tunnel Vision', creator: 'Deep Current', genre: 'Electronic', duration: '3:28' },
+      { title: 'Exit Signs', creator: 'Roadside', genre: 'Indie Electronic', duration: '3:55' },
+      { title: 'Afterglow Drive', creator: 'Sunset Rogue', genre: 'Chillwave', duration: '4:22' },
+      { title: 'Red Taillights', creator: 'Brake Light', genre: 'Synthwave', duration: '3:17' },
+      { title: 'AM Radio Static', creator: 'Lost Signal', genre: 'Ambient', duration: '5:01' },
     ],
   },
 };
@@ -61,16 +61,16 @@ function getPlaylistForMood(mood: string): { name: string; tracks: Track[] } {
   // Generate a default playlist for other moods
   const name = `${mood} Vibes`;
   const tracks: Track[] = [
-    { title: 'Frequency Shift', artist: 'PULSE', genre: 'Electronic', duration: '3:45' },
-    { title: 'Amber Waves', artist: 'Golden Hour', genre: 'Chill', duration: '4:02' },
-    { title: 'Digital Bloom', artist: 'Flora Beats', genre: 'Lo-fi', duration: '3:18' },
-    { title: 'Echo Chamber', artist: 'Reverb', genre: 'Ambient', duration: '4:28' },
-    { title: 'Solar Flare', artist: 'Nova Synthwave', genre: 'Synthwave', duration: '3:55' },
-    { title: 'Whisper Network', artist: 'Subtext', genre: 'Indie', duration: '3:32' },
-    { title: 'Crystal Clear', artist: 'Prism', genre: 'Electronic', duration: '4:10' },
-    { title: 'Velvet Touch', artist: 'Silk Road', genre: 'R&B', duration: '3:48' },
-    { title: 'Moonwalk', artist: 'Gravity Well', genre: 'Synthwave', duration: '4:15' },
-    { title: 'Still Waters', artist: 'Lake Effect', genre: 'Ambient', duration: '5:22' },
+    { title: 'Frequency Shift', creator: 'PULSE', genre: 'Electronic', duration: '3:45' },
+    { title: 'Amber Waves', creator: 'Golden Hour', genre: 'Chill', duration: '4:02' },
+    { title: 'Digital Bloom', creator: 'Flora Beats', genre: 'Lo-fi', duration: '3:18' },
+    { title: 'Echo Chamber', creator: 'Reverb', genre: 'Ambient', duration: '4:28' },
+    { title: 'Solar Flare', creator: 'Nova Synthwave', genre: 'Synthwave', duration: '3:55' },
+    { title: 'Whisper Network', creator: 'Subtext', genre: 'Indie', duration: '3:32' },
+    { title: 'Crystal Clear', creator: 'Prism', genre: 'Electronic', duration: '4:10' },
+    { title: 'Velvet Touch', creator: 'Silk Road', genre: 'R&B', duration: '3:48' },
+    { title: 'Moonwalk', creator: 'Gravity Well', genre: 'Synthwave', duration: '4:15' },
+    { title: 'Still Waters', creator: 'Lake Effect', genre: 'Ambient', duration: '5:22' },
   ];
   return { name, tracks };
 }
@@ -242,7 +242,7 @@ export default function GeneratePlaylistPage() {
                   </button>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm truncate">{track.title}</p>
-                    <p className="text-xs text-gray-500">{track.artist}</p>
+                    <p className="text-xs text-gray-500">{track.creator}</p>
                   </div>
                   <span className="text-xs text-gray-600 bg-white/5 px-2 py-1 rounded">{track.genre}</span>
                   <span className="text-xs text-gray-500 w-10 text-right">{track.duration}</span>

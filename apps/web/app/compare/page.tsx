@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 
-const artists = [
+const creators = [
   { id: 'nova', name: 'Nova Synthwave', plays: 2_840_000, followers: 187_400, tracks: 34, events: 12, revenue: 48_200, genre: 'Synthwave' },
   { id: 'luna', name: 'Luna Beats', plays: 3_210_000, followers: 224_100, tracks: 28, events: 8, revenue: 62_500, genre: 'Lo-Fi / Beats' },
   { id: 'cipher', name: 'Cipher', plays: 1_960_000, followers: 143_800, tracks: 41, events: 22, revenue: 37_900, genre: 'Hip-Hop' },
@@ -25,8 +25,8 @@ export default function ComparePage() {
   const [artistAId, setArtistAId] = useState('');
   const [artistBId, setArtistBId] = useState('');
 
-  const artistA = artists.find((a) => a.id === artistAId);
-  const artistB = artists.find((a) => a.id === artistBId);
+  const artistA = creators.find((a) => a.id === artistAId);
+  const artistB = creators.find((a) => a.id === artistBId);
   const bothSelected = artistA && artistB;
 
   const metrics = bothSelected
@@ -63,18 +63,18 @@ export default function ComparePage() {
           <span>&larr;</span> Back to Home
         </Link>
 
-        <h1 className="text-3xl sm:text-4xl font-black mb-2">Compare Artists</h1>
-        <p className="text-gray-400 mb-8">See how your favorite artists stack up side by side.</p>
+        <h1 className="text-3xl sm:text-4xl font-black mb-2">Compare Creators</h1>
+        <p className="text-gray-400 mb-8">See how your favorite creators stack up side by side.</p>
 
-        {/* Artist selectors */}
+        {/* Creator selectors */}
         <div className="flex flex-col sm:flex-row items-center gap-4 mb-10">
           <select
             value={artistAId}
             onChange={(e) => setArtistAId(e.target.value)}
             className="flex-1 w-full sm:w-auto bg-[#15151f] border border-brand-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-red-600"
           >
-            <option value="">Select Artist A</option>
-            {artists
+            <option value="">Select Creator A</option>
+            {creators
               .filter((a) => a.id !== artistBId)
               .map((a) => (
                 <option key={a.id} value={a.id}>{a.name}</option>
@@ -88,8 +88,8 @@ export default function ComparePage() {
             onChange={(e) => setArtistBId(e.target.value)}
             className="flex-1 w-full sm:w-auto bg-[#15151f] border border-brand-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-red-600"
           >
-            <option value="">Select Artist B</option>
-            {artists
+            <option value="">Select Creator B</option>
+            {creators
               .filter((a) => a.id !== artistAId)
               .map((a) => (
                 <option key={a.id} value={a.id}>{a.name}</option>
@@ -228,7 +228,7 @@ export default function ComparePage() {
           </>
         ) : (
           <div className="bg-[#15151f] rounded-2xl p-12 text-center">
-            <p className="text-gray-500 text-lg">Select two artists above to see a side-by-side comparison.</p>
+            <p className="text-gray-500 text-lg">Select two creators above to see a side-by-side comparison.</p>
           </div>
         )}
       </div>

@@ -9,7 +9,7 @@ function SearchResults() {
   const searchParams = useSearchParams();
   const query = searchParams.get('q') ?? '';
 
-  const { data: artists } = trpc.users.searchUsers.useQuery(
+  const { data: creators } = trpc.users.searchUsers.useQuery(
     { query, limit: 6 },
     { enabled: query.length > 0 }
   );
@@ -53,12 +53,12 @@ function SearchResults() {
       l.sellerName?.toLowerCase().includes(lowerQuery)
   ) ?? [];
 
-  const totalResults = (artists?.length ?? 0) + matchedTracks.length + matchedEvents.length + matchedListings.length;
+  const totalResults = (creators?.length ?? 0) + matchedTracks.length + matchedEvents.length + matchedListings.length;
 
   if (!query) {
     return (
       <div className="text-center py-16">
-        <p className="text-gray-400 text-lg">Enter a search term to find tracks, artists, events, and more.</p>
+        <p className="text-gray-400 text-lg">Enter a search term to find tracks, creators, events, and more.</p>
       </div>
     );
   }
@@ -69,23 +69,23 @@ function SearchResults() {
         {totalResults} result{totalResults !== 1 ? 's' : ''} for &quot;{query}&quot;
       </p>
 
-      {/* Artists */}
-      {artists && artists.length > 0 && (
+      {/* Creators */}
+      {creators && creators.length > 0 && (
         <section className="mb-10">
-          <h2 className="text-xl font-bold mb-4">Artists</h2>
+          <h2 className="text-xl font-bold mb-4">Creators</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {artists.map((artist) => (
+            {creators.map((creator) => (
               <Link
-                key={artist.id}
-                href={`/artist/${artist.id}`}
+                key={creator.id}
+                href={`/artist/${creator.id}`}
                 className="flex items-center gap-4 rounded-xl bg-[#15151f] p-4 transition hover:bg-[#1a1a2e]"
               >
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-lg font-bold shrink-0">
-                  {artist.name?.charAt(0)?.toUpperCase() ?? '?'}
+                  {creator.name?.charAt(0)?.toUpperCase() ?? '?'}
                 </div>
                 <div>
-                  <p className="font-semibold">{artist.name}</p>
-                  <p className="text-xs text-gray-400">{artist.role}</p>
+                  <p className="font-semibold">{creator.name}</p>
+                  <p className="text-xs text-gray-400">{creator.role}</p>
                 </div>
               </Link>
             ))}

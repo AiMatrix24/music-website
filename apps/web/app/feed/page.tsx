@@ -161,7 +161,7 @@ export default function FeedPage() {
         </Link>
 
         <h1 className="text-3xl font-black mb-2">Your Feed</h1>
-        <p className="text-gray-400 mb-8">Updates from artists you follow.</p>
+        <p className="text-gray-400 mb-8">Updates from creators you follow.</p>
 
         {/* Feed Items */}
         <div className="space-y-6">

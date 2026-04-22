@@ -97,14 +97,14 @@ export default function ApplyPage() {
               <h2 className="text-xl font-bold mb-4">Basic Information</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1">Artist / Band Name *</label>
+                  <label className="block text-sm text-gray-400 mb-1">Creator / Band Name *</label>
                   <input
                     type="text"
                     name="artistName"
                     value={form.artistName}
                     onChange={handleChange}
                     className="w-full rounded-lg bg-white/5 border border-white/10 px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-600 transition"
-                    placeholder="Your artist name"
+                    placeholder="Your creator name"
                   />
                 </div>
                 <div>

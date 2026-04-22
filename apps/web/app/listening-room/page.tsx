@@ -16,7 +16,7 @@ const ACTIVE_ROOMS = [
     host: 'DJ_Aurora',
     hostInitial: 'D',
     track: 'Neon Highway',
-    artist: 'ZVRA',
+    creator: 'ZVRA',
     listeners: 12,
     genre: 'Synthwave',
     visibility: 'public' as const,
@@ -27,7 +27,7 @@ const ACTIVE_ROOMS = [
     host: 'LofiKing',
     hostInitial: 'L',
     track: 'Rainy Afternoons',
-    artist: 'Mira Solis',
+    creator: 'Mira Solis',
     listeners: 34,
     genre: 'Lo-Fi',
     visibility: 'public' as const,
@@ -38,7 +38,7 @@ const ACTIVE_ROOMS = [
     host: 'GuitarHero42',
     hostInitial: 'G',
     track: 'Thunder Road',
-    artist: 'Electric Tide',
+    creator: 'Electric Tide',
     listeners: 8,
     genre: 'Rock',
     visibility: 'friends' as const,
@@ -49,7 +49,7 @@ const ACTIVE_ROOMS = [
     host: 'BeatDropper',
     hostInitial: 'B',
     track: 'Gold Chains',
-    artist: 'K-Nova',
+    creator: 'K-Nova',
     listeners: 21,
     genre: 'Hip-Hop',
     visibility: 'public' as const,
@@ -60,7 +60,7 @@ const ACTIVE_ROOMS = [
     host: 'Dreamweaver',
     hostInitial: 'D',
     track: 'Ocean Floor',
-    artist: 'Aether',
+    creator: 'Aether',
     listeners: 6,
     genre: 'Ambient',
     visibility: 'private' as const,
@@ -71,7 +71,7 @@ const ACTIVE_ROOMS = [
     host: 'VinylHead',
     hostInitial: 'V',
     track: 'Paper Cranes',
-    artist: 'The Drift',
+    creator: 'The Drift',
     listeners: 15,
     genre: 'Indie',
     visibility: 'public' as const,
@@ -79,9 +79,9 @@ const ACTIVE_ROOMS = [
 ];
 
 const ROOM_QUEUE = [
-  { title: 'Crystal Waves', artist: 'ZVRA' },
-  { title: 'Phantom Signal', artist: 'KVLT' },
-  { title: 'Solar Drift', artist: 'Aether' },
+  { title: 'Crystal Waves', creator: 'ZVRA' },
+  { title: 'Phantom Signal', creator: 'KVLT' },
+  { title: 'Solar Drift', creator: 'Aether' },
 ];
 
 const ROOM_CHAT = [
@@ -231,7 +231,7 @@ export default function ListeningRoomPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-xl font-bold truncate">{activeRoom.track}</h3>
-                    <p className="text-gray-400 truncate">{activeRoom.artist}</p>
+                    <p className="text-gray-400 truncate">{activeRoom.creator}</p>
                     <div className="mt-4">
                       <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
                         <div
@@ -297,7 +297,7 @@ export default function ListeningRoomPage() {
                       </div>
                       <div className="min-w-0">
                         <p className="font-semibold text-sm truncate">{q.title}</p>
-                        <p className="text-xs text-gray-400 truncate">{q.artist}</p>
+                        <p className="text-xs text-gray-400 truncate">{q.creator}</p>
                       </div>
                     </div>
                   ))}
@@ -431,7 +431,7 @@ export default function ListeningRoomPage() {
               </div>
               <div className="text-sm mb-1 truncate">
                 <span className="text-white font-medium">{room.track}</span>
-                <span className="text-gray-500"> &mdash; {room.artist}</span>
+                <span className="text-gray-500"> &mdash; {room.creator}</span>
               </div>
               <div className="flex items-center justify-between mt-4">
                 <span className="text-sm text-gray-400 flex items-center gap-1">

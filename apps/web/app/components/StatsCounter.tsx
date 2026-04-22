@@ -61,7 +61,7 @@ export function StatsCounter() {
   const totalPlays = tracks?.reduce((sum, t) => sum + (t.playCount ?? 0), 0) ?? 0;
   const trackCount = tracks?.length ?? 0;
 
-  // Derive unique artist count from tracks
+  // Derive unique creator count from tracks
   const uniqueArtists = tracks
     ? new Set(tracks.map(t => (t as { artistId?: string }).artistId).filter(Boolean)).size
     : 0;
@@ -78,7 +78,7 @@ export function StatsCounter() {
       <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
         <AnimatedStat value={playsDisplay} suffix={playsSuffix + ' PLAYS'} label="Total Plays" />
         <AnimatedStat value={trackCount} label="Tracks" />
-        <AnimatedStat value={artistCount} label="Artists" />
+        <AnimatedStat value={artistCount} label="Creators" />
         <AnimatedStat value={eventCount} label="Live Events" />
       </div>
     </section>

@@ -10,12 +10,12 @@ import { useToast } from '@/app/components/Toast';
 /* ------------------------------------------------------------------ */
 
 const POPULAR_TRACKS = [
-  { id: 'k1', title: 'Neon Skyline', artist: 'ZVRA', bpm: 128 },
-  { id: 'k2', title: 'Ocean Protocol', artist: 'Mira Solis', bpm: 110 },
-  { id: 'k3', title: 'Concrete Waves', artist: 'The Drift', bpm: 95 },
-  { id: 'k4', title: 'Phantom Signal', artist: 'KVLT', bpm: 140 },
-  { id: 'k5', title: 'Solar Drift', artist: 'Aether', bpm: 100 },
-  { id: 'k6', title: 'Deep Currents', artist: 'Undertow', bpm: 120 },
+  { id: 'k1', title: 'Neon Skyline', creator: 'ZVRA', bpm: 128 },
+  { id: 'k2', title: 'Ocean Protocol', creator: 'Mira Solis', bpm: 110 },
+  { id: 'k3', title: 'Concrete Waves', creator: 'The Drift', bpm: 95 },
+  { id: 'k4', title: 'Phantom Signal', creator: 'KVLT', bpm: 140 },
+  { id: 'k5', title: 'Solar Drift', creator: 'Aether', bpm: 100 },
+  { id: 'k6', title: 'Deep Currents', creator: 'Undertow', bpm: 120 },
 ];
 
 const MOCK_LYRICS = [
@@ -75,7 +75,7 @@ export default function KaraokePage() {
   const filteredTracks = POPULAR_TRACKS.filter(
     (t) =>
       t.title.toLowerCase().includes(search.toLowerCase()) ||
-      t.artist.toLowerCase().includes(search.toLowerCase())
+      t.creator.toLowerCase().includes(search.toLowerCase())
   );
 
   const handleSelectTrack = (track: (typeof POPULAR_TRACKS)[0]) => {
@@ -168,7 +168,7 @@ export default function KaraokePage() {
                     <span className="text-3xl opacity-50 group-hover:opacity-100 transition">&#127908;</span>
                   </div>
                   <h3 className="font-bold">{track.title}</h3>
-                  <p className="text-sm text-gray-400">{track.artist}</p>
+                  <p className="text-sm text-gray-400">{track.creator}</p>
                   <p className="text-xs text-gray-600 mt-1">{track.bpm} BPM</p>
                 </button>
               ))}
@@ -183,7 +183,7 @@ export default function KaraokePage() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold">{selectedTrack.title}</h2>
-                <p className="text-sm text-gray-400">{selectedTrack.artist}</p>
+                <p className="text-sm text-gray-400">{selectedTrack.creator}</p>
               </div>
               <button
                 onClick={() => { setSelectedTrack(null); setIsPlaying(false); setCurrentLine(0); }}

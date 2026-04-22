@@ -17,7 +17,7 @@ const QR_CONTEXTS = [
   { id: 'merch', label: 'Merchandise' },
   { id: 'event', label: 'Live Event' },
   { id: 'album', label: 'Album / EP' },
-  { id: 'profile', label: 'Artist Profile' },
+  { id: 'profile', label: 'Creator Profile' },
 ];
 
 const STEP_TITLES = [
@@ -134,7 +134,7 @@ export default function OnboardingPage() {
                 <input
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Your artist name"
+                  placeholder="Your creator name"
                   className="w-full bg-brand-950 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-red-600"
                 />
               </div>

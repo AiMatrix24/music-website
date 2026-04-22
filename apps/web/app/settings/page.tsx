@@ -291,7 +291,7 @@ export default function SettingsPage() {
           <div className="space-y-6">
             <div className="rounded-2xl bg-[#15151f] p-6">
               <h2 className="text-lg font-bold mb-2">Social Media Channels</h2>
-              <p className="text-xs text-gray-500 mb-6">Connect your channels — they&apos;ll appear on your artist profile</p>
+              <p className="text-xs text-gray-500 mb-6">Connect your channels — they&apos;ll appear on your creator profile</p>
               <div className="space-y-5">
                 <SocialInput label="Instagram" icon="📸" value={socialInstagram} onChange={setSocialInstagram} placeholder="@yourusername" />
                 <SocialInput label="Twitter / X" icon="𝕏" value={socialTwitter} onChange={setSocialTwitter} placeholder="@yourusername" />
@@ -308,9 +308,9 @@ export default function SettingsPage() {
               <h2 className="text-lg font-bold mb-2">Streaming Services</h2>
               <p className="text-xs text-gray-500 mb-4">Link your distributor accounts for cross-platform sync</p>
               <div className="space-y-3">
-                <ServiceRow name="Spotify for Artists" icon="🟢" connected={connectedSpotify}
+                <ServiceRow name="Spotify for Creators" icon="🟢" connected={connectedSpotify}
                   onToggle={() => { setConnectedSpotify(!connectedSpotify); toast(connectedSpotify ? 'Spotify disconnected' : 'Spotify connected!', connectedSpotify ? 'info' : 'success'); }} />
-                <ServiceRow name="Apple Music for Artists" icon="🍎" connected={connectedAppleMusic}
+                <ServiceRow name="Apple Music for Creators" icon="🍎" connected={connectedAppleMusic}
                   onToggle={() => { setConnectedAppleMusic(!connectedAppleMusic); toast(connectedAppleMusic ? 'Apple Music disconnected' : 'Apple Music connected!', connectedAppleMusic ? 'info' : 'success'); }} />
                 <ServiceRow name="YouTube Music" icon="▶️" connected={false} onToggle={() => toast('Coming soon!', 'info')} />
                 <ServiceRow name="Amazon Music" icon="🔵" connected={false} onToggle={() => toast('Coming soon!', 'info')} />
@@ -418,7 +418,7 @@ export default function SettingsPage() {
               <div className="space-y-5">
                 <Toggle label="New followers" desc="When someone follows you" checked={notifNewFollower} onChange={setNotifNewFollower} />
                 <Toggle label="Ticket sales" desc="When someone buys a ticket to your event" checked={notifTicketSale} onChange={setNotifTicketSale} />
-                <Toggle label="Artist broadcasts" desc="Messages from artists you follow" checked={notifBroadcast} onChange={setNotifBroadcast} />
+                <Toggle label="Creator broadcasts" desc="Messages from creators you follow" checked={notifBroadcast} onChange={setNotifBroadcast} />
                 <Toggle label="Play milestones" desc="When your tracks hit 1K, 10K, 100K plays" checked={notifPlayMilestone} onChange={setNotifPlayMilestone} />
                 <Toggle label="New comments" desc="When someone comments on your tracks" checked={notifNewComment} onChange={setNotifNewComment} />
                 <Toggle label="Payout complete" desc="When a payout has been processed" checked={notifPayoutComplete} onChange={setNotifPayoutComplete} />

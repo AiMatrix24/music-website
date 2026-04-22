@@ -7,7 +7,7 @@ type ContractStatus = 'Active' | 'Expiring soon' | 'Expired';
 type ReleaseStatus = 'Live' | 'Pending' | 'Takedown';
 type ClaimStatus = 'Investigating' | 'Contested' | 'Approved';
 
-interface Artist {
+interface Creator {
   id: number;
   name: string;
   contract: ContractStatus;
@@ -18,7 +18,7 @@ interface Artist {
 interface Release {
   id: number;
   title: string;
-  artist: string;
+  creator: string;
   releaseDate: string;
   streams: number;
   revenue: number;
@@ -35,7 +35,7 @@ interface Claim {
 const LABEL_NAME = 'Skyline Records';
 const IS_VERIFIED = true;
 
-const ROSTER: Artist[] = [
+const ROSTER: Creator[] = [
   { id: 1, name: 'Aria Lane', contract: 'Active', releases: 12, initials: 'AL' },
   { id: 2, name: 'Echo Drift', contract: 'Active', releases: 8, initials: 'ED' },
   { id: 3, name: 'Nova Knight', contract: 'Expiring soon', releases: 24, initials: 'NK' },
@@ -50,7 +50,7 @@ const RECENT_RELEASES: Release[] = [
   {
     id: 1,
     title: 'Neon Highway',
-    artist: 'Aria Lane',
+    creator: 'Aria Lane',
     releaseDate: '2026-04-01',
     streams: 482000,
     revenue: 1928,
@@ -59,7 +59,7 @@ const RECENT_RELEASES: Release[] = [
   {
     id: 2,
     title: 'Midnight Rain',
-    artist: 'Nova Knight',
+    creator: 'Nova Knight',
     releaseDate: '2026-03-15',
     streams: 1240000,
     revenue: 4960,
@@ -68,7 +68,7 @@ const RECENT_RELEASES: Release[] = [
   {
     id: 3,
     title: 'Velvet Touch',
-    artist: 'Velvet Bloom',
+    creator: 'Velvet Bloom',
     releaseDate: '2026-03-08',
     streams: 87000,
     revenue: 348,
@@ -77,7 +77,7 @@ const RECENT_RELEASES: Release[] = [
   {
     id: 4,
     title: 'Sunset Drift',
-    artist: 'Echo Drift',
+    creator: 'Echo Drift',
     releaseDate: '2026-02-20',
     streams: 312000,
     revenue: 1248,
@@ -86,7 +86,7 @@ const RECENT_RELEASES: Release[] = [
   {
     id: 5,
     title: 'Shadow Protocol',
-    artist: 'Crimson Tide',
+    creator: 'Crimson Tide',
     releaseDate: '2026-02-12',
     streams: 156000,
     revenue: 624,
@@ -95,7 +95,7 @@ const RECENT_RELEASES: Release[] = [
   {
     id: 6,
     title: 'Static Bloom',
-    artist: 'Static Gold',
+    creator: 'Static Gold',
     releaseDate: '2026-01-30',
     streams: 24000,
     revenue: 96,
@@ -145,7 +145,7 @@ const CLAIM_BADGE: Record<ClaimStatus, string> = {
 const QUICK_ACTIONS = [
   { icon: '📋', label: 'Claim a Track', desc: 'File a master claim', href: '/labels/claim' },
   { icon: '🚫', label: 'Submit Takedown', desc: 'DMCA-style request', href: '/labels/takedown' },
-  { icon: '➕', label: 'Add Artist to Roster', desc: 'Onboard a new artist', href: '#' },
+  { icon: '➕', label: 'Add Creator to Roster', desc: 'Onboard a new creator', href: '#' },
   { icon: '🔍', label: 'Run Catalog Audit', desc: 'Check for issues', href: '#' },
 ];
 
@@ -190,7 +190,7 @@ export default function LabelDashboardPage() {
   const maxRevenue = Math.max(...REVENUE_DATA.map((d) => d.value));
 
   const stats = [
-    { label: 'Active Artists', value: ROSTER.filter((a) => a.contract === 'Active').length },
+    { label: 'Active Creators', value: ROSTER.filter((a) => a.contract === 'Active').length },
     { label: 'Total Releases', value: RECENT_RELEASES.length * 14 },
     { label: 'Pending Claims', value: PENDING_CLAIMS.filter((c) => c.status !== 'Approved').length },
     { label: 'Monthly Revenue', value: formatCurrency(monthlyRevenue) },
@@ -288,7 +288,7 @@ export default function LabelDashboardPage() {
                   <thead>
                     <tr className="text-left text-gray-400 border-b border-gray-800">
                       <th className="py-2 pr-3">Title</th>
-                      <th className="py-2 pr-3">Artist</th>
+                      <th className="py-2 pr-3">Creator</th>
                       <th className="py-2 pr-3">Release Date</th>
                       <th className="py-2 pr-3 text-right">Streams (30d)</th>
                       <th className="py-2 pr-3 text-right">Revenue (30d)</th>
@@ -299,7 +299,7 @@ export default function LabelDashboardPage() {
                     {RECENT_RELEASES.map((r) => (
                       <tr key={r.id} className="border-b border-gray-800/60">
                         <td className="py-3 pr-3 font-semibold">{r.title}</td>
-                        <td className="py-3 pr-3 text-gray-300">{r.artist}</td>
+                        <td className="py-3 pr-3 text-gray-300">{r.creator}</td>
                         <td className="py-3 pr-3 text-gray-400">{r.releaseDate}</td>
                         <td className="py-3 pr-3 text-right">{formatNumber(r.streams)}</td>
                         <td className="py-3 pr-3 text-right">{formatCurrency(r.revenue)}</td>
@@ -432,7 +432,7 @@ export default function LabelDashboardPage() {
               <h3 className="font-semibold text-sm mb-3">Quick Stats</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Total artists</span>
+                  <span className="text-gray-400">Total creators</span>
                   <span className="font-semibold">{ROSTER.length}</span>
                 </div>
                 <div className="flex justify-between">

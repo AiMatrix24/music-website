@@ -80,7 +80,7 @@ const CHANNELS: Record<string, ChannelData> = {
 const DEFAULT_CHANNEL: ChannelData = {
   id: 'unknown',
   name: 'OPYNX Creator Channel',
-  creator: 'Independent Artist',
+  creator: 'Independent Creator',
   creatorHandle: 'creator',
   genre: 'Mixed',
   listeners: 420,
@@ -439,7 +439,7 @@ export default function RadioChannelPage() {
                     href={`/artist/${channel.creatorHandle}`}
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 text-sm font-semibold transition"
                   >
-                    View Artist Profile
+                    View Creator Profile
                   </Link>
                 </div>
               </div>

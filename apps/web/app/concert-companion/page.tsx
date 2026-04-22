@@ -11,7 +11,7 @@ import { useToast } from '@/app/components/Toast';
 
 interface SetlistTrack {
   title: string;
-  artist: string;
+  creator: string;
   status: 'played' | 'current' | 'upcoming';
 }
 
@@ -37,13 +37,13 @@ const ACTIVE_EVENTS = [
 ];
 
 const SETLIST: SetlistTrack[] = [
-  { title: 'Crystal Waves', artist: 'ZVRA', status: 'played' },
-  { title: 'Phantom Signal', artist: 'ZVRA', status: 'played' },
-  { title: 'Static Dreams', artist: 'ZVRA', status: 'played' },
-  { title: 'Neon Highway', artist: 'ZVRA', status: 'current' },
-  { title: 'Solar Drift', artist: 'ZVRA', status: 'upcoming' },
-  { title: 'Deep Currents', artist: 'ZVRA', status: 'upcoming' },
-  { title: 'Ocean Protocol', artist: 'ZVRA', status: 'upcoming' },
+  { title: 'Crystal Waves', creator: 'ZVRA', status: 'played' },
+  { title: 'Phantom Signal', creator: 'ZVRA', status: 'played' },
+  { title: 'Static Dreams', creator: 'ZVRA', status: 'played' },
+  { title: 'Neon Highway', creator: 'ZVRA', status: 'current' },
+  { title: 'Solar Drift', creator: 'ZVRA', status: 'upcoming' },
+  { title: 'Deep Currents', creator: 'ZVRA', status: 'upcoming' },
+  { title: 'Ocean Protocol', creator: 'ZVRA', status: 'upcoming' },
 ];
 
 const LIVE_LYRICS = [
@@ -220,7 +220,7 @@ export default function ConcertCompanionPage() {
                         <p className={`font-semibold text-sm truncate ${track.status === 'current' ? 'text-red-400' : ''}`}>
                           {track.title}
                         </p>
-                        <p className="text-xs text-gray-500">{track.artist}</p>
+                        <p className="text-xs text-gray-500">{track.creator}</p>
                       </div>
                       {track.status === 'current' && (
                         <span className="ml-auto text-xs text-red-400 font-medium">Now Playing</span>

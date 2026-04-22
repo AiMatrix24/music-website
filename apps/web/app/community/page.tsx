@@ -67,7 +67,7 @@ export default function CommunityPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-black mb-2">Community</h1>
-            <p className="text-gray-400">Connect with artists, fans, and creators.</p>
+            <p className="text-gray-400">Connect with creators, fans, and creators.</p>
           </div>
           <button
             onClick={() => setShowNewThread(true)}

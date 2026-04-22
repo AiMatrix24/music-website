@@ -4,9 +4,9 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 const ROLES = [
-  { id: 'fan', label: 'Fan', icon: '\u266B', description: 'Discover music, attend events, and support your favorite artists directly.' },
+  { id: 'fan', label: 'Fan', icon: '\u266B', description: 'Discover music, attend events, and support your favorite creators directly.' },
   { id: 'creator', label: 'Creator', icon: '\u266A', description: 'Upload tracks, sell tickets, monetize your art with transparent revenue sharing.' },
-  { id: 'facilitator', label: 'Facilitator', icon: '\u2606', description: 'Host events, manage venues, and earn commissions by connecting fans and artists.' },
+  { id: 'facilitator', label: 'Facilitator', icon: '\u2606', description: 'Host events, manage venues, and earn commissions by connecting fans and creators.' },
 ];
 
 const GENRES = [
@@ -15,8 +15,8 @@ const GENRES = [
 ];
 
 const RECOMMENDATIONS: Record<string, string[]> = {
-  fan: ['Browse trending tracks on Explore', 'Follow your first 5 artists', 'Check out upcoming events near you'],
-  creator: ['Upload your first track', 'Set up your artist profile', 'Create your first event'],
+  fan: ['Browse trending tracks on Explore', 'Follow your first 5 creators', 'Check out upcoming events near you'],
+  creator: ['Upload your first track', 'Set up your creator profile', 'Create your first event'],
   facilitator: ['Complete venue verification', 'Browse available events to host', 'Set up your payout preferences'],
 };
 

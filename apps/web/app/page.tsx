@@ -45,7 +45,7 @@ export default function HomePage() {
             No Middlemen.
           </h1>
           <p className="text-lg text-gray-400 max-w-lg mx-auto mb-4">
-            Subscribe directly to artists for $8.73/month. Every dollar is
+            Subscribe directly to creators for $8.73/month. Every dollar is
             transparent, on-chain, and verifiable. Zero app store tax.
           </p>
           <Link href="/ewyk" className="inline-block mb-10 text-sm font-semibold text-red-400 hover:text-red-300 transition border-b border-red-400/30 hover:border-red-300 pb-0.5">
@@ -92,7 +92,7 @@ export default function HomePage() {
             <WaterfallCard
               amount="$1.00"
               label="Creator"
-              description="Direct to the artist. Always. Never reduced."
+              description="Direct to the creator. Always. Never reduced."
               color="from-purple-500 to-indigo-500"
             />
             <WaterfallCard
@@ -137,7 +137,7 @@ export default function HomePage() {
             />
             <FeatureCard
               title="Merch Discounts"
-              description="10-15% off on artist merchandise."
+              description="10-15% off on creator merchandise."
             />
             <FeatureCard
               title="On-Chain Payouts"

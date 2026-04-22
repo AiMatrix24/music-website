@@ -17,7 +17,7 @@ const PAST_RELEASES = [
 function generatePressRelease(form: { releaseType: ReleaseType; title: string; details: string; tone: Tone; includeQuote: boolean }) {
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const toneAdj = form.tone === 'Exciting' ? 'groundbreaking' : form.tone === 'Casual' ? 'fresh' : form.tone === 'Formal' ? 'distinguished' : 'significant';
-  const headline = `${form.title} — A ${toneAdj.charAt(0).toUpperCase() + toneAdj.slice(1)} ${form.releaseType} from OPYNX Artist`;
+  const headline = `${form.title} — A ${toneAdj.charAt(0).toUpperCase() + toneAdj.slice(1)} ${form.releaseType} from OPYNX Creator`;
 
   const p1 = form.tone === 'Exciting'
     ? `Get ready for something incredible. Today marks the announcement of "${form.title}", a ${toneAdj} ${form.releaseType.toLowerCase()} that is set to redefine the music landscape. This release represents months of creative exploration and artistic vision coming together in a powerful new way.`
@@ -32,7 +32,7 @@ function generatePressRelease(form: { releaseType: ReleaseType; title: string; d
   const p3 = `Available on all major platforms through OPYNX, "${form.title}" is expected to generate significant buzz across the music industry. Pre-save links are now live, and fans can stay updated through official social media channels for exclusive behind-the-scenes content.`;
 
   const quote = form.includeQuote
-    ? `"This project means everything to me. I poured my heart and soul into every moment of it, and I cannot wait for everyone to experience it the way I intended." — Artist Name`
+    ? `"This project means everything to me. I poured my heart and soul into every moment of it, and I cannot wait for everyone to experience it the way I intended." — Creator Name`
     : '';
 
   return { today, headline, p1, p2, p3, quote };
@@ -100,8 +100,8 @@ export default function PressReleasePage() {
       '',
       generated.quote ? generated.quote : '',
       '',
-      'About Artist Name',
-      'Artist Name is an independent musician creating genre-defying music that connects with audiences worldwide. With a growing catalog of releases on OPYNX, they continue to push creative boundaries and build a dedicated fanbase.',
+      'About Creator Name',
+      'Creator Name is an independent musician creating genre-defying music that connects with audiences worldwide. With a growing catalog of releases on OPYNX, they continue to push creative boundaries and build a dedicated fanbase.',
       '',
       'Contact',
       'Press inquiries: press@opynx.com',
@@ -184,7 +184,7 @@ export default function PressReleasePage() {
                 onChange={(e) => setForm({ ...form, includeQuote: e.target.checked })}
                 className="w-4 h-4 rounded border-brand-800/30 bg-brand-950 text-red-600 focus:ring-red-600"
               />
-              <span className="text-sm text-gray-400">Include artist quote</span>
+              <span className="text-sm text-gray-400">Include creator quote</span>
             </label>
             <button
               onClick={handleGenerate}
@@ -232,9 +232,9 @@ export default function PressReleasePage() {
 
               {/* About Section */}
               <div className="border-t border-brand-800/20 pt-6 mt-6">
-                <h3 className="text-sm font-bold mb-2">About {session?.user?.name || 'Artist Name'}</h3>
+                <h3 className="text-sm font-bold mb-2">About {session?.user?.name || 'Creator Name'}</h3>
                 <p className="text-xs text-gray-500 leading-relaxed">
-                  {session?.user?.name || 'Artist Name'} is an independent musician creating genre-defying music that connects with audiences worldwide. With a growing catalog of releases on OPYNX, they continue to push creative boundaries and build a dedicated fanbase.
+                  {session?.user?.name || 'Creator Name'} is an independent musician creating genre-defying music that connects with audiences worldwide. With a growing catalog of releases on OPYNX, they continue to push creative boundaries and build a dedicated fanbase.
                 </p>
               </div>
 

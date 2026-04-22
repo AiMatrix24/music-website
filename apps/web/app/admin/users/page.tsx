@@ -17,7 +17,7 @@ const MOCK_USERS = Array.from({ length: 15 }, (_, i) => ({
     'nina.v@outlook.com', 'tyler.oaks@gmail.com', 'priya.s@hotmail.com', 'jake.monroe@opynx.com', 'aisha.t@gmail.com',
     'cody.blaze@proton.me', 'mei.lin@yahoo.com', 'oscar.r@gmail.com', 'fatima@opynx.com', 'devon.c@outlook.com',
   ][i],
-  role: ['artist', 'fan', 'artist', 'fan', 'facilitator', 'fan', 'artist', 'fan', 'admin', 'fan', 'artist', 'fan', 'facilitator', 'artist', 'fan'][i],
+  role: ['creator', 'fan', 'creator', 'fan', 'facilitator', 'fan', 'creator', 'fan', 'admin', 'fan', 'creator', 'fan', 'facilitator', 'creator', 'fan'][i],
   subscriptionTier: ['superfan', 'fan', 'patron', 'fan', 'none', 'fan', 'superfan', 'patron', 'none', 'fan', 'fan', 'superfan', 'fan', 'none', 'fan'][i],
   status: i === 3 || i === 10 ? 'suspended' : 'active',
   avatar: null as string | null,
@@ -149,7 +149,7 @@ export default function AdminUsersPage() {
           >
             <option value="all">All Roles</option>
             <option value="fan">Fan</option>
-            <option value="artist">Artist</option>
+            <option value="creator">Creator</option>
             <option value="facilitator">Facilitator</option>
             <option value="admin">Admin</option>
           </select>
@@ -204,7 +204,7 @@ export default function AdminUsersPage() {
                         className="bg-transparent border border-white/10 rounded px-2 py-1 text-xs text-gray-300 outline-none focus:border-red-600/50"
                       >
                         <option value="fan">Fan</option>
-                        <option value="artist">Artist</option>
+                        <option value="creator">Creator</option>
                         <option value="facilitator">Facilitator</option>
                         <option value="admin">Admin</option>
                       </select>

@@ -78,8 +78,8 @@ export default function EWYKPage() {
               <div className="text-4xl mb-4">💸</div>
               <h3 className="text-xl font-bold mb-3">Pro-Rata Dilution</h3>
               <p className="text-gray-400">
-                Your streams go into a global pool. A top artist&apos;s 100M streams
-                literally reduce the payout rate for independent artists sharing the same pool.
+                Your streams go into a global pool. A top creator&apos;s 100M streams
+                literally reduce the payout rate for independent creators sharing the same pool.
               </p>
             </div>
             <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-8">
@@ -131,7 +131,7 @@ export default function EWYKPage() {
             <Principle
               num="05"
               title="You Compete With Yourself"
-              description="Instead of competing for a slice of a shrinking pool, you only compete with your own previous performance. Grew from 1,000 to 5,000 subscribers? That's 5x income — guaranteed."
+              description="Instead of competing for a slice of a shrinking pool, you only compete with your own previous performance. Grew from 1,000 to 5,000 subscribers? That's 5x income — direct."
             />
           </div>
         </div>
@@ -166,7 +166,7 @@ export default function EWYKPage() {
                 <ComparisonRow
                   feature="Discovery"
                   legacy="Black box algorithms & paid placements"
-                  opynx="Artist-driven — you bring your fans, you keep them"
+                  opynx="Creator-driven — you bring your fans, you keep them"
                 />
                 <ComparisonRow
                   feature="Visibility"
@@ -341,8 +341,8 @@ export default function EWYKPage() {
                   </button>
                 </div>
                 <p className="text-xs text-gray-600 mt-2">
-                  Per the 2024 platform data, an artist ranked #100,000 averages ~10K-30K streams/month.
-                  An artist at #10,000 averages ~1M streams/month.
+                  Per the 2024 platform data, an creator ranked #100,000 averages ~10K-30K streams/month.
+                  An creator at #10,000 averages ~1M streams/month.
                 </p>
               </div>
 
@@ -426,31 +426,31 @@ export default function EWYKPage() {
             </p>
           </div>
 
-          {/* Artist Ranking Reality */}
+          {/* Creator Ranking Reality */}
           <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6 mb-6">
             <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">
-              The Hard Truth: Artist Income by Platform Ranking (2024 Data)
+              The Hard Truth: Creator Income by Platform Ranking (2024 Data)
             </p>
             <div className="space-y-2 text-sm">
               <div className="flex items-center justify-between p-3 bg-brand-950/50 rounded-lg">
-                <span>Top 10,000 artists (top 0.1%)</span>
+                <span>Top 10,000 creators (top 0.1%)</span>
                 <span className="font-bold text-green-400">~$131,000/year</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-brand-950/50 rounded-lg">
-                <span>Top 100,000 artists (top 1%)</span>
+                <span>Top 100,000 creators (top 1%)</span>
                 <span className="font-bold text-yellow-400">~$6,000/year</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-brand-950/50 rounded-lg">
-                <span>Top 1,000,000 artists</span>
+                <span>Top 1,000,000 creators</span>
                 <span className="font-bold text-red-400">~$24/year</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-red-900/20 border border-red-600/30 rounded-lg">
                 <span className="font-bold">OPYNX with 500 subscribers</span>
-                <span className="font-bold text-red-400">$6,000/year guaranteed</span>
+                <span className="font-bold text-red-400">~$6,000/year direct</span>
               </div>
             </div>
             <p className="text-xs text-gray-500 mt-4">
-              At #100,000 on a streaming platform, an artist makes $6K/year — below the survival
+              At #100,000 on a streaming platform, an creator makes $6K/year — below the survival
               threshold in most developed economies. On OPYNX, just 500 subscribers gets you to
               the same income level — predictably, every year.
             </p>
@@ -458,7 +458,7 @@ export default function EWYKPage() {
 
           <p className="text-xs text-gray-500 text-center mt-6">
             Use the &ldquo;Industry Reference&rdquo; cards above to load realistic per-million-stream rates.
-            OPYNX rate is the guaranteed $1.00-per-subscriber-per-month creator payout, verifiable on Polygon.
+            OPYNX rate is the $1.00-per-active-subscriber-per-month creator payout, verifiable on Polygon. Actual earnings depend on active subscriber count and payment status.
           </p>
         </div>
       </section>

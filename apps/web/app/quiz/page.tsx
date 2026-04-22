@@ -16,7 +16,7 @@ interface Question {
 }
 
 const QUIZ_CATEGORIES = [
-  { id: 'top-artist', name: 'Your Top Artist', icon: '&#11088;', description: 'How well do you know your most-played artist?' },
+  { id: 'top-creator', name: 'Your Top Creator', icon: '&#11088;', description: 'How well do you know your most-played creator?' },
   { id: 'genre-master', name: 'Genre Master', icon: '&#127925;', description: 'Can you identify the genre from the clue?' },
   { id: 'lyrics', name: 'Lyrics Challenge', icon: '&#127908;', description: 'Complete the missing lyrics' },
   { id: 'release-dates', name: 'Release Dates', icon: '&#128197;', description: 'Guess when the album dropped' },
@@ -24,7 +24,7 @@ const QUIZ_CATEGORIES = [
 ];
 
 const QUIZ_QUESTIONS: Record<string, Question[]> = {
-  'top-artist': [
+  'top-creator': [
     { question: 'Which album put ZVRA on the map?', options: ['Neon Highway', 'Crystal Waves', 'Phantom Signal', 'Static Dreams'], correct: 0 },
     { question: 'What genre is ZVRA primarily known for?', options: ['Lo-Fi', 'Synthwave', 'Jazz', 'Classical'], correct: 1 },
     { question: 'How many albums has ZVRA released?', options: ['2', '3', '5', '7'], correct: 2 },

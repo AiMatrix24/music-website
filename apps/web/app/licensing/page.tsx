@@ -11,7 +11,7 @@ type Vocal = 'All' | 'Vocal' | 'Instrumental';
 interface Track {
   id: number;
   title: string;
-  artist: string;
+  creator: string;
   genre: string;
   mood: Mood;
   bpm: number;
@@ -22,18 +22,18 @@ interface Track {
 }
 
 const TRACKS: Track[] = [
-  { id: 1, title: 'Neon Highway', artist: 'Cipher', genre: 'Electronic', mood: 'Upbeat', bpm: 128, duration: '3:24', price: 99, vocal: 'Instrumental', tags: ['Upbeat', 'Energetic'] },
-  { id: 2, title: 'Midnight Rain', artist: 'VoxQueen', genre: 'R&B', mood: 'Dramatic', bpm: 85, duration: '4:12', price: 149, vocal: 'Vocal', tags: ['Dramatic', 'Emotional'] },
-  { id: 3, title: 'Sunset Drift', artist: 'ChillProducer', genre: 'Lo-Fi', mood: 'Chill', bpm: 72, duration: '2:58', price: 79, vocal: 'Instrumental', tags: ['Chill', 'Relaxing'] },
-  { id: 4, title: 'Shadow Protocol', artist: 'SynthLord', genre: 'Cinematic', mood: 'Dark', bpm: 95, duration: '3:45', price: 199, vocal: 'Instrumental', tags: ['Dark', 'Intense'] },
-  { id: 5, title: 'Rise Above', artist: 'IndieStar', genre: 'Indie Rock', mood: 'Inspirational', bpm: 110, duration: '3:32', price: 129, vocal: 'Vocal', tags: ['Inspirational', 'Uplifting'] },
-  { id: 6, title: 'Digital Dreams', artist: 'NeonWave', genre: 'Synthwave', mood: 'Upbeat', bpm: 118, duration: '4:01', price: 99, vocal: 'Instrumental', tags: ['Upbeat', 'Retro'] },
-  { id: 7, title: 'Broken Mirrors', artist: 'BeatDropper', genre: 'Hip-Hop', mood: 'Dark', bpm: 90, duration: '3:15', price: 149, vocal: 'Vocal', tags: ['Dark', 'Raw'] },
-  { id: 8, title: 'Ocean Breeze', artist: 'LoopMaster', genre: 'Ambient', mood: 'Chill', bpm: 68, duration: '5:22', price: 69, vocal: 'Instrumental', tags: ['Chill', 'Ambient'] },
-  { id: 9, title: 'Victory Lap', artist: 'Cipher', genre: 'Electronic', mood: 'Inspirational', bpm: 135, duration: '3:48', price: 179, vocal: 'Instrumental', tags: ['Inspirational', 'Powerful'] },
-  { id: 10, title: 'Velvet Touch', artist: 'VoxQueen', genre: 'Soul', mood: 'Dramatic', bpm: 78, duration: '4:30', price: 159, vocal: 'Vocal', tags: ['Dramatic', 'Soulful'] },
-  { id: 11, title: 'Street Lights', artist: 'BeatDropper', genre: 'Trap', mood: 'Upbeat', bpm: 140, duration: '2:45', price: 89, vocal: 'Instrumental', tags: ['Upbeat', 'Hard'] },
-  { id: 12, title: 'Morning Light', artist: 'ChillProducer', genre: 'Lo-Fi', mood: 'Inspirational', bpm: 82, duration: '3:10', price: 79, vocal: 'Instrumental', tags: ['Inspirational', 'Warm'] },
+  { id: 1, title: 'Neon Highway', creator: 'Cipher', genre: 'Electronic', mood: 'Upbeat', bpm: 128, duration: '3:24', price: 99, vocal: 'Instrumental', tags: ['Upbeat', 'Energetic'] },
+  { id: 2, title: 'Midnight Rain', creator: 'VoxQueen', genre: 'R&B', mood: 'Dramatic', bpm: 85, duration: '4:12', price: 149, vocal: 'Vocal', tags: ['Dramatic', 'Emotional'] },
+  { id: 3, title: 'Sunset Drift', creator: 'ChillProducer', genre: 'Lo-Fi', mood: 'Chill', bpm: 72, duration: '2:58', price: 79, vocal: 'Instrumental', tags: ['Chill', 'Relaxing'] },
+  { id: 4, title: 'Shadow Protocol', creator: 'SynthLord', genre: 'Cinematic', mood: 'Dark', bpm: 95, duration: '3:45', price: 199, vocal: 'Instrumental', tags: ['Dark', 'Intense'] },
+  { id: 5, title: 'Rise Above', creator: 'IndieStar', genre: 'Indie Rock', mood: 'Inspirational', bpm: 110, duration: '3:32', price: 129, vocal: 'Vocal', tags: ['Inspirational', 'Uplifting'] },
+  { id: 6, title: 'Digital Dreams', creator: 'NeonWave', genre: 'Synthwave', mood: 'Upbeat', bpm: 118, duration: '4:01', price: 99, vocal: 'Instrumental', tags: ['Upbeat', 'Retro'] },
+  { id: 7, title: 'Broken Mirrors', creator: 'BeatDropper', genre: 'Hip-Hop', mood: 'Dark', bpm: 90, duration: '3:15', price: 149, vocal: 'Vocal', tags: ['Dark', 'Raw'] },
+  { id: 8, title: 'Ocean Breeze', creator: 'LoopMaster', genre: 'Ambient', mood: 'Chill', bpm: 68, duration: '5:22', price: 69, vocal: 'Instrumental', tags: ['Chill', 'Ambient'] },
+  { id: 9, title: 'Victory Lap', creator: 'Cipher', genre: 'Electronic', mood: 'Inspirational', bpm: 135, duration: '3:48', price: 179, vocal: 'Instrumental', tags: ['Inspirational', 'Powerful'] },
+  { id: 10, title: 'Velvet Touch', creator: 'VoxQueen', genre: 'Soul', mood: 'Dramatic', bpm: 78, duration: '4:30', price: 159, vocal: 'Vocal', tags: ['Dramatic', 'Soulful'] },
+  { id: 11, title: 'Street Lights', creator: 'BeatDropper', genre: 'Trap', mood: 'Upbeat', bpm: 140, duration: '2:45', price: 89, vocal: 'Instrumental', tags: ['Upbeat', 'Hard'] },
+  { id: 12, title: 'Morning Light', creator: 'ChillProducer', genre: 'Lo-Fi', mood: 'Inspirational', bpm: 82, duration: '3:10', price: 79, vocal: 'Instrumental', tags: ['Inspirational', 'Warm'] },
 ];
 
 const LICENSE_TIERS = [
@@ -65,17 +65,17 @@ const LICENSE_TIERS = [
 ];
 
 const PLACEMENTS = [
-  { title: 'Echoes of Tomorrow', show: 'Netflix Original Series', type: 'TV Show', artist: 'Cipher' },
-  { title: 'Rise Above', show: 'Nike "Just Move" Campaign', type: 'Advertisement', artist: 'IndieStar' },
-  { title: 'Shadow Protocol', show: 'The Last Signal (Indie Film)', type: 'Film', artist: 'SynthLord' },
-  { title: 'Ocean Breeze', show: 'The Creative Hour Podcast', type: 'Podcast', artist: 'LoopMaster' },
+  { title: 'Echoes of Tomorrow', show: 'Netflix Original Series', type: 'TV Show', creator: 'Cipher' },
+  { title: 'Rise Above', show: 'Nike "Just Move" Campaign', type: 'Advertisement', creator: 'IndieStar' },
+  { title: 'Shadow Protocol', show: 'The Last Signal (Indie Film)', type: 'Film', creator: 'SynthLord' },
+  { title: 'Ocean Breeze', show: 'The Creative Hour Podcast', type: 'Podcast', creator: 'LoopMaster' },
 ];
 
 const FAQ = [
-  { q: 'What rights do I get with a standard license?', a: 'A standard license grants you non-exclusive rights to use the track in social media content, YouTube videos, and podcasts with up to 100K combined views. The artist retains ownership and can license the same track to others.' },
+  { q: 'What rights do I get with a standard license?', a: 'A standard license grants you non-exclusive rights to use the track in social media content, YouTube videos, and podcasts with up to 100K combined views. The creator retains ownership and can license the same track to others.' },
   { q: 'Can I modify or remix a licensed track?', a: 'Yes, all license tiers allow you to edit, cut, loop, and adapt the track to fit your project. However, you cannot redistribute the raw audio file or resell the track itself.' },
-  { q: 'How do artists get paid for licensing?', a: 'Artists receive 70% of all licensing fees. Payments are processed within 48 hours of purchase and deposited via USDC on Polygon or direct bank transfer.' },
-  { q: 'What if I need a custom composition?', a: 'Contact the artist directly through their OPYNX profile to discuss custom work. Pricing and terms are negotiated between you and the artist.' },
+  { q: 'How do creators get paid for licensing?', a: 'Creators receive 70% of all licensing fees. Payments are processed within 48 hours of purchase and deposited via USDC on Polygon or direct bank transfer.' },
+  { q: 'What if I need a custom composition?', a: 'Contact the creator directly through their OPYNX profile to discuss custom work. Pricing and terms are negotiated between you and the creator.' },
 ];
 
 const MOODS: Mood[] = ['All', 'Upbeat', 'Dramatic', 'Chill', 'Dark', 'Inspirational'];
@@ -156,7 +156,7 @@ export default function LicensingPage() {
             Get Your Music in <span className="text-red-500">Film, TV & Ads</span>
           </h1>
           <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-            License high-quality tracks from OPYNX artists for your next project. Simple pricing, instant access.
+            License high-quality tracks from OPYNX creators for your next project. Simple pricing, instant access.
           </p>
         </div>
 
@@ -217,7 +217,7 @@ export default function LicensingPage() {
               </div>
               <div className="p-4">
                 <h3 className="font-bold text-sm mb-0.5">{track.title}</h3>
-                <p className="text-xs text-gray-400 mb-3">{track.artist} &middot; {track.genre}</p>
+                <p className="text-xs text-gray-400 mb-3">{track.creator} &middot; {track.genre}</p>
                 <div className="flex flex-wrap gap-1.5 mb-3">
                   {track.tags.map((tag) => (
                     <span key={tag} className={`text-xs px-2 py-0.5 rounded-full font-medium ${MOOD_COLORS[tag] || 'bg-gray-600/20 text-gray-400'}`}>
@@ -290,13 +290,13 @@ export default function LicensingPage() {
 
         {/* Revenue Split */}
         <div className="bg-[#15151f] border border-brand-800/30 rounded-2xl p-8 text-center mb-16">
-          <h2 className="text-2xl font-bold mb-3">Artists Keep 70%</h2>
+          <h2 className="text-2xl font-bold mb-3">Creators Keep 70%</h2>
           <p className="text-gray-400 max-w-xl mx-auto mb-6">
-            OPYNX offers industry-leading revenue splits. Artists keep 70% of all licensing fees, with transparent on-chain payments.
+            OPYNX offers industry-leading revenue splits. Creators keep 70% of all licensing fees, with transparent on-chain payments.
           </p>
           <div className="flex items-center justify-center gap-2 max-w-md mx-auto">
             <div className="flex-[7] h-8 bg-red-600 rounded-l-full flex items-center justify-center text-xs font-bold">
-              Artist 70%
+              Creator 70%
             </div>
             <div className="flex-[3] h-8 bg-brand-800/50 rounded-r-full flex items-center justify-center text-xs font-bold text-gray-400">
               Platform 30%
@@ -336,7 +336,7 @@ export default function LicensingPage() {
                 <span className="text-xs px-2.5 py-1 rounded-full bg-red-600/20 text-red-400 font-semibold">{p.type}</span>
                 <h3 className="font-bold text-sm mt-3 mb-1">{p.show}</h3>
                 <p className="text-xs text-gray-400">
-                  &ldquo;{p.title}&rdquo; by {p.artist}
+                  &ldquo;{p.title}&rdquo; by {p.creator}
                 </p>
               </div>
             ))}

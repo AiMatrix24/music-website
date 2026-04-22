@@ -10,7 +10,7 @@ const VENUE_NAME = 'The Velvet Room';
 
 const STATS = [
   { label: 'Upcoming Shows', value: '7', icon: '🎶' },
-  { label: 'Total Artists Hosted', value: '142', icon: '🎤' },
+  { label: 'Total Creators Hosted', value: '142', icon: '🎤' },
   { label: 'Avg Attendance', value: '284', icon: '👥' },
   { label: 'Revenue This Month', value: '$12,450', icon: '💰' },
   { label: 'Open Slots', value: '3', icon: '📅' },
@@ -18,11 +18,11 @@ const STATS = [
 ];
 
 const PENDING_APPLICATIONS = [
-  { id: 1, artist: 'Maya Chen', avatar: 'M', slot: 'Friday Night Opener (May 8)', genre: 'Indie Pop', followers: 2400, plays: 18200, daysAgo: 1 },
-  { id: 2, artist: 'DJ Flux', avatar: 'D', slot: 'Saturday Electronic Night (May 9)', genre: 'Electronic', followers: 5100, plays: 42000, daysAgo: 2 },
-  { id: 3, artist: 'The Brass Roots', avatar: 'T', slot: 'Sunday Jazz Brunch (May 10)', genre: 'Jazz', followers: 1800, plays: 9500, daysAgo: 3 },
-  { id: 4, artist: 'Pixel Wave', avatar: 'P', slot: 'Friday Night Opener (May 8)', genre: 'Synthwave', followers: 3300, plays: 27600, daysAgo: 3 },
-  { id: 5, artist: 'Rue Dominguez', avatar: 'R', slot: 'Saturday Electronic Night (May 9)', genre: 'Lo-fi', followers: 950, plays: 6800, daysAgo: 5 },
+  { id: 1, creator: 'Maya Chen', avatar: 'M', slot: 'Friday Night Opener (May 8)', genre: 'Indie Pop', followers: 2400, plays: 18200, daysAgo: 1 },
+  { id: 2, creator: 'DJ Flux', avatar: 'D', slot: 'Saturday Electronic Night (May 9)', genre: 'Electronic', followers: 5100, plays: 42000, daysAgo: 2 },
+  { id: 3, creator: 'The Brass Roots', avatar: 'T', slot: 'Sunday Jazz Brunch (May 10)', genre: 'Jazz', followers: 1800, plays: 9500, daysAgo: 3 },
+  { id: 4, creator: 'Pixel Wave', avatar: 'P', slot: 'Friday Night Opener (May 8)', genre: 'Synthwave', followers: 3300, plays: 27600, daysAgo: 3 },
+  { id: 5, creator: 'Rue Dominguez', avatar: 'R', slot: 'Saturday Electronic Night (May 9)', genre: 'Lo-fi', followers: 950, plays: 6800, daysAgo: 5 },
 ];
 
 const ACTIVE_SLOTS = [
@@ -32,9 +32,9 @@ const ACTIVE_SLOTS = [
 ];
 
 const UPCOMING_SHOWS = [
-  { id: 1, artist: 'Luna Vega', date: '2026-04-18', ticketsSold: 210, capacity: 300 },
-  { id: 2, artist: 'Echo Chamber', date: '2026-04-25', ticketsSold: 145, capacity: 300 },
-  { id: 3, artist: 'Nadia Rose', date: '2026-05-02', ticketsSold: 85, capacity: 300 },
+  { id: 1, creator: 'Luna Vega', date: '2026-04-18', ticketsSold: 210, capacity: 300 },
+  { id: 2, creator: 'Echo Chamber', date: '2026-04-25', ticketsSold: 145, capacity: 300 },
+  { id: 3, creator: 'Nadia Rose', date: '2026-05-02', ticketsSold: 85, capacity: 300 },
 ];
 
 const REVENUE_BREAKDOWN = [
@@ -93,7 +93,7 @@ export default function VenueDashboardPage() {
   const handleApplication = (id: number, action: 'accept' | 'decline') => {
     setApplications((prev) => prev.filter((a) => a.id !== id));
     toast(
-      action === 'accept' ? 'Artist accepted! Confirmation sent.' : 'Application declined.',
+      action === 'accept' ? 'Creator accepted! Confirmation sent.' : 'Application declined.',
       action === 'accept' ? 'success' : 'info'
     );
   };
@@ -116,7 +116,7 @@ export default function VenueDashboardPage() {
         <div className="mb-8">
           <p className="text-sm text-red-400 font-medium mb-1">{VENUE_NAME}</p>
           <h1 className="text-3xl font-bold">Venue Dashboard</h1>
-          <p className="text-gray-400 mt-1">Manage bookings, artists, and revenue</p>
+          <p className="text-gray-400 mt-1">Manage bookings, creators, and revenue</p>
         </div>
 
         {/* ── Stats Row ── */}
@@ -189,7 +189,7 @@ export default function VenueDashboardPage() {
                         {app.avatar}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-sm">{app.artist}</p>
+                        <p className="font-semibold text-sm">{app.creator}</p>
                         <p className="text-xs text-gray-500 truncate">{app.slot}</p>
                       </div>
                       <span className="text-xs text-gray-600 shrink-0">{app.daysAgo}d ago</span>
@@ -262,7 +262,7 @@ export default function VenueDashboardPage() {
                 <div key={show.id} className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-5">
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <p className="font-semibold text-sm">{show.artist}</p>
+                      <p className="font-semibold text-sm">{show.creator}</p>
                       <p className="text-xs text-gray-500">
                         {new Date(show.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                       </p>
@@ -288,7 +288,7 @@ export default function VenueDashboardPage() {
           <div className="flex flex-wrap gap-3">
             {[
               { label: 'Post New Slot', href: '/booking', icon: '➕' },
-              { label: 'Browse Artists', href: '/explore', icon: '🔍' },
+              { label: 'Browse Creators', href: '/explore', icon: '🔍' },
               { label: 'View Analytics', href: '/dashboard/analytics', icon: '📊' },
             ].map((action) => (
               <Link

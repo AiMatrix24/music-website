@@ -75,12 +75,12 @@ export default function CreatorsDiscoverPage() {
             <span className="mr-3">⭐</span>Discover Rising Talent
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-gray-300">
-            Find your next opener, collaborator, or showcase artist
+            Find your next opener, collaborator, or showcase creator
           </p>
           <div className="mx-auto mt-8 flex max-w-2xl flex-wrap justify-center gap-4 text-sm">
             <div className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2">
               <span className="text-red-400">🏟️</span>
-              <span className="text-gray-300">Venues looking for artists</span>
+              <span className="text-gray-300">Venues looking for creators</span>
             </div>
             <div className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2">
               <span className="text-red-400">🎤</span>
@@ -215,7 +215,7 @@ export default function CreatorsDiscoverPage() {
                         href="/booking"
                         className="flex-1 rounded-lg bg-red-600 py-2 text-center text-sm font-semibold text-white transition hover:bg-red-700"
                       >
-                        Book Artist
+                        Book Creator
                       </Link>
                     </div>
                   </div>
@@ -232,7 +232,7 @@ export default function CreatorsDiscoverPage() {
 
             {/* Apply CTA */}
             <div className="mt-16 rounded-2xl border border-white/10 bg-gradient-to-r from-red-950/50 to-brand-900 p-8 text-center">
-              <h2 className="text-2xl font-bold">Are You an Emerging Artist?</h2>
+              <h2 className="text-2xl font-bold">Are You an Emerging Creator?</h2>
               <p className="mx-auto mt-2 max-w-lg text-gray-300">
                 Get discovered by venues, established creators, and new fans. Apply to be featured on OPYNX and take your music career to the next level.
               </p>

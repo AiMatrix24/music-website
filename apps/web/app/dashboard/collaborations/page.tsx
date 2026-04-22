@@ -83,7 +83,7 @@ export default function CollaborationsPage() {
               ← Dashboard
             </Link>
             <h1 className="text-3xl font-bold">Collaborations</h1>
-            <p className="text-gray-400 mt-1">Work with other artists and split revenue</p>
+            <p className="text-gray-400 mt-1">Work with other creators and split revenue</p>
           </div>
           <button
             onClick={() => setShowInviteForm(!showInviteForm)}
@@ -99,7 +99,7 @@ export default function CollaborationsPage() {
             <h2 className="text-lg font-bold mb-4">Invite Collaborator</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div>
-                <label className="text-sm text-gray-400 block mb-1">Artist Name or Email</label>
+                <label className="text-sm text-gray-400 block mb-1">Creator Name or Email</label>
                 <input
                   type="text"
                   value={inviteSearch}

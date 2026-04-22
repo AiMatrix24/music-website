@@ -127,7 +127,7 @@ export default function MentorshipPage() {
             Connect with a <span className="text-red-500">Mentor</span>
           </h1>
           <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-            Get matched with established artists who can help accelerate your music career. Personalized guidance from those who have been there.
+            Get matched with established creators who can help accelerate your music career. Personalized guidance from those who have been there.
           </p>
         </div>
 
@@ -321,7 +321,7 @@ export default function MentorshipPage() {
         <div className="bg-gradient-to-br from-red-600/10 to-purple-600/10 border border-red-500/20 rounded-2xl p-8 text-center">
           <h2 className="text-2xl font-bold mb-3">Become a Mentor</h2>
           <p className="text-gray-400 max-w-xl mx-auto mb-6">
-            Share your experience and help the next generation of artists grow. Mentors earn OPYNX credits and build their reputation.
+            Share your experience and help the next generation of creators grow. Mentors earn OPYNX credits and build their reputation.
           </p>
           <div className="flex flex-wrap justify-center gap-3 mb-6 text-sm text-gray-400">
             {['2+ years music experience', 'Active OPYNX profile', 'Consistent availability', 'Passion for teaching'].map((req) => (

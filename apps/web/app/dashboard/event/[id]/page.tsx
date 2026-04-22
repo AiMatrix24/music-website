@@ -122,7 +122,7 @@ export default function EventManagePage() {
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <div className="w-3 h-3 rounded-full bg-red-500" />
-                    <span className="text-gray-400">Artist (85%)</span>
+                    <span className="text-gray-400">Creator (85%)</span>
                   </div>
                   <p className="font-bold text-red-400">${(artistRevenue / 100).toFixed(2)}</p>
                 </div>

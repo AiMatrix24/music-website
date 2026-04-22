@@ -65,7 +65,7 @@ const OPPORTUNITIES = [
   },
   {
     id: 5,
-    headliner: 'Various Artists',
+    headliner: 'Various Creators',
     avatar: 'V',
     eventTitle: 'Showcase Night — 5 Openers Needed',
     venue: 'The Basement',
@@ -203,7 +203,7 @@ export default function ApplyOpenerPage() {
             Open for a Headliner
           </h1>
           <p className="text-gray-400 mt-2 max-w-xl">
-            Get discovered by performing alongside established artists. Browse available opener
+            Get discovered by performing alongside established creators. Browse available opener
             slots, apply with your best work, and land your next big stage.
           </p>
         </div>
@@ -276,7 +276,7 @@ export default function ApplyOpenerPage() {
                   <div className="border-t border-brand-800/20 p-5 space-y-4">
                     {/* Auto-filled profile summary */}
                     <div className="rounded-xl bg-brand-950/50 border border-brand-800/10 p-3">
-                      <p className="text-xs text-gray-500 mb-1">Your Artist Profile</p>
+                      <p className="text-xs text-gray-500 mb-1">Your Creator Profile</p>
                       <p className="text-sm font-medium">{session?.user?.name || 'Your Name'}</p>
                       <p className="text-xs text-gray-500">{session?.user?.email}</p>
                     </div>

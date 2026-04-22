@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     template: '%s | OPYNX',
   },
   description:
-    'The FanEngage Protocol. Subscribe directly to artists for $8.73/mo. Transparent on-chain revenue sharing. No middlemen.',
+    'The FanEngage Protocol. Subscribe directly to creators for $8.73/mo. Transparent on-chain revenue sharing. No middlemen.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
@@ -42,21 +42,21 @@ export const metadata: Metadata = {
     siteName: 'OPYNX',
     title: 'OPYNX — Direct-to-Fan Music & Events',
     description:
-      'Subscribe directly to artists. Transparent on-chain revenue sharing on Polygon. No middlemen.',
+      'Subscribe directly to creators. Transparent on-chain revenue sharing on Polygon. No middlemen.',
     locale: 'en_US',
   },
   twitter: {
     card: 'summary_large_image',
     title: 'OPYNX — Direct-to-Fan Music & Events',
     description:
-      'Subscribe directly to artists. Transparent revenue sharing. No middlemen.',
+      'Subscribe directly to creators. Transparent revenue sharing. No middlemen.',
   },
   keywords: [
     'music streaming',
     'direct to fan',
     'web3 music',
     'polygon',
-    'artist platform',
+    'creator platform',
     'transparent revenue',
     'OPYNX',
   ],

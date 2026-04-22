@@ -87,7 +87,7 @@ export default function AccessibilityPage() {
               <li>The audio waveform visualizer in the music player does not yet have a full text alternative.</li>
               <li>Some older embedded content from third-party sources may not meet all accessibility standards.</li>
               <li>Live streaming chat may have limited screen reader support during high-volume periods.</li>
-              <li>Certain data visualizations in the artist analytics dashboard are being updated with better alt text and data tables.</li>
+              <li>Certain data visualizations in the creator analytics dashboard are being updated with better alt text and data tables.</li>
               <li>PDF documents (receipts, contracts) are being converted to accessible formats.</li>
             </ul>
             <p className="mt-2">

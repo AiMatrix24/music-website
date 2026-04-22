@@ -8,20 +8,20 @@ const CONTRACT_ADDRESS = '0x7a3B...f2e1';
 const FULL_CONTRACT = '0x7a3B8c9D4e5F6a7B8c9D4e5F6a7B8c9D4ef2e1';
 
 const PAYOUTS = [
-  { date: '2026-03-27', artist: 'Cipher', amount: '1,245.00', txHash: '0x1a2b3c...9f8e7d', fullHash: '0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f9f8e7d', status: 'confirmed' },
-  { date: '2026-03-26', artist: 'NeonWave', amount: '892.50', txHash: '0x2b3c4d...8e7d6c', fullHash: '0x2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f8e7d6c', status: 'confirmed' },
-  { date: '2026-03-25', artist: 'BeatDropper', amount: '2,150.75', txHash: '0x3c4d5e...7d6c5b', fullHash: '0x3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f7d6c5b', status: 'confirmed' },
-  { date: '2026-03-24', artist: 'VoxQueen', amount: '567.25', txHash: '0x4d5e6f...6c5b4a', fullHash: '0x4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f6c5b4a', status: 'confirmed' },
-  { date: '2026-03-23', artist: 'SynthLord', amount: '1,890.00', txHash: '0x5e6f7a...5b4a39', fullHash: '0x5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f5b4a39', status: 'confirmed' },
-  { date: '2026-03-22', artist: 'IndieStar', amount: '445.50', txHash: '0x6f7a8b...4a3928', fullHash: '0x6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f4a3928', status: 'confirmed' },
-  { date: '2026-03-21', artist: 'ChillProducer', amount: '3,200.00', txHash: '0x7a8b9c...392817', fullHash: '0x7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f392817', status: 'confirmed' },
-  { date: '2026-03-20', artist: 'LoopMaster', amount: '780.00', txHash: '0x8b9c0d...281706', fullHash: '0x8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f281706', status: 'confirmed' },
+  { date: '2026-03-27', creator: 'Cipher', amount: '1,245.00', txHash: '0x1a2b3c...9f8e7d', fullHash: '0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f9f8e7d', status: 'confirmed' },
+  { date: '2026-03-26', creator: 'NeonWave', amount: '892.50', txHash: '0x2b3c4d...8e7d6c', fullHash: '0x2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f8e7d6c', status: 'confirmed' },
+  { date: '2026-03-25', creator: 'BeatDropper', amount: '2,150.75', txHash: '0x3c4d5e...7d6c5b', fullHash: '0x3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f7d6c5b', status: 'confirmed' },
+  { date: '2026-03-24', creator: 'VoxQueen', amount: '567.25', txHash: '0x4d5e6f...6c5b4a', fullHash: '0x4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f6c5b4a', status: 'confirmed' },
+  { date: '2026-03-23', creator: 'SynthLord', amount: '1,890.00', txHash: '0x5e6f7a...5b4a39', fullHash: '0x5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f5b4a39', status: 'confirmed' },
+  { date: '2026-03-22', creator: 'IndieStar', amount: '445.50', txHash: '0x6f7a8b...4a3928', fullHash: '0x6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f4a3928', status: 'confirmed' },
+  { date: '2026-03-21', creator: 'ChillProducer', amount: '3,200.00', txHash: '0x7a8b9c...392817', fullHash: '0x7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f392817', status: 'confirmed' },
+  { date: '2026-03-20', creator: 'LoopMaster', amount: '780.00', txHash: '0x8b9c0d...281706', fullHash: '0x8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f281706', status: 'confirmed' },
 ];
 
 const STEPS = [
-  { icon: '1', title: 'Fan Subscribes', desc: 'A fan subscribes to an artist or purchases content on OPYNX' },
+  { icon: '1', title: 'Fan Subscribes', desc: 'A fan subscribes to an creator or purchases content on OPYNX' },
   { icon: '2', title: 'Smart Contract Splits', desc: 'Payment is automatically split according to the on-chain agreement' },
-  { icon: '3', title: 'Artist Receives USDC', desc: 'Artist receives their share directly in USDC on Polygon' },
+  { icon: '3', title: 'Creator Receives USDC', desc: 'Creator receives their share directly in USDC on Polygon' },
   { icon: '4', title: 'Verified on Polygon', desc: 'Every transaction is publicly verifiable on the Polygon blockchain' },
 ];
 
@@ -150,7 +150,7 @@ export default function BlockchainPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
           {[
             { label: 'Total Payouts', value: '2,847', color: 'text-green-400' },
-            { label: 'Artists Paid', value: '412', color: 'text-purple-400' },
+            { label: 'Creators Paid', value: '412', color: 'text-purple-400' },
             { label: 'Average Payout', value: '$44.78', color: 'text-blue-400' },
             { label: 'Contract Version', value: 'v2.4.1', color: 'text-red-400' },
           ].map((stat) => (
@@ -171,7 +171,7 @@ export default function BlockchainPage() {
               <thead>
                 <tr className="text-left text-sm text-gray-400 border-b border-brand-800/20">
                   <th className="px-6 py-3 font-medium">Date</th>
-                  <th className="px-6 py-3 font-medium">Artist</th>
+                  <th className="px-6 py-3 font-medium">Creator</th>
                   <th className="px-6 py-3 font-medium">Amount (USDC)</th>
                   <th className="px-6 py-3 font-medium">Tx Hash</th>
                   <th className="px-6 py-3 font-medium">Status</th>
@@ -181,7 +181,7 @@ export default function BlockchainPage() {
                 {PAYOUTS.map((p, i) => (
                   <tr key={i} className="border-b border-brand-800/10 hover:bg-brand-800/10 transition">
                     <td className="px-6 py-4 text-sm text-gray-300">{p.date}</td>
-                    <td className="px-6 py-4 text-sm font-medium">{p.artist}</td>
+                    <td className="px-6 py-4 text-sm font-medium">{p.creator}</td>
                     <td className="px-6 py-4 text-sm text-green-400 font-mono">${p.amount}</td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">

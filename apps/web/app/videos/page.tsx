@@ -14,14 +14,14 @@ const filterTabs: { key: FilterTab; label: string }[] = [
 ];
 
 const videos = [
-  { id: 1, title: 'Midnight Drive (Official Video)', artist: 'KAEL', views: 1283400, date: 'Mar 15, 2026', duration: '4:12', gradient: 'from-red-700 to-purple-800', category: 'official' as FilterTab },
-  { id: 2, title: 'Neon Horizon — Live at The Warehouse', artist: 'Aria Frost', views: 847200, date: 'Mar 10, 2026', duration: '6:45', gradient: 'from-cyan-700 to-blue-900', category: 'live' as FilterTab },
-  { id: 3, title: 'Velvet Chains (Visualizer)', artist: 'Luna Voss', views: 592100, date: 'Mar 8, 2026', duration: '3:48', gradient: 'from-pink-600 to-violet-800', category: 'visualizers' as FilterTab },
-  { id: 4, title: 'Making of "Shatter" — Studio Session', artist: 'DVRK MATTER', views: 324700, date: 'Mar 5, 2026', duration: '12:34', gradient: 'from-amber-700 to-red-900', category: 'bts' as FilterTab },
-  { id: 5, title: 'Ghost Frequency (Official Video)', artist: 'KAEL', views: 1102300, date: 'Feb 28, 2026', duration: '3:55', gradient: 'from-emerald-700 to-teal-900', category: 'official' as FilterTab },
-  { id: 6, title: 'Paper Crowns — Rooftop Session', artist: 'Mira Chen', views: 678900, date: 'Feb 22, 2026', duration: '5:20', gradient: 'from-orange-600 to-rose-800', category: 'live' as FilterTab },
-  { id: 7, title: 'Low Tide (Visualizer)', artist: 'Oceanic', views: 445600, date: 'Feb 18, 2026', duration: '4:02', gradient: 'from-indigo-600 to-blue-900', category: 'visualizers' as FilterTab },
-  { id: 8, title: 'Wildfire (Official Video)', artist: 'Sage & the Saints', views: 923400, date: 'Feb 12, 2026', duration: '4:38', gradient: 'from-yellow-600 to-amber-900', category: 'official' as FilterTab },
+  { id: 1, title: 'Midnight Drive (Official Video)', creator: 'KAEL', views: 1283400, date: 'Mar 15, 2026', duration: '4:12', gradient: 'from-red-700 to-purple-800', category: 'official' as FilterTab },
+  { id: 2, title: 'Neon Horizon — Live at The Warehouse', creator: 'Aria Frost', views: 847200, date: 'Mar 10, 2026', duration: '6:45', gradient: 'from-cyan-700 to-blue-900', category: 'live' as FilterTab },
+  { id: 3, title: 'Velvet Chains (Visualizer)', creator: 'Luna Voss', views: 592100, date: 'Mar 8, 2026', duration: '3:48', gradient: 'from-pink-600 to-violet-800', category: 'visualizers' as FilterTab },
+  { id: 4, title: 'Making of "Shatter" — Studio Session', creator: 'DVRK MATTER', views: 324700, date: 'Mar 5, 2026', duration: '12:34', gradient: 'from-amber-700 to-red-900', category: 'bts' as FilterTab },
+  { id: 5, title: 'Ghost Frequency (Official Video)', creator: 'KAEL', views: 1102300, date: 'Feb 28, 2026', duration: '3:55', gradient: 'from-emerald-700 to-teal-900', category: 'official' as FilterTab },
+  { id: 6, title: 'Paper Crowns — Rooftop Session', creator: 'Mira Chen', views: 678900, date: 'Feb 22, 2026', duration: '5:20', gradient: 'from-orange-600 to-rose-800', category: 'live' as FilterTab },
+  { id: 7, title: 'Low Tide (Visualizer)', creator: 'Oceanic', views: 445600, date: 'Feb 18, 2026', duration: '4:02', gradient: 'from-indigo-600 to-blue-900', category: 'visualizers' as FilterTab },
+  { id: 8, title: 'Wildfire (Official Video)', creator: 'Sage & the Saints', views: 923400, date: 'Feb 12, 2026', duration: '4:38', gradient: 'from-yellow-600 to-amber-900', category: 'official' as FilterTab },
 ];
 
 function formatViews(n: number): string {
@@ -102,7 +102,7 @@ export default function VideosPage() {
               </div>
               <div className="p-3">
                 <h3 className="font-bold text-sm text-white group-hover:text-red-400 transition line-clamp-2">{video.title}</h3>
-                <p className="text-xs text-gray-500 mt-1">{video.artist}</p>
+                <p className="text-xs text-gray-500 mt-1">{video.creator}</p>
                 <p className="text-xs text-gray-600 mt-1">{formatViews(video.views)} views &middot; {video.date}</p>
               </div>
             </Link>

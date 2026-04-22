@@ -26,7 +26,7 @@ interface JournalEntry {
   mood: string;
   moodLabel: string;
   track: string;
-  artist: string;
+  creator: string;
   text: string;
   tags: string[];
 }
@@ -39,7 +39,7 @@ const MOCK_ENTRIES: JournalEntry[] = [
     mood: '\u{1F60A}',
     moodLabel: 'Happy',
     track: 'Neon Highway',
-    artist: 'ZVRA',
+    creator: 'ZVRA',
     text: 'Discovered this track on the way to work and it completely changed my morning. The synth layers feel like driving through a city at night.',
     tags: ['Road Trip', 'Memories'],
   },
@@ -50,7 +50,7 @@ const MOCK_ENTRIES: JournalEntry[] = [
     mood: '\u{1F60C}',
     moodLabel: 'Chill',
     track: 'Ocean Protocol',
-    artist: 'Mira Solis',
+    creator: 'Mira Solis',
     text: 'Perfect background for a rainy afternoon. Made some tea and just let this wash over me. Exactly what I needed today.',
     tags: ['Late Night', 'Studying'],
   },
@@ -61,7 +61,7 @@ const MOCK_ENTRIES: JournalEntry[] = [
     mood: '\u{1F624}',
     moodLabel: 'Energetic',
     track: 'Phantom Signal',
-    artist: 'KVLT',
+    creator: 'KVLT',
     text: 'Hit a new PR at the gym with this blasting. The drop at 2:15 gives me superhuman strength apparently.',
     tags: ['Workout'],
   },
@@ -72,7 +72,7 @@ const MOCK_ENTRIES: JournalEntry[] = [
     mood: '\u{1F914}',
     moodLabel: 'Reflective',
     track: 'Crystal Waves',
-    artist: 'ZVRA',
+    creator: 'ZVRA',
     text: 'This song reminds me of last summer. Funny how music can transport you to a specific moment in time.',
     tags: ['Memories', 'Walking'],
   },
@@ -83,7 +83,7 @@ const MOCK_ENTRIES: JournalEntry[] = [
     mood: '\u{1F622}',
     moodLabel: 'Sad',
     track: 'Deep Currents',
-    artist: 'Undertow',
+    creator: 'Undertow',
     text: 'One of those days where you need music that understands you. This track has such beautiful melancholy in its chord progression.',
     tags: ['Late Night'],
   },
@@ -94,7 +94,7 @@ const MOCK_ENTRIES: JournalEntry[] = [
     mood: '\u{1F60A}',
     moodLabel: 'Happy',
     track: 'Solar Drift',
-    artist: 'Aether',
+    creator: 'Aether',
     text: 'Cooked a big dinner for friends with this album on repeat. Everyone asked what was playing. Great conversation starter.',
     tags: ['Cooking', 'Memories'],
   },
@@ -174,7 +174,7 @@ export default function JournalPage() {
       mood: entryMood,
       moodLabel: moodOption?.label || '',
       track: entryTrack || 'Unknown Track',
-      artist: 'Unknown Artist',
+      creator: 'Unknown Creator',
       text: entryText,
       tags: entryTags,
     };
@@ -314,7 +314,7 @@ export default function JournalPage() {
                   type="text"
                   value={entryTrack}
                   onChange={(e) => setEntryTrack(e.target.value)}
-                  placeholder="Track name or artist..."
+                  placeholder="Track name or creator..."
                   className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-red-600/50"
                 />
               </div>
@@ -400,7 +400,7 @@ export default function JournalPage() {
                             </div>
                             <div className="min-w-0">
                               <p className="text-sm font-semibold truncate">{entry.track}</p>
-                              <p className="text-xs text-gray-500 truncate">{entry.artist}</p>
+                              <p className="text-xs text-gray-500 truncate">{entry.creator}</p>
                             </div>
                           </div>
                           <p className="text-gray-300 text-sm leading-relaxed mb-3">{entry.text}</p>
@@ -485,7 +485,7 @@ export default function JournalPage() {
                   <p className="font-semibold">{STATS.topMood}</p>
                 </div>
                 <div className="border-t border-white/5 pt-3">
-                  <p className="text-sm text-gray-400">Most Journaled Artist</p>
+                  <p className="text-sm text-gray-400">Most Journaled Creator</p>
                   <p className="font-semibold">{STATS.topArtist}</p>
                 </div>
                 <div className="border-t border-white/5 pt-3">

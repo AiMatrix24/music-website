@@ -8,7 +8,7 @@ const MOCK_PROJECTS = [
   {
     id: 1,
     title: 'Midnight Sessions — Full-Length Album',
-    artist: 'Luna Vega',
+    creator: 'Luna Vega',
     description: 'Help fund the recording of my debut full-length album, featuring 12 original tracks produced at Sunset Sound Studios.',
     goal: 15000,
     raised: 11250,
@@ -25,7 +25,7 @@ const MOCK_PROJECTS = [
   {
     id: 2,
     title: 'Neon Dreams — Music Video',
-    artist: 'KVLT Collective',
+    creator: 'KVLT Collective',
     description: 'We\'re producing a cinematic music video for our single "Neon Dreams" with a full production crew and VFX team.',
     goal: 8000,
     raised: 5600,
@@ -42,7 +42,7 @@ const MOCK_PROJECTS = [
   {
     id: 3,
     title: 'West Coast Tour Fund',
-    artist: 'The Broken Signals',
+    creator: 'The Broken Signals',
     description: 'Help us hit the road! Funding a 10-city West Coast tour with stops from San Diego to Seattle this summer.',
     goal: 25000,
     raised: 8750,
@@ -89,7 +89,7 @@ export default function CrowdfundingPage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mt-4 mb-8 gap-4">
         <div>
           <h1 className="text-3xl md:text-4xl font-bold">Fan-Funded Projects</h1>
-          <p className="text-gray-400 mt-1">Support the artists you love. Fund the music that matters.</p>
+          <p className="text-gray-400 mt-1">Support the creators you love. Fund the music that matters.</p>
         </div>
         <button onClick={() => setShowForm(!showForm)} className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-3 rounded-xl transition whitespace-nowrap">
           {showForm ? 'Cancel' : 'Start a Project'}
@@ -113,7 +113,7 @@ export default function CrowdfundingPage() {
 
       <div className="bg-[#15151f] rounded-xl p-4 mb-10 border border-red-600/20">
         <p className="text-gray-300 text-sm text-center">
-          <span className="text-red-500 font-semibold">All-or-nothing funding:</span> Projects must reach their full goal by the deadline. If the goal isn&apos;t met, all backers are refunded. This ensures artists only receive funds when they can deliver on their promises.
+          <span className="text-red-500 font-semibold">All-or-nothing funding:</span> Projects must reach their full goal by the deadline. If the goal isn&apos;t met, all backers are refunded. This ensures creators only receive funds when they can deliver on their promises.
         </p>
       </div>
 
@@ -175,7 +175,7 @@ export default function CrowdfundingPage() {
                 </div>
                 <div className="flex-1">
                   <h3 className="text-white font-bold text-lg">{project.title}</h3>
-                  <p className="text-red-500 text-sm font-medium">{project.artist}</p>
+                  <p className="text-red-500 text-sm font-medium">{project.creator}</p>
                   <p className="text-gray-400 text-sm mt-2">{project.description}</p>
 
                   <div className="mt-4">

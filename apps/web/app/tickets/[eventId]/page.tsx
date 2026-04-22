@@ -449,7 +449,7 @@ export default function TicketPurchasePage() {
                   <div className="mt-4 p-3 bg-brand-950/50 rounded-lg">
                     <p className="text-xs text-gray-500 mb-2">Where your money goes:</p>
                     <div className="space-y-1 text-xs">
-                      <div className="flex justify-between"><span className="text-gray-500">Artist (85%)</span><span className="text-red-400">${(total * 0.85).toFixed(2)}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500">Creator (85%)</span><span className="text-red-400">${(total * 0.85).toFixed(2)}</span></div>
                       <div className="flex justify-between"><span className="text-gray-500">Facilitator (5%)</span><span className="text-pink-400">${(total * 0.05).toFixed(2)}</span></div>
                       <div className="flex justify-between"><span className="text-gray-500">Platform (10%)</span><span className="text-cyan-400">${(total * 0.10).toFixed(2)}</span></div>
                     </div>

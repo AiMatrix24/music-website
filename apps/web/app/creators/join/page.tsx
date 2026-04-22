@@ -81,7 +81,7 @@ export default function CreatorJoinPage() {
             <span className="text-red-500">OPYNX</span>
           </h1>
           <p className="text-gray-400 text-lg max-w-xl mx-auto">
-            The platform built for independent artists. Upload music, sell
+            The platform built for independent creators. Upload music, sell
             tickets, track earnings, and connect directly with your fans.
           </p>
         </div>

@@ -69,11 +69,11 @@ const WEEKLY: Record<string, Slot[]> = {
 
 const SHOWS = [
   { id: 'nmm', title: 'New Music Monday', host: 'Scout', time: 'Mon 10am-12pm', desc: 'First listens and deep dives on the week\'s most important new releases from the OPYNX roster.', color: 'from-red-600 to-orange-500' },
-  { id: 'tbt', title: 'Throwback Thursday', host: 'Classic Cal', time: 'Thu 6-8pm', desc: 'Classic tracks from 70s funk to 2000s indie — the songs that shaped the artists we love.', color: 'from-amber-600 to-yellow-500' },
-  { id: 'sfs', title: 'Superfan Saturday', host: 'Mia Rivers', time: 'Sat 2-5pm', desc: 'Exclusive content for OPYNX supporters: unreleased tracks, demos, and artist Q&As.', color: 'from-purple-600 to-pink-500' },
+  { id: 'tbt', title: 'Throwback Thursday', host: 'Classic Cal', time: 'Thu 6-8pm', desc: 'Classic tracks from 70s funk to 2000s indie — the songs that shaped the creators we love.', color: 'from-amber-600 to-yellow-500' },
+  { id: 'sfs', title: 'Superfan Saturday', host: 'Mia Rivers', time: 'Sat 2-5pm', desc: 'Exclusive content for OPYNX supporters: unreleased tracks, demos, and creator Q&As.', color: 'from-purple-600 to-pink-500' },
   { id: 'isp', title: 'Indie Spotlight', host: 'Ivy Blake', time: 'Tue 8-10pm', desc: 'Two hours dedicated to emerging creators breaking out on the network this week.', color: 'from-emerald-500 to-teal-500' },
   { id: 'lnu', title: 'Late Night Underground', host: 'Nocturne', time: 'Nightly 11pm-2am', desc: 'Deep electronic, ambient, and the sounds of the after-hours scene from around the world.', color: 'from-slate-600 to-zinc-500' },
-  { id: 'md', title: 'Morning Drive', host: 'DJ Kora', time: 'Weekdays 6-10am', desc: 'Your commute companion — energetic picks, artist news, and the day\'s top charted tracks.', color: 'from-sky-500 to-indigo-500' },
+  { id: 'md', title: 'Morning Drive', host: 'DJ Kora', time: 'Weekdays 6-10am', desc: 'Your commute companion — energetic picks, creator news, and the day\'s top charted tracks.', color: 'from-sky-500 to-indigo-500' },
   { id: 'ww', title: 'Wax Wednesday', host: 'Vinyl Vic', time: 'Wed 7-9pm', desc: 'All-vinyl sets from classic LPs, rare pressings, and crate-dug gems.', color: 'from-rose-600 to-red-700' },
   { id: 'wr', title: 'Weekly Rewind', host: 'Scout', time: 'Sun 7-9pm', desc: 'Everything you missed — the best segments, drops, and listener moments from the week.', color: 'from-cyan-500 to-blue-600' },
 ];

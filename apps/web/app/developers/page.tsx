@@ -112,7 +112,7 @@ export default function DevelopersPage() {
                     <EndpointBadge method="GET" />
                     <code className="text-sm text-gray-300 font-mono">/v1/tracks</code>
                   </div>
-                  <p className="text-sm text-gray-400 mb-3">List all tracks. Supports pagination and filtering by genre, artist, or BPM.</p>
+                  <p className="text-sm text-gray-400 mb-3">List all tracks. Supports pagination and filtering by genre, creator, or BPM.</p>
                   <p className="text-xs text-gray-500 mb-2">Parameters: <code className="text-gray-400">page</code>, <code className="text-gray-400">limit</code>, <code className="text-gray-400">genre</code>, <code className="text-gray-400">artist_id</code>, <code className="text-gray-400">bpm_min</code>, <code className="text-gray-400">bpm_max</code></p>
                   <CodeBlock>{`curl https://api.opynx.dev/v1/tracks?genre=synthwave&limit=10 \\
   -H "Authorization: Bearer YOUR_API_KEY"`}</CodeBlock>
@@ -123,7 +123,7 @@ export default function DevelopersPage() {
     {
       "id": "trk_abc123",
       "title": "Midnight Drive",
-      "artist": { "id": "art_xyz", "name": "NeonWave" },
+      "creator": { "id": "art_xyz", "name": "NeonWave" },
       "genre": "synthwave",
       "bpm": 120,
       "duration": 225,
@@ -163,7 +163,7 @@ export default function DevelopersPage() {
                     <EndpointBadge method="GET" />
                     <code className="text-sm text-gray-300 font-mono">/v1/events</code>
                   </div>
-                  <p className="text-sm text-gray-400 mb-3">List upcoming events. Filter by location, date range, or artist.</p>
+                  <p className="text-sm text-gray-400 mb-3">List upcoming events. Filter by location, date range, or creator.</p>
                   <p className="text-xs text-gray-500 mb-2">Parameters: <code className="text-gray-400">page</code>, <code className="text-gray-400">limit</code>, <code className="text-gray-400">city</code>, <code className="text-gray-400">date_from</code>, <code className="text-gray-400">date_to</code>, <code className="text-gray-400">artist_id</code></p>
                   <CodeBlock>{`curl https://api.opynx.dev/v1/events?city=los-angeles&limit=5 \\
   -H "Authorization: Bearer YOUR_API_KEY"`}</CodeBlock>

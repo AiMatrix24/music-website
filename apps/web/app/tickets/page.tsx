@@ -32,7 +32,7 @@ export default function TicketsPage() {
       {/* Hero */}
       <section className="relative py-20 px-6 bg-gradient-to-b from-red-950/30 via-brand-950 to-brand-950">
         <div className="max-w-5xl mx-auto text-center">
-          <p className="text-sm font-semibold uppercase tracking-[4px] text-red-500 mb-4">Direct from Artists</p>
+          <p className="text-sm font-semibold uppercase tracking-[4px] text-red-500 mb-4">Direct from Creators</p>
           <h1 className="text-4xl md:text-6xl font-black mb-4">
             Live Events & <span className="text-red-500">Tickets</span>
           </h1>
@@ -46,7 +46,7 @@ export default function TicketsPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search events, artists, venues..."
+              placeholder="Search events, creators, venues..."
               className="w-full bg-[#15151f] border border-brand-800/30 rounded-full px-6 py-4 text-white placeholder:text-gray-500 focus:border-red-600 outline-none transition pr-12"
             />
             <svg className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -162,7 +162,7 @@ export default function TicketsPage() {
       <section className="py-16 px-6 bg-[#15151f]/50">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-2xl font-bold mb-2">Recommended For You</h2>
-          <p className="text-gray-400 text-sm mb-8">Based on your listening history and followed artists</p>
+          <p className="text-gray-400 text-sm mb-8">Based on your listening history and followed creators</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {(events ?? []).slice(0, 3).map((event) => {
               const d = new Date(event.startDate);
@@ -177,7 +177,7 @@ export default function TicketsPage() {
                   </div>
                   <div className="p-4">
                     <h3 className="font-bold truncate">{event.title}</h3>
-                    <p className="text-xs text-gray-500 mt-1">{event.hostName ?? 'Artist'}</p>
+                    <p className="text-xs text-gray-500 mt-1">{event.hostName ?? 'Creator'}</p>
                     <p className="text-xs text-red-400 font-semibold mt-2">Recommended for you</p>
                   </div>
                 </Link>
@@ -194,7 +194,7 @@ export default function TicketsPage() {
             How <span className="text-red-500">OpynX</span> Tickets Work
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <HowItWorksCard step="1" title="Artist Lists Event" description="Artists set their own prices, tiers, and capacity. No middlemen markup." />
+            <HowItWorksCard step="1" title="Creator Lists Event" description="Creators set their own prices, tiers, and capacity. No middlemen markup." />
             <HowItWorksCard step="2" title="You Buy Direct" description="Pay with USDC or card. Anti-scalper verified. Group discounts available." />
             <HowItWorksCard step="3" title="Get QR Ticket" description="Unique QR code tied to your identity. Optional ticket insurance." />
             <HowItWorksCard step="4" title="Scan & Enter" description="Show your QR at the venue. ADA accessible. Instant verification." />

@@ -83,7 +83,7 @@ export default function TrackDetailPage() {
                 track={{
                   id: track.id,
                   title: track.title,
-                  artist: track.artistName ?? undefined,
+                  creator: track.artistName ?? undefined,
                   genre: track.genre ?? undefined,
                   duration: track.duration ?? undefined,
                 }}

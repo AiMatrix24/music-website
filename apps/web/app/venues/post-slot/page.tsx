@@ -17,7 +17,7 @@ const SLOT_TYPES = [
   'Support Act / Opener',
   'Headliner',
   'New Music Test Night',
-  'Showcase / Multi-Artist',
+  'Showcase / Multi-Creator',
   'Private Event',
 ];
 
@@ -82,7 +82,7 @@ export default function PostSlotPage() {
       toast('Please fill in all required fields', 'error');
       return;
     }
-    toast('Slot posted successfully! Artists can now apply.', 'success');
+    toast('Slot posted successfully! Creators can now apply.', 'success');
   };
 
   const handleRemoveSlot = (id: number) => {
@@ -124,7 +124,7 @@ export default function PostSlotPage() {
             Back to Venues
           </Link>
           <h1 className="mt-2 text-3xl font-bold md:text-4xl">Post an Available Slot</h1>
-          <p className="mt-2 text-gray-300">Let artists know when your stage is available. Fill out the details below and start receiving applications.</p>
+          <p className="mt-2 text-gray-300">Let creators know when your stage is available. Fill out the details below and start receiving applications.</p>
         </div>
       </div>
 
@@ -206,7 +206,7 @@ export default function PostSlotPage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-300">How Many Artists</label>
+                <label className="mb-1.5 block text-sm font-medium text-gray-300">How Many Creators</label>
                 <input
                   type="number"
                   min="1"
@@ -280,7 +280,7 @@ export default function PostSlotPage() {
               )}
               {form.compensationType === 'door_split' && (
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-gray-300">Artist Door Split %</label>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-300">Creator Door Split %</label>
                   <div className="relative">
                     <input
                       type="number"

@@ -14,7 +14,7 @@ type SubscriptionTier = 'free' | 'standard' | 'superfan';
 interface TrackPurchaseInfo {
   id: string;
   title: string;
-  artist: string;
+  creator: string;
   coverArt: string | null;
   pricingModel: PricingModel;
   fixedPrice: number;       // in dollars
@@ -33,7 +33,7 @@ function getMockTrack(id: string): TrackPurchaseInfo {
   return {
     id,
     title: 'Voltage Drop',
-    artist: 'Cipher',
+    creator: 'Cipher',
     coverArt: null,
     pricingModel: 'pay-what-you-want',
     fixedPrice: 2.99,
@@ -88,7 +88,7 @@ export default function TrackBuyPage() {
           </div>
           <h1 className="text-2xl font-bold mb-2">Purchase Confirmed</h1>
           <p className="text-gray-400 mb-6">
-            You now own &ldquo;{track.title}&rdquo; by {track.artist}.
+            You now own &ldquo;{track.title}&rdquo; by {track.creator}.
           </p>
 
           <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6 mb-6 text-left space-y-3">
@@ -138,7 +138,7 @@ export default function TrackBuyPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold">{track.title}</h1>
-            <p className="text-gray-400">{track.artist}</p>
+            <p className="text-gray-400">{track.creator}</p>
           </div>
         </div>
 

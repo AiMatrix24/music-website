@@ -75,7 +75,7 @@ function LikedTracks() {
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-gray-400">{likedTracks.length} liked tracks</p>
         <button onClick={() => {
-          if (likedTracks[0]) play({ id: likedTracks[0].id, title: likedTracks[0].title, artist: likedTracks[0].artistName ?? 'Unknown', genre: likedTracks[0].genre ?? '', duration: likedTracks[0].duration ?? 0 });
+          if (likedTracks[0]) play({ id: likedTracks[0].id, title: likedTracks[0].title, creator: likedTracks[0].artistName ?? 'Unknown', genre: likedTracks[0].genre ?? '', duration: likedTracks[0].duration ?? 0 });
         }} className="rounded-full bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-500 transition">
           ▶ Play All
         </button>
@@ -83,7 +83,7 @@ function LikedTracks() {
       <div className="space-y-2">
         {likedTracks.map((track, i) => (
           <div key={track.id}
-            onClick={() => play({ id: track.id, title: track.title, artist: track.artistName ?? 'Unknown', genre: track.genre ?? '', duration: track.duration ?? 0 })}
+            onClick={() => play({ id: track.id, title: track.title, creator: track.artistName ?? 'Unknown', genre: track.genre ?? '', duration: track.duration ?? 0 })}
             className="flex items-center gap-4 rounded-xl bg-[#15151f] p-4 transition hover:bg-[#1a1a2e] cursor-pointer group">
             <span className="text-gray-500 text-sm w-6 text-right group-hover:hidden">{i + 1}</span>
             <span className="text-red-400 text-sm w-6 text-right hidden group-hover:block">▶</span>
@@ -162,7 +162,7 @@ function ListeningHistory() {
       <div className="space-y-2">
         {history.map((track) => (
           <div key={track.id + track.playedAt.toISOString()}
-            onClick={() => play({ id: track.id, title: track.title, artist: track.artistName ?? 'Unknown', genre: track.genre ?? '', duration: track.duration ?? 0 })}
+            onClick={() => play({ id: track.id, title: track.title, creator: track.artistName ?? 'Unknown', genre: track.genre ?? '', duration: track.duration ?? 0 })}
             className="flex items-center gap-4 rounded-xl bg-[#15151f] p-4 transition hover:bg-[#1a1a2e] cursor-pointer">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-sm font-bold">
               {track.genre?.charAt(0) ?? '♪'}
@@ -182,28 +182,28 @@ function ListeningHistory() {
 }
 
 function FollowingArtists() {
-  const { data: artists, isLoading } = trpc.users.listCreators.useQuery({ limit: 20 });
+  const { data: creators, isLoading } = trpc.users.listCreators.useQuery({ limit: 20 });
 
   if (isLoading) return <LoadingSkeleton />;
 
   // Mock: show first 4 as "followed"
-  const following = artists?.slice(0, 4) ?? [];
+  const following = creators?.slice(0, 4) ?? [];
 
   if (following.length === 0) {
-    return <EmptyTab icon="👤" title="Not following anyone" desc="Follow your favorite artists to see their updates here." actionLabel="Discover Artists" actionHref="/explore" />;
+    return <EmptyTab icon="👤" title="Not following anyone" desc="Follow your favorite creators to see their updates here." actionLabel="Discover Creators" actionHref="/explore" />;
   }
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      {following.map((artist) => (
-        <Link key={artist.id} href={`/artist/${artist.id}`}
+      {following.map((creator) => (
+        <Link key={creator.id} href={`/artist/${creator.id}`}
           className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-5 flex items-center gap-4 transition hover:bg-[#1a1a2e]">
           <div className="w-14 h-14 rounded-full bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-xl font-black shrink-0">
-            {artist.name?.charAt(0)?.toUpperCase() ?? '?'}
+            {creator.name?.charAt(0)?.toUpperCase() ?? '?'}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-bold truncate">{artist.name}</p>
-            <span className="text-xs text-red-400 capitalize">{artist.role}</span>
+            <p className="font-bold truncate">{creator.name}</p>
+            <span className="text-xs text-red-400 capitalize">{creator.role}</span>
           </div>
           <span className="text-xs bg-red-600/20 text-red-400 px-3 py-1 rounded-full font-semibold">Following</span>
         </Link>

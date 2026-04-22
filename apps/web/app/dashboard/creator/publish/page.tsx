@@ -17,7 +17,7 @@ type Exclusivity = 'open' | 'subscriber-only' | 'time-gated-24h' | 'time-gated-4
 interface TrackPublishSettings {
   id: string;
   title: string;
-  artist: string;
+  creator: string;
   visibility: Visibility;
   downloadable: Downloadable;
   license: License;
@@ -81,7 +81,7 @@ export default function PublishingPreferencesPage() {
         dbTracks.map((t) => ({
           id: t.id,
           title: t.title,
-          artist: (t as any).artistName ?? 'You',
+          creator: (t as any).artistName ?? 'You',
           visibility: mapVisibility(t.visibility),
           downloadable: 'yes' as Downloadable,
           license: 'all-rights-reserved' as License,

@@ -6,7 +6,7 @@ import { useState } from 'react';
 const liveStreams = [
   {
     id: 1,
-    artist: 'KAEL',
+    creator: 'KAEL',
     title: 'Late Night Synth Session',
     viewers: 1243,
     gradient: 'from-red-600 to-purple-800',
@@ -14,7 +14,7 @@ const liveStreams = [
   },
   {
     id: 2,
-    artist: 'Luna Voss',
+    creator: 'Luna Voss',
     title: 'New Album Listening Party',
     viewers: 3891,
     gradient: 'from-pink-600 to-red-800',
@@ -22,7 +22,7 @@ const liveStreams = [
   },
   {
     id: 3,
-    artist: 'Prism Collective',
+    creator: 'Prism Collective',
     title: 'Jazz Fusion Jam - Open Collab',
     viewers: 672,
     gradient: 'from-amber-600 to-orange-800',
@@ -31,20 +31,20 @@ const liveStreams = [
 ];
 
 const upcomingStreams = [
-  { id: 1, artist: 'DVRK MATTER', title: 'Freestyle Friday', date: 'Mar 28, 2026', time: '8:00 PM EST', reminded: false },
-  { id: 2, artist: 'Aria Frost', title: 'Studio Session: New EP Preview', date: 'Mar 29, 2026', time: '3:00 PM EST', reminded: false },
-  { id: 3, artist: 'The Koda', title: 'Acoustic Unplugged Set', date: 'Mar 30, 2026', time: '7:00 PM EST', reminded: false },
-  { id: 4, artist: 'Sage & the Saints', title: 'Songwriting Workshop', date: 'Apr 1, 2026', time: '5:00 PM EST', reminded: false },
-  { id: 5, artist: 'Mira Chen', title: 'Pop Production Masterclass', date: 'Apr 3, 2026', time: '2:00 PM EST', reminded: false },
+  { id: 1, creator: 'DVRK MATTER', title: 'Freestyle Friday', date: 'Mar 28, 2026', time: '8:00 PM EST', reminded: false },
+  { id: 2, creator: 'Aria Frost', title: 'Studio Session: New EP Preview', date: 'Mar 29, 2026', time: '3:00 PM EST', reminded: false },
+  { id: 3, creator: 'The Koda', title: 'Acoustic Unplugged Set', date: 'Mar 30, 2026', time: '7:00 PM EST', reminded: false },
+  { id: 4, creator: 'Sage & the Saints', title: 'Songwriting Workshop', date: 'Apr 1, 2026', time: '5:00 PM EST', reminded: false },
+  { id: 5, creator: 'Mira Chen', title: 'Pop Production Masterclass', date: 'Apr 3, 2026', time: '2:00 PM EST', reminded: false },
 ];
 
 const pastStreams = [
-  { id: 1, artist: 'KAEL', title: 'Beat Making Marathon', views: 12400, duration: '2h 34m', gradient: 'from-blue-600 to-indigo-800' },
-  { id: 2, artist: 'Luna Voss', title: 'Fan Q&A + Acoustic Covers', views: 8900, duration: '1h 12m', gradient: 'from-pink-600 to-rose-800' },
-  { id: 3, artist: 'Hex Theory', title: 'Post-Punk Noise Experiment', views: 5300, duration: '1h 45m', gradient: 'from-violet-600 to-purple-800' },
-  { id: 4, artist: 'Oceanic', title: 'Lo-Fi Chill Vibes', views: 15600, duration: '3h 10m', gradient: 'from-teal-600 to-cyan-800' },
-  { id: 5, artist: 'DVRK MATTER', title: 'Cypher Night Vol. 3', views: 21200, duration: '2h 05m', gradient: 'from-orange-600 to-red-800' },
-  { id: 6, artist: 'Prism Collective', title: 'Live from Jazz Cafe', views: 7100, duration: '1h 30m', gradient: 'from-amber-600 to-yellow-800' },
+  { id: 1, creator: 'KAEL', title: 'Beat Making Marathon', views: 12400, duration: '2h 34m', gradient: 'from-blue-600 to-indigo-800' },
+  { id: 2, creator: 'Luna Voss', title: 'Fan Q&A + Acoustic Covers', views: 8900, duration: '1h 12m', gradient: 'from-pink-600 to-rose-800' },
+  { id: 3, creator: 'Hex Theory', title: 'Post-Punk Noise Experiment', views: 5300, duration: '1h 45m', gradient: 'from-violet-600 to-purple-800' },
+  { id: 4, creator: 'Oceanic', title: 'Lo-Fi Chill Vibes', views: 15600, duration: '3h 10m', gradient: 'from-teal-600 to-cyan-800' },
+  { id: 5, creator: 'DVRK MATTER', title: 'Cypher Night Vol. 3', views: 21200, duration: '2h 05m', gradient: 'from-orange-600 to-red-800' },
+  { id: 6, creator: 'Prism Collective', title: 'Live from Jazz Cafe', views: 7100, duration: '1h 30m', gradient: 'from-amber-600 to-yellow-800' },
 ];
 
 function formatViewers(n: number): string {
@@ -77,7 +77,7 @@ export default function LivePage() {
         </div>
         <h1 className="text-4xl font-bold mb-3">Live Streaming</h1>
         <p className="text-gray-400 max-w-xl mx-auto">
-          Watch artists perform live, join listening parties, and connect with creators in real-time.
+          Watch creators perform live, join listening parties, and connect with creators in real-time.
         </p>
       </div>
 
@@ -119,7 +119,7 @@ export default function LivePage() {
 
               <div className="p-4">
                 <h3 className="font-semibold truncate">{stream.title}</h3>
-                <p className="text-sm text-gray-400">{stream.artist}</p>
+                <p className="text-sm text-gray-400">{stream.creator}</p>
                 <p className="text-xs text-gray-500 mt-1">Started {stream.started}</p>
               </div>
             </div>
@@ -141,7 +141,7 @@ export default function LivePage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold truncate">{stream.title}</p>
-                <p className="text-sm text-gray-400">{stream.artist}</p>
+                <p className="text-sm text-gray-400">{stream.creator}</p>
               </div>
               <div className="text-right hidden sm:block">
                 <p className="text-sm text-gray-300">{stream.date}</p>
@@ -187,7 +187,7 @@ export default function LivePage() {
               <div className="p-4">
                 <h3 className="font-semibold truncate text-sm">{stream.title}</h3>
                 <div className="flex justify-between items-center mt-1">
-                  <p className="text-sm text-gray-400">{stream.artist}</p>
+                  <p className="text-sm text-gray-400">{stream.creator}</p>
                   <p className="text-xs text-gray-500">{formatViewers(stream.views)} views</p>
                 </div>
               </div>
