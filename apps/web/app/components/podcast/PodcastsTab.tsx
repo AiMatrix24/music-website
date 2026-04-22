@@ -4,19 +4,34 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { trpc } from '@/lib/trpc/client';
 import { useToast } from '@/app/components/Toast';
-import { PodcastShowForm } from './PodcastShowForm';
-import { EpisodeForm } from './EpisodeForm';
+import { PodcastShowForm, type ExistingShow } from './PodcastShowForm';
+import { EpisodeForm, type ExistingEpisode } from './EpisodeForm';
+
+type Mode =
+  | { kind: 'list' }
+  | { kind: 'create-show' }
+  | { kind: 'edit-show'; show: ExistingShow }
+  | { kind: 'add-episode'; podcastId: string; podcastTitle: string }
+  | { kind: 'edit-episode'; podcastId: string; podcastTitle: string; episode: ExistingEpisode };
 
 export function PodcastsTab() {
   const { toast } = useToast();
   const myShows = trpc.podcasts.getMine.useQuery();
-  const [creatingShow, setCreatingShow] = useState(false);
-  const [activeShowId, setActiveShowId] = useState<string | null>(null);
+  const utils = trpc.useUtils();
+  const [mode, setMode] = useState<Mode>({ kind: 'list' });
 
   const deleteEpisode = trpc.podcastEpisodes.delete.useMutation({
     onSuccess: () => {
-      toast('Episode deleted');
-      myShows.refetch();
+      toast('Episode deleted', 'success');
+      utils.podcasts.getMine.invalidate();
+    },
+    onError: (err) => toast(err.message || 'Delete failed', 'error'),
+  });
+
+  const deleteShow = trpc.podcasts.delete.useMutation({
+    onSuccess: () => {
+      toast('Show deleted', 'success');
+      utils.podcasts.getMine.invalidate();
     },
     onError: (err) => toast(err.message || 'Delete failed', 'error'),
   });
@@ -26,11 +41,70 @@ export function PodcastsTab() {
   }
 
   const shows = myShows.data ?? [];
-  const activeShow = shows.find((s) => s.id === activeShowId);
 
+  // ── Edit/create overlay states ──
+  if (mode.kind === 'create-show') {
+    return (
+      <div className="space-y-4">
+        <button onClick={() => setMode({ kind: 'list' })} className="text-sm text-gray-400 hover:text-white">
+          ← Back to podcasts
+        </button>
+        <PodcastShowForm onCreated={() => setMode({ kind: 'list' })} onCancel={() => setMode({ kind: 'list' })} />
+      </div>
+    );
+  }
+
+  if (mode.kind === 'edit-show') {
+    return (
+      <div className="space-y-4">
+        <button onClick={() => setMode({ kind: 'list' })} className="text-sm text-gray-400 hover:text-white">
+          ← Back to podcasts
+        </button>
+        <PodcastShowForm
+          existing={mode.show}
+          onCreated={() => setMode({ kind: 'list' })}
+          onCancel={() => setMode({ kind: 'list' })}
+        />
+      </div>
+    );
+  }
+
+  if (mode.kind === 'add-episode') {
+    return (
+      <div className="space-y-4">
+        <button onClick={() => setMode({ kind: 'list' })} className="text-sm text-gray-400 hover:text-white">
+          ← Back to podcasts
+        </button>
+        <EpisodeForm
+          podcastId={mode.podcastId}
+          podcastTitle={mode.podcastTitle}
+          onSaved={() => setMode({ kind: 'list' })}
+          onCancel={() => setMode({ kind: 'list' })}
+        />
+      </div>
+    );
+  }
+
+  if (mode.kind === 'edit-episode') {
+    return (
+      <div className="space-y-4">
+        <button onClick={() => setMode({ kind: 'list' })} className="text-sm text-gray-400 hover:text-white">
+          ← Back to podcasts
+        </button>
+        <EpisodeForm
+          podcastId={mode.podcastId}
+          podcastTitle={mode.podcastTitle}
+          existing={mode.episode}
+          onSaved={() => setMode({ kind: 'list' })}
+          onCancel={() => setMode({ kind: 'list' })}
+        />
+      </div>
+    );
+  }
+
+  // ── List view ──
   return (
     <div className="space-y-6">
-      {/* Header + new show button */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold">My Podcasts</h2>
@@ -38,9 +112,9 @@ export function PodcastsTab() {
             Each show gets a public page and an RSS feed for Apple/Spotify/Pocket Casts.
           </p>
         </div>
-        {!creatingShow && shows.length > 0 && (
+        {shows.length > 0 && (
           <button
-            onClick={() => setCreatingShow(true)}
+            onClick={() => setMode({ kind: 'create-show' })}
             className="rounded-full bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-brand-500 transition"
           >
             + New Show
@@ -48,31 +122,9 @@ export function PodcastsTab() {
         )}
       </div>
 
-      {/* Empty state OR new show form */}
-      {(creatingShow || shows.length === 0) && (
-        <PodcastShowForm
-          onCreated={() => {
-            setCreatingShow(false);
-            myShows.refetch();
-          }}
-        />
-      )}
-
-      {/* Episode form (modal-ish, shown when activeShow set) */}
-      {activeShow && (
-        <EpisodeForm
-          podcastId={activeShow.id}
-          podcastTitle={activeShow.title}
-          onCreated={() => {
-            setActiveShowId(null);
-            myShows.refetch();
-          }}
-          onCancel={() => setActiveShowId(null)}
-        />
-      )}
-
-      {/* Show list */}
-      {shows.length > 0 && !activeShow && (
+      {shows.length === 0 ? (
+        <PodcastShowForm onCreated={() => myShows.refetch()} />
+      ) : (
         <div className="space-y-3">
           {shows.map((show) => (
             <div key={show.id} className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-5">
@@ -100,10 +152,31 @@ export function PodcastsTab() {
                   )}
                   <div className="flex flex-wrap gap-2">
                     <button
-                      onClick={() => setActiveShowId(show.id)}
+                      onClick={() => setMode({ kind: 'add-episode', podcastId: show.id, podcastTitle: show.title })}
                       className="rounded-full bg-brand-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-brand-500 transition"
                     >
                       + Add Episode
+                    </button>
+                    <button
+                      onClick={() =>
+                        setMode({
+                          kind: 'edit-show',
+                          show: {
+                            id: show.id,
+                            title: show.title,
+                            description: show.description,
+                            category: show.category,
+                            language: show.language,
+                            author: show.author,
+                            ownerEmail: show.ownerEmail,
+                            explicit: show.explicit,
+                            coverUrl: show.coverUrl,
+                          },
+                        })
+                      }
+                      className="rounded-full bg-brand-950 border border-brand-800/30 px-4 py-1.5 text-xs font-semibold text-gray-300 hover:text-white transition"
+                    >
+                      Edit
                     </button>
                     <Link
                       href={`/podcast/${show.slug}`}
@@ -119,14 +192,27 @@ export function PodcastsTab() {
                     >
                       RSS Feed
                     </Link>
+                    <button
+                      onClick={() => {
+                        if (
+                          confirm(
+                            `Delete "${show.title}" and all ${show.episodeCount} episode${show.episodeCount === 1 ? '' : 's'}? This cannot be undone.`
+                          )
+                        ) {
+                          deleteShow.mutate({ id: show.id });
+                        }
+                      }}
+                      className="rounded-full bg-red-950/40 border border-red-800/30 px-4 py-1.5 text-xs font-semibold text-red-400 hover:bg-red-900/40 hover:text-red-300 transition"
+                    >
+                      Delete Show
+                    </button>
                   </div>
                 </div>
               </div>
 
-              {/* Episode list */}
               {show.episodes.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-brand-800/20 space-y-2">
-                  {show.episodes.slice(0, 5).map((ep) => (
+                <div className="mt-4 pt-4 border-t border-brand-800/20 space-y-1">
+                  {show.episodes.slice(0, 8).map((ep) => (
                     <div key={ep.id} className="flex items-center justify-between gap-3 py-2">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{ep.title}</p>
@@ -136,20 +222,46 @@ export function PodcastsTab() {
                           {ep.publishedAt ? new Date(ep.publishedAt).toLocaleDateString() : 'draft'}
                         </p>
                       </div>
-                      <button
-                        onClick={() => {
-                          if (confirm(`Delete "${ep.title}"?`)) {
-                            deleteEpisode.mutate({ id: ep.id });
+                      <div className="flex gap-1 shrink-0">
+                        <button
+                          onClick={() =>
+                            setMode({
+                              kind: 'edit-episode',
+                              podcastId: show.id,
+                              podcastTitle: show.title,
+                              episode: {
+                                id: ep.id,
+                                podcastId: ep.podcastId,
+                                title: ep.title,
+                                description: ep.description,
+                                audioUrl: ep.audioUrl,
+                                duration: ep.duration,
+                                episodeNumber: ep.episodeNumber,
+                                seasonNumber: ep.seasonNumber,
+                                explicit: ep.explicit,
+                                episodeType: ep.episodeType,
+                              },
+                            })
                           }
-                        }}
-                        className="text-xs text-red-400 hover:text-red-300 px-2 py-1"
-                      >
-                        Delete
-                      </button>
+                          className="text-xs text-gray-400 hover:text-white px-2 py-1"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Delete "${ep.title}"?`)) {
+                              deleteEpisode.mutate({ id: ep.id });
+                            }
+                          }}
+                          className="text-xs text-red-400 hover:text-red-300 px-2 py-1"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   ))}
-                  {show.episodes.length > 5 && (
-                    <p className="text-xs text-gray-500">+{show.episodes.length - 5} more</p>
+                  {show.episodes.length > 8 && (
+                    <p className="text-xs text-gray-500">+{show.episodes.length - 8} more</p>
                   )}
                 </div>
               )}

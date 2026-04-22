@@ -1635,6 +1635,23 @@ const podcastsRouter = createRouter({
         .returning();
       return updated;
     }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const [existing] = await db
+        .select()
+        .from(podcasts)
+        .where(eq(podcasts.id, input.id))
+        .limit(1);
+      if (!existing) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (existing.userId !== ctx.session.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
+      // Episodes cascade-delete via FK constraint (onDelete: 'cascade')
+      await db.delete(podcasts).where(eq(podcasts.id, input.id));
+      return { ok: true };
+    }),
 });
 
 // ─── Podcast Episodes Router ───
@@ -1708,6 +1725,44 @@ const podcastEpisodesRouter = createRouter({
         .limit(1);
       if (!episode) throw new TRPCError({ code: 'NOT_FOUND', message: 'Episode not found' });
       return { ...episode, podcast: show };
+    }),
+
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        title: z.string().min(1).max(300).optional(),
+        description: z.string().max(10000).optional(),
+        audioUrl: z.string().url().optional(),
+        duration: z.number().int().min(0).optional(),
+        episodeNumber: z.number().int().min(0).optional(),
+        seasonNumber: z.number().int().min(0).optional(),
+        explicit: z.boolean().optional(),
+        episodeType: z.enum(['full', 'trailer', 'bonus']).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [episode] = await db
+        .select()
+        .from(podcastEpisodes)
+        .where(eq(podcastEpisodes.id, input.id))
+        .limit(1);
+      if (!episode) throw new TRPCError({ code: 'NOT_FOUND' });
+      const [show] = await db
+        .select()
+        .from(podcasts)
+        .where(eq(podcasts.id, episode.podcastId))
+        .limit(1);
+      if (!show || show.userId !== ctx.session.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
+      const { id: _, ...patch } = input;
+      const [updated] = await db
+        .update(podcastEpisodes)
+        .set({ ...patch, updatedAt: new Date() })
+        .where(eq(podcastEpisodes.id, input.id))
+        .returning();
+      return updated;
     }),
 
   delete: protectedProcedure
