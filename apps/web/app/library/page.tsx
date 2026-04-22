@@ -75,7 +75,7 @@ function LikedTracks() {
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-gray-400">{likedTracks.length} liked tracks</p>
         <button onClick={() => {
-          if (likedTracks[0]) play({ id: likedTracks[0].id, title: likedTracks[0].title, creator: likedTracks[0].artistName ?? 'Unknown', genre: likedTracks[0].genre ?? '', duration: likedTracks[0].duration ?? 0 });
+          if (likedTracks[0]) play({ id: likedTracks[0].id, title: likedTracks[0].title, creator: likedTracks[0].artistName ?? 'Unknown', genre: likedTracks[0].genre ?? '', duration: likedTracks[0].duration ?? 0, audioUrl: (likedTracks[0] as { audioUrl?: string | null }).audioUrl ?? null, coverUrl: (likedTracks[0] as { coverUrl?: string | null }).coverUrl ?? null });
         }} className="rounded-full bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-500 transition">
           ▶ Play All
         </button>
@@ -83,7 +83,7 @@ function LikedTracks() {
       <div className="space-y-2">
         {likedTracks.map((track, i) => (
           <div key={track.id}
-            onClick={() => play({ id: track.id, title: track.title, creator: track.artistName ?? 'Unknown', genre: track.genre ?? '', duration: track.duration ?? 0 })}
+            onClick={() => play({ id: track.id, title: track.title, creator: track.artistName ?? 'Unknown', genre: track.genre ?? '', duration: track.duration ?? 0, audioUrl: (track as { audioUrl?: string | null }).audioUrl ?? null, coverUrl: (track as { coverUrl?: string | null }).coverUrl ?? null })}
             className="flex items-center gap-4 rounded-xl bg-[#15151f] p-4 transition hover:bg-[#1a1a2e] cursor-pointer group">
             <span className="text-gray-500 text-sm w-6 text-right group-hover:hidden">{i + 1}</span>
             <span className="text-red-400 text-sm w-6 text-right hidden group-hover:block">▶</span>
@@ -162,7 +162,7 @@ function ListeningHistory() {
       <div className="space-y-2">
         {history.map((track) => (
           <div key={track.id + track.playedAt.toISOString()}
-            onClick={() => play({ id: track.id, title: track.title, creator: track.artistName ?? 'Unknown', genre: track.genre ?? '', duration: track.duration ?? 0 })}
+            onClick={() => play({ id: track.id, title: track.title, creator: track.artistName ?? 'Unknown', genre: track.genre ?? '', duration: track.duration ?? 0, audioUrl: (track as { audioUrl?: string | null }).audioUrl ?? null, coverUrl: (track as { coverUrl?: string | null }).coverUrl ?? null })}
             className="flex items-center gap-4 rounded-xl bg-[#15151f] p-4 transition hover:bg-[#1a1a2e] cursor-pointer">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-sm font-bold">
               {track.genre?.charAt(0) ?? '♪'}

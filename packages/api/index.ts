@@ -348,6 +348,8 @@ const tracksRouter = createRouter({
           price: tracks.price,
           createdAt: tracks.createdAt,
           artistName: users.name,
+          coverUrl: tracks.coverUrl,
+          audioUrl: sql<string | null>`COALESCE(${tracks.audioUrl320}, ${tracks.audioUrl128})`,
         })
         .from(tracks)
         .leftJoin(users, eq(tracks.userId, users.id))
@@ -376,6 +378,8 @@ const tracksRouter = createRouter({
           createdAt: tracks.createdAt,
           updatedAt: tracks.updatedAt,
           artistName: users.name,
+          coverUrl: tracks.coverUrl,
+          audioUrl: sql<string | null>`COALESCE(${tracks.audioUrl320}, ${tracks.audioUrl128})`,
         })
         .from(tracks)
         .leftJoin(users, eq(tracks.userId, users.id))
@@ -425,7 +429,12 @@ const tracksRouter = createRouter({
         bpm: z.number().int().min(1).max(999).optional(),
         license: z.string().optional(),
         visibility: z.enum(['public', 'private', 'unlisted', 'subscribers_only']).default('public'),
-        originalFileKey: z.string(),
+        // Real URLs from UploadThing or paste-URL fallback
+        audioUrl: z.string().url().optional(),
+        coverUrl: z.string().url().optional(),
+        duration: z.number().int().min(0).optional(),
+        // Legacy field kept for backwards compatibility with old form callers
+        originalFileKey: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -439,8 +448,15 @@ const tracksRouter = createRouter({
           bpm: input.bpm ?? null,
           license: input.license ?? null,
           visibility: input.visibility,
-          status: 'uploading',
-          originalFileKey: input.originalFileKey,
+          // Track is "published" the moment we have a playable URL.
+          status: input.audioUrl ? 'published' : 'uploading',
+          originalFileKey: input.originalFileKey ?? input.audioUrl ?? null,
+          // Mirror the URL into all three quality tiers until a transcode
+          // pipeline exists. Player reads audioUrl320 first, falls back to 128.
+          audioUrl128: input.audioUrl ?? null,
+          audioUrl320: input.audioUrl ?? null,
+          coverUrl: input.coverUrl ?? null,
+          duration: input.duration ?? null,
         })
         .returning();
       return track;

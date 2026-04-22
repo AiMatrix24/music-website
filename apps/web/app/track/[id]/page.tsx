@@ -86,6 +86,8 @@ export default function TrackDetailPage() {
                   creator: track.artistName ?? undefined,
                   genre: track.genre ?? undefined,
                   duration: track.duration ?? undefined,
+                  audioUrl: (track as { audioUrl?: string | null }).audioUrl ?? null,
+                  coverUrl: (track as { coverUrl?: string | null }).coverUrl ?? null,
                 }}
                 size="lg"
               />

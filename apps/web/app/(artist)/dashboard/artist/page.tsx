@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { useState, useRef } from 'react';
 import { useToast } from '@/app/components/Toast';
 import { PodcastsTab } from '@/app/components/podcast/PodcastsTab';
+import { CoverImageField } from '@/app/components/podcast/CoverImageField';
+import { useUploadThing } from '@/lib/uploadthing-client';
 
 export default function ArtistDashboard() {
   const { data: session, status } = useSession();
@@ -136,6 +138,11 @@ function MyTracksTab({ tracks }: { tracks: Array<{ id: string; title: string; ge
 }
 
 /* ─── Upload Tab ─── */
+const TRACK_GENRES = [
+  'Synthwave', 'Lo-fi Hip Hop', 'Electronic', 'Indie Rock', 'Post-Punk',
+  'Ambient', 'Alternative', 'Hip Hop', 'Pop', 'R&B', 'Jazz', 'Classical',
+];
+
 function UploadTab({ onSuccess }: { onSuccess: () => void }) {
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -144,53 +151,106 @@ function UploadTab({ onSuccess }: { onSuccess: () => void }) {
   const [genre, setGenre] = useState('');
   const [bpm, setBpm] = useState('');
   const [visibility, setVisibility] = useState('public');
-  const [uploading, setUploading] = useState(false);
+  const [audioUrl, setAudioUrl] = useState('');
+  const [audioMode, setAudioMode] = useState<'upload' | 'url'>('upload');
+  const [audioError, setAudioError] = useState('');
+  const [duration, setDuration] = useState<number | null>(null);
+  const [coverUrl, setCoverUrl] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const { startUpload, isUploading } = useUploadThing('audioUpload', {
+    onClientUploadComplete: (res) => {
+      const url = res?.[0]?.ufsUrl ?? res?.[0]?.url;
+      if (url) {
+        setAudioUrl(url);
+        setAudioError('');
+        toast('Audio uploaded', 'success');
+      } else {
+        setAudioError('Upload completed but no URL returned. Try paste-URL mode.');
+      }
+    },
+    onUploadError: (err) => {
+      const msg = err.message || 'Audio upload failed';
+      setAudioError(msg);
+      toast(msg, 'error');
+    },
+  });
 
   const uploadMutation = trpc.tracks.upload.useMutation({
     onSuccess: () => {
-      toast('Track uploaded successfully!');
+      toast('Track published!', 'success');
       setFile(null);
       setTitle('');
       setGenre('');
       setBpm('');
+      setAudioUrl('');
+      setCoverUrl('');
+      setDuration(null);
+      setAudioError('');
+      setSubmitting(false);
       onSuccess();
     },
     onError: (err) => {
-      toast(err.message || 'Upload failed', 'error');
-      setUploading(false);
+      toast(err.message || 'Publish failed', 'error');
+      setSubmitting(false);
     },
   });
 
-  const handleFileDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    const f = e.dataTransfer.files[0];
-    if (f && isAudioFile(f)) {
-      setFile(f);
-      if (!title) setTitle(f.name.replace(/\.[^.]+$/, ''));
-    } else {
-      toast('Please drop an audio file (MP3, WAV, FLAC)', 'error');
+  const handleFile = async (f: File | null) => {
+    setAudioError('');
+    if (!f) return;
+    if (!isAudioFile(f)) {
+      setAudioError('Please choose an audio file (MP3, WAV, FLAC, M4A)');
+      toast('Please choose an audio file (MP3, WAV, FLAC, M4A)', 'error');
+      return;
     }
-  };
+    if (f.size > 64 * 1024 * 1024) {
+      setAudioError(`File is ${(f.size / 1024 / 1024).toFixed(1)}MB — max 64MB. Try paste-URL mode.`);
+      toast('File too large for upload — try paste-URL', 'error');
+      return;
+    }
+    setFile(f);
+    if (!title) setTitle(f.name.replace(/\.[^.]+$/, ''));
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (f && isAudioFile(f)) {
-      setFile(f);
-      if (!title) setTitle(f.name.replace(/\.[^.]+$/, ''));
+    // Probe duration via HTML5 audio
+    const audio = new Audio();
+    audio.preload = 'metadata';
+    audio.onloadedmetadata = () => {
+      if (Number.isFinite(audio.duration)) setDuration(Math.round(audio.duration));
+      URL.revokeObjectURL(audio.src);
+    };
+    audio.src = URL.createObjectURL(f);
+
+    // Auto-upload
+    try {
+      const res = await startUpload([f]);
+      if (!res || res.length === 0) {
+        setAudioError('Upload returned no result. Try paste-URL mode.');
+      }
+    } catch (err: any) {
+      const msg = err?.message || 'Upload threw an error';
+      setAudioError(msg);
+      toast(msg, 'error');
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file || !title.trim()) return;
+    if (!title.trim()) {
+      toast('Title is required', 'error');
+      return;
+    }
+    if (!audioUrl) {
+      toast('Upload an audio file or paste a URL first', 'error');
+      return;
+    }
+    if (audioMode === 'upload' && file && !audioUrl && !audioError) {
+      toast('Audio is still uploading — wait for it to finish', 'error');
+      return;
+    }
+    setSubmitting(true);
 
-    setUploading(true);
-
-    // Generate a slug from the title
-    const slug = title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '');
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now().toString(36);
 
     uploadMutation.mutate({
       title: title.trim(),
@@ -198,44 +258,92 @@ function UploadTab({ onSuccess }: { onSuccess: () => void }) {
       genre: genre || undefined,
       bpm: bpm ? parseInt(bpm) : undefined,
       visibility: visibility as 'public' | 'private' | 'unlisted' | 'subscribers_only',
-      originalFileKey: `uploads/${Date.now()}-${file.name}`,
+      audioUrl,
+      coverUrl: coverUrl || undefined,
+      duration: duration ?? undefined,
     });
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Drop zone */}
-      <div
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={handleFileDrop}
-        onClick={() => fileRef.current?.click()}
-        className={`border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition ${
-          file
-            ? 'border-brand-500 bg-brand-600/5'
-            : 'border-brand-700/30 hover:border-brand-600/50 bg-[#15151f]'
-        }`}
-      >
-        <input
-          ref={fileRef}
-          type="file"
-          accept="audio/*"
-          onChange={handleFileSelect}
-          className="hidden"
-        />
-        {file ? (
-          <>
-            <p className="text-3xl mb-3">🎵</p>
-            <p className="font-semibold text-lg">{file.name}</p>
-            <p className="text-sm text-gray-400 mt-1">
-              {(file.size / (1024 * 1024)).toFixed(1)} MB · Click to change
-            </p>
-          </>
+      {/* Audio source: upload or paste URL */}
+      <div className="rounded-2xl bg-[#15151f] p-6 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-lg">Audio File *</h3>
+          <div className="flex gap-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setAudioMode('upload')}
+              className={`px-3 py-1 rounded ${audioMode === 'upload' ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'}`}
+            >
+              Upload file
+            </button>
+            <button
+              type="button"
+              onClick={() => setAudioMode('url')}
+              className={`px-3 py-1 rounded ${audioMode === 'url' ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'}`}
+            >
+              Paste URL
+            </button>
+          </div>
+        </div>
+
+        {audioMode === 'upload' ? (
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              const f = e.dataTransfer.files[0];
+              if (f) handleFile(f);
+            }}
+            onClick={() => fileRef.current?.click()}
+            className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition ${
+              file ? 'border-brand-500 bg-brand-600/5' : 'border-brand-700/30 hover:border-brand-600/50 bg-brand-950/40'
+            }`}
+          >
+            <input
+              ref={fileRef}
+              type="file"
+              accept="audio/*,.mp3,.wav,.flac,.m4a"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleFile(f);
+              }}
+              className="hidden"
+            />
+            {file ? (
+              <>
+                <p className="text-3xl mb-2">🎵</p>
+                <p className="font-semibold">{file.name}</p>
+                <p className={`text-xs mt-1 ${audioError ? 'text-red-400' : audioUrl ? 'text-green-400' : 'text-gray-500'}`}>
+                  {(file.size / (1024 * 1024)).toFixed(1)} MB
+                  {duration !== null && ` · ${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}`}
+                  {isUploading && ' · uploading...'}
+                  {audioUrl && !audioError && ' · uploaded ✓'}
+                  {audioError && ` · ${audioError}`}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-4xl mb-3">📁</p>
+                <p className="text-gray-400 mb-2">Drag an audio file or click to browse</p>
+                <p className="text-xs text-gray-600">MP3, WAV, FLAC, M4A — Max 64MB</p>
+              </>
+            )}
+          </div>
         ) : (
           <>
-            <p className="text-4xl mb-3">📁</p>
-            <p className="text-gray-400 mb-2">Drag and drop an audio file here</p>
-            <p className="text-sm text-gray-500">or click to browse</p>
-            <p className="text-xs text-gray-600 mt-3">MP3, WAV, FLAC — Max 100MB</p>
+            <input
+              type="url"
+              value={audioUrl}
+              onChange={(e) => {
+                setAudioUrl(e.target.value);
+                setAudioError('');
+              }}
+              placeholder="https://your-host.com/track.mp3"
+              className="w-full bg-brand-950 border border-brand-800/30 rounded-xl px-4 py-3 text-white placeholder:text-gray-600 focus:border-brand-500 outline-none transition"
+            />
+            <p className="text-xs text-gray-500">Direct link to MP3, WAV, FLAC, or M4A (S3, Backblaze, your own server)</p>
           </>
         )}
       </div>
@@ -256,6 +364,13 @@ function UploadTab({ onSuccess }: { onSuccess: () => void }) {
           />
         </div>
 
+        <CoverImageField
+          label="Cover Art (optional)"
+          hint="Square image, 1500×1500+ recommended, ≤8MB"
+          value={coverUrl}
+          onChange={setCoverUrl}
+        />
+
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm text-gray-400 mb-1">Genre</label>
@@ -265,18 +380,9 @@ function UploadTab({ onSuccess }: { onSuccess: () => void }) {
               className="w-full bg-brand-950 border border-brand-800/30 rounded-xl px-4 py-3 text-white focus:border-brand-500 outline-none transition"
             >
               <option value="">Select genre</option>
-              <option value="Synthwave">Synthwave</option>
-              <option value="Lo-fi Hip Hop">Lo-fi Hip Hop</option>
-              <option value="Electronic">Electronic</option>
-              <option value="Indie Rock">Indie Rock</option>
-              <option value="Post-Punk">Post-Punk</option>
-              <option value="Ambient">Ambient</option>
-              <option value="Alternative">Alternative</option>
-              <option value="Hip Hop">Hip Hop</option>
-              <option value="Pop">Pop</option>
-              <option value="R&B">R&amp;B</option>
-              <option value="Jazz">Jazz</option>
-              <option value="Classical">Classical</option>
+              {TRACK_GENRES.map((g) => (
+                <option key={g} value={g}>{g}</option>
+              ))}
             </select>
           </div>
 
@@ -311,10 +417,10 @@ function UploadTab({ onSuccess }: { onSuccess: () => void }) {
 
       <button
         type="submit"
-        disabled={!file || !title.trim() || uploading}
+        disabled={!audioUrl || !title.trim() || submitting || isUploading}
         className="w-full rounded-full bg-gradient-to-r from-brand-600 to-brand-500 py-4 font-semibold text-white text-lg transition hover:shadow-lg hover:shadow-brand-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {uploading ? 'Uploading...' : 'Upload Track'}
+        {submitting ? 'Publishing...' : isUploading ? 'Uploading audio...' : 'Publish Track'}
       </button>
     </form>
   );

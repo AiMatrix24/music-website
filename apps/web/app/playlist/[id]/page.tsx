@@ -79,12 +79,15 @@ export default function PlaylistDetailPage() {
               <button
                 onClick={() => {
                   if (playlistTracks[0]) {
+                    const t = playlistTracks[0].track as typeof playlistTracks[0]['track'] & { audioUrl320?: string | null; audioUrl128?: string | null; coverUrl?: string | null };
                     play({
-                      id: playlistTracks[0].track.id,
-                      title: playlistTracks[0].track.title,
+                      id: t.id,
+                      title: t.title,
                       creator: 'Unknown',
-                      genre: playlistTracks[0].track.genre ?? '',
-                      duration: playlistTracks[0].track.duration ?? 0,
+                      genre: t.genre ?? '',
+                      duration: t.duration ?? 0,
+                      audioUrl: t.audioUrl320 ?? t.audioUrl128 ?? null,
+                      coverUrl: t.coverUrl ?? null,
                     });
                   }
                 }}

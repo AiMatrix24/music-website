@@ -9,6 +9,8 @@ interface PlayButtonProps {
     creator?: string;
     genre?: string;
     duration?: number;
+    audioUrl?: string | null;
+    coverUrl?: string | null;
   };
   size?: 'sm' | 'md' | 'lg';
   className?: string;
@@ -31,6 +33,8 @@ export function PlayButton({ track, size = 'md', className = '' }: PlayButtonPro
         creator: track.creator ?? 'Unknown creator',
         genre: track.genre ?? 'Music',
         duration: track.duration ?? 0,
+        audioUrl: track.audioUrl ?? null,
+        coverUrl: track.coverUrl ?? null,
       });
     }
   };
