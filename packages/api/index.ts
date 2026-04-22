@@ -1528,12 +1528,53 @@ const podcastsRouter = createRouter({
       return withEpisodes;
     }),
 
+  getMine: protectedProcedure.query(async ({ ctx }) => {
+    const rows = await db
+      .select()
+      .from(podcasts)
+      .where(eq(podcasts.userId, ctx.session.user.id))
+      .orderBy(desc(podcasts.createdAt));
+    const withEpisodes = await Promise.all(
+      rows.map(async (show) => {
+        const episodes = await db
+          .select()
+          .from(podcastEpisodes)
+          .where(eq(podcastEpisodes.podcastId, show.id))
+          .orderBy(desc(podcastEpisodes.createdAt));
+        return { ...show, episodes, episodeCount: episodes.length };
+      })
+    );
+    return withEpisodes;
+  }),
+
+  getBySlug: publicProcedure
+    .input(z.object({ slug: z.string().min(1) }))
+    .query(async ({ input }) => {
+      const [show] = await db
+        .select()
+        .from(podcasts)
+        .where(eq(podcasts.slug, input.slug))
+        .limit(1);
+      if (!show) throw new TRPCError({ code: 'NOT_FOUND', message: 'Podcast not found' });
+      const episodes = await db
+        .select()
+        .from(podcastEpisodes)
+        .where(and(eq(podcastEpisodes.podcastId, show.id), eq(podcastEpisodes.status, 'published')))
+        .orderBy(desc(podcastEpisodes.publishedAt));
+      return { ...show, episodes };
+    }),
+
   create: protectedProcedure
     .input(
       z.object({
         title: z.string().min(1).max(200),
         description: z.string().max(2000).optional(),
         category: z.string().optional(),
+        coverUrl: z.string().url().optional(),
+        author: z.string().max(200).optional(),
+        ownerEmail: z.string().email().optional(),
+        language: z.string().min(2).max(10).default('en'),
+        explicit: z.boolean().default(false),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -1551,9 +1592,153 @@ const podcastsRouter = createRouter({
           slug,
           description: input.description ?? null,
           category: input.category ?? null,
+          coverUrl: input.coverUrl ?? null,
+          author: input.author ?? null,
+          ownerEmail: input.ownerEmail ?? null,
+          language: input.language,
+          explicit: input.explicit,
+          status: 'published',
         })
         .returning();
       return show;
+    }),
+
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        title: z.string().min(1).max(200).optional(),
+        description: z.string().max(2000).optional(),
+        category: z.string().optional(),
+        coverUrl: z.string().url().optional(),
+        author: z.string().max(200).optional(),
+        ownerEmail: z.string().email().optional(),
+        language: z.string().min(2).max(10).optional(),
+        explicit: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [existing] = await db
+        .select()
+        .from(podcasts)
+        .where(eq(podcasts.id, input.id))
+        .limit(1);
+      if (!existing) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (existing.userId !== ctx.session.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
+      const { id: _, ...patch } = input;
+      const [updated] = await db
+        .update(podcasts)
+        .set({ ...patch, updatedAt: new Date() })
+        .where(eq(podcasts.id, input.id))
+        .returning();
+      return updated;
+    }),
+});
+
+// ─── Podcast Episodes Router ───
+const podcastEpisodesRouter = createRouter({
+  create: protectedProcedure
+    .input(
+      z.object({
+        podcastId: z.string().uuid(),
+        title: z.string().min(1).max(300),
+        description: z.string().max(10000).optional(),
+        audioUrl: z.string().url(),
+        duration: z.number().int().min(0).optional(),
+        fileSize: z.number().int().min(0).optional(),
+        episodeNumber: z.number().int().min(0).optional(),
+        seasonNumber: z.number().int().min(0).optional(),
+        explicit: z.boolean().default(false),
+        episodeType: z.enum(['full', 'trailer', 'bonus']).default('full'),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify ownership of the podcast show
+      const [show] = await db
+        .select()
+        .from(podcasts)
+        .where(eq(podcasts.id, input.podcastId))
+        .limit(1);
+      if (!show) throw new TRPCError({ code: 'NOT_FOUND', message: 'Podcast not found' });
+      if (show.userId !== ctx.session.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
+      const slug = input.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 100)
+        + '-' + Date.now().toString(36);
+      const [episode] = await db
+        .insert(podcastEpisodes)
+        .values({
+          podcastId: input.podcastId,
+          title: input.title,
+          slug,
+          description: input.description ?? null,
+          audioUrl: input.audioUrl,
+          duration: input.duration ?? null,
+          fileSize: input.fileSize ?? null,
+          episodeNumber: input.episodeNumber ?? null,
+          seasonNumber: input.seasonNumber ?? null,
+          explicit: input.explicit,
+          episodeType: input.episodeType,
+          status: 'published',
+          publishedAt: new Date(),
+        })
+        .returning();
+      return episode;
+    }),
+
+  getBySlug: publicProcedure
+    .input(z.object({ podcastSlug: z.string(), episodeSlug: z.string() }))
+    .query(async ({ input }) => {
+      const [show] = await db
+        .select()
+        .from(podcasts)
+        .where(eq(podcasts.slug, input.podcastSlug))
+        .limit(1);
+      if (!show) throw new TRPCError({ code: 'NOT_FOUND', message: 'Podcast not found' });
+      const [episode] = await db
+        .select()
+        .from(podcastEpisodes)
+        .where(and(eq(podcastEpisodes.podcastId, show.id), eq(podcastEpisodes.slug, input.episodeSlug)))
+        .limit(1);
+      if (!episode) throw new TRPCError({ code: 'NOT_FOUND', message: 'Episode not found' });
+      return { ...episode, podcast: show };
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const [episode] = await db
+        .select()
+        .from(podcastEpisodes)
+        .where(eq(podcastEpisodes.id, input.id))
+        .limit(1);
+      if (!episode) throw new TRPCError({ code: 'NOT_FOUND' });
+      const [show] = await db
+        .select()
+        .from(podcasts)
+        .where(eq(podcasts.id, episode.podcastId))
+        .limit(1);
+      if (!show || show.userId !== ctx.session.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
+      await db.delete(podcastEpisodes).where(eq(podcastEpisodes.id, input.id));
+      return { ok: true };
+    }),
+
+  recordDownload: publicProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ input }) => {
+      await db
+        .update(podcastEpisodes)
+        .set({ downloadCount: sql`${podcastEpisodes.downloadCount} + 1` })
+        .where(eq(podcastEpisodes.id, input.id));
+      return { ok: true };
     }),
 });
 
@@ -1577,6 +1762,7 @@ export const appRouter = createRouter({
   likes: likesRouter,
   admin: adminRouter,
   podcasts: podcastsRouter,
+  podcastEpisodes: podcastEpisodesRouter,
 });
 
 export type AppRouter = typeof appRouter;

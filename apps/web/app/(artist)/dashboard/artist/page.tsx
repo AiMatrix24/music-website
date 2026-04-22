@@ -5,6 +5,7 @@ import { trpc } from '@/lib/trpc/client';
 import Link from 'next/link';
 import { useState, useRef } from 'react';
 import { useToast } from '@/app/components/Toast';
+import { PodcastsTab } from '@/app/components/podcast/PodcastsTab';
 
 export default function ArtistDashboard() {
   const { data: session, status } = useSession();
@@ -26,7 +27,7 @@ export default function ArtistDashboard() {
     { enabled: status === 'authenticated' }
   );
 
-  const [activeTab, setActiveTab] = useState<'tracks' | 'upload' | 'messages' | 'events'>('tracks');
+  const [activeTab, setActiveTab] = useState<'tracks' | 'upload' | 'messages' | 'events' | 'podcasts'>('tracks');
 
   if (status === 'loading') {
     return (
@@ -72,7 +73,7 @@ export default function ArtistDashboard() {
 
       {/* Tabs */}
       <div className="flex gap-2 mb-6 overflow-x-auto">
-        {(['tracks', 'upload', 'events', 'messages'] as const).map((tab) => (
+        {(['tracks', 'upload', 'events', 'podcasts', 'messages'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -82,7 +83,7 @@ export default function ArtistDashboard() {
                 : 'bg-[#15151f] text-gray-400 hover:text-white'
             }`}
           >
-            {tab === 'tracks' ? 'My Tracks' : tab === 'upload' ? 'Upload Music' : tab === 'events' ? 'Events & Tickets' : 'Message Fans'}
+            {tab === 'tracks' ? 'My Tracks' : tab === 'upload' ? 'Upload Music' : tab === 'events' ? 'Events & Tickets' : tab === 'podcasts' ? 'Podcasts' : 'Message Fans'}
           </button>
         ))}
       </div>
@@ -90,6 +91,7 @@ export default function ArtistDashboard() {
       {activeTab === 'tracks' && <MyTracksTab tracks={myTracks.data ?? []} />}
       {activeTab === 'upload' && <UploadTab onSuccess={() => { myTracks.refetch(); setActiveTab('tracks'); }} />}
       {activeTab === 'events' && <EventsTab events={myEvents.data ?? []} onRefresh={() => myEvents.refetch()} />}
+      {activeTab === 'podcasts' && <PodcastsTab />}
       {activeTab === 'messages' && <MessagesTab broadcasts={myBroadcasts.data ?? []} onSent={() => myBroadcasts.refetch()} />}
     </div>
   );
