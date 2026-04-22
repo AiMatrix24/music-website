@@ -1661,7 +1661,8 @@ const podcastEpisodesRouter = createRouter({
       z.object({
         podcastId: z.string().uuid(),
         title: z.string().min(1).max(300),
-        description: z.string().max(10000).optional(),
+        description: z.string().max(50000).optional(),
+        coverUrl: z.string().url().optional(),
         audioUrl: z.string().url(),
         duration: z.number().int().min(0).optional(),
         fileSize: z.number().int().min(0).optional(),
@@ -1695,6 +1696,7 @@ const podcastEpisodesRouter = createRouter({
           title: input.title,
           slug,
           description: input.description ?? null,
+          coverUrl: input.coverUrl ?? null,
           audioUrl: input.audioUrl,
           duration: input.duration ?? null,
           fileSize: input.fileSize ?? null,
@@ -1732,7 +1734,8 @@ const podcastEpisodesRouter = createRouter({
       z.object({
         id: z.string().uuid(),
         title: z.string().min(1).max(300).optional(),
-        description: z.string().max(10000).optional(),
+        description: z.string().max(50000).optional(),
+        coverUrl: z.string().url().optional(),
         audioUrl: z.string().url().optional(),
         duration: z.number().int().min(0).optional(),
         episodeNumber: z.number().int().min(0).optional(),

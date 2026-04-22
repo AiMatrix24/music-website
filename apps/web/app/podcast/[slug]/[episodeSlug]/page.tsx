@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useRef } from 'react';
+import { useRef, useMemo } from 'react';
+import DOMPurify from 'isomorphic-dompurify';
 import { trpc } from '@/lib/trpc/client';
 
 export default function EpisodeDetailPage() {
@@ -45,6 +46,14 @@ export default function EpisodeDetailPage() {
 
   const ep = data;
   const show = data.podcast;
+  const coverImage = ep.coverUrl ?? show.coverUrl;
+  const sanitizedDescription = useMemo(() => {
+    if (!ep.description) return '';
+    return DOMPurify.sanitize(ep.description, {
+      ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'ul', 'ol', 'li', 'h2', 'h3', 'h4', 'blockquote', 'a', 'code', 'pre'],
+      ALLOWED_ATTR: ['href', 'target', 'rel'],
+    });
+  }, [ep.description]);
 
   return (
     <div className="min-h-screen py-16 px-6">
@@ -52,6 +61,18 @@ export default function EpisodeDetailPage() {
         <Link href={`/podcast/${show.slug}`} className="text-sm text-gray-400 hover:text-white transition mb-8 inline-block">
           ← {show.title}
         </Link>
+
+        {/* Episode artwork (per-episode cover overrides show cover) */}
+        {coverImage && (
+          <div className="mb-6">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={coverImage}
+              alt=""
+              className="w-full max-w-md aspect-square rounded-2xl object-cover shadow-2xl"
+            />
+          </div>
+        )}
 
         {/* Episode header */}
         <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -101,13 +122,14 @@ export default function EpisodeDetailPage() {
           </div>
         )}
 
-        {/* Show notes */}
-        {ep.description && (
+        {/* Show notes (sanitized HTML from rich text editor) */}
+        {sanitizedDescription && (
           <div className="rounded-2xl bg-[#15151f] p-6">
             <h2 className="font-bold mb-3">Show Notes</h2>
-            <div className="text-sm text-gray-300 leading-relaxed whitespace-pre-line">
-              {ep.description}
-            </div>
+            <div
+              className="prose prose-sm prose-invert max-w-none prose-a:text-brand-400 prose-strong:text-white prose-headings:text-white"
+              dangerouslySetInnerHTML={{ __html: sanitizedDescription }}
+            />
           </div>
         )}
       </div>

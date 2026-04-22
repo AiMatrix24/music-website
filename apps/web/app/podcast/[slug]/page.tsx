@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useMemo } from 'react';
+import DOMPurify from 'isomorphic-dompurify';
 import { trpc } from '@/lib/trpc/client';
 
 export default function PodcastDetailPage() {
@@ -18,6 +20,14 @@ export default function PodcastDetailPage() {
       </div>
     );
   }
+
+  const sanitizedDescription = useMemo(() => {
+    if (!show?.description) return '';
+    return DOMPurify.sanitize(show.description, {
+      ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 's', 'ul', 'ol', 'li', 'h2', 'h3', 'h4', 'blockquote', 'a', 'code', 'pre'],
+      ALLOWED_ATTR: ['href', 'target', 'rel'],
+    });
+  }, [show?.description]);
 
   if (isError || !show) {
     return (
@@ -51,8 +61,11 @@ export default function PodcastDetailPage() {
             <p className="text-sm text-brand-400 font-semibold uppercase tracking-wider mb-1">Podcast</p>
             <h1 className="text-4xl font-black mb-2">{show.title}</h1>
             {show.author && <p className="text-gray-400 mb-3">Hosted by {show.author}</p>}
-            {show.description && (
-              <p className="text-sm text-gray-400 leading-relaxed mb-4 whitespace-pre-line">{show.description}</p>
+            {sanitizedDescription && (
+              <div
+                className="prose prose-sm prose-invert max-w-none mb-4 prose-a:text-brand-400 prose-strong:text-white prose-headings:text-white"
+                dangerouslySetInnerHTML={{ __html: sanitizedDescription }}
+              />
             )}
             <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
               <span>{show.episodes.length} episode{show.episodes.length === 1 ? '' : 's'}</span>
@@ -99,11 +112,16 @@ export default function PodcastDetailPage() {
                   className="px-6 py-5 block hover:bg-brand-950/40 transition"
                 >
                   <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-full bg-brand-600 flex items-center justify-center text-white shrink-0 mt-1">
-                      <svg className="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                    </div>
+                    {ep.coverUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={ep.coverUrl} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0 mt-0.5" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-brand-600 flex items-center justify-center text-white shrink-0 mt-1">
+                        <svg className="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         {ep.seasonNumber && ep.episodeNumber && (
@@ -120,7 +138,7 @@ export default function PodcastDetailPage() {
                       </div>
                       <h3 className="font-bold mb-1">{ep.title}</h3>
                       {ep.description && (
-                        <p className="text-sm text-gray-400 line-clamp-2">{ep.description}</p>
+                        <p className="text-sm text-gray-400 line-clamp-2">{stripHtml(ep.description)}</p>
                       )}
                       <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
                         {ep.duration && <span>{formatDuration(ep.duration)}</span>}
@@ -142,4 +160,8 @@ function formatDuration(seconds: number): string {
   const m = Math.floor((seconds % 3600) / 60);
   if (h > 0) return `${h}h ${m}m`;
   return `${m} min`;
+}
+
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }

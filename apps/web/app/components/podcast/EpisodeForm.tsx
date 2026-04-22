@@ -4,6 +4,8 @@ import { useState, useRef } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { useUploadThing } from '@/lib/uploadthing-client';
 import { useToast } from '@/app/components/Toast';
+import { CoverImageField } from './CoverImageField';
+import { RichTextEditor } from './RichTextEditor';
 
 const AUDIO_TYPES = ['audio/mpeg', 'audio/mp3', 'audio/mp4', 'audio/m4a', 'audio/wav', 'audio/x-m4a'];
 
@@ -12,6 +14,7 @@ export type ExistingEpisode = {
   podcastId: string;
   title: string;
   description: string | null;
+  coverUrl: string | null;
   audioUrl: string | null;
   duration: number | null;
   episodeNumber: number | null;
@@ -43,9 +46,10 @@ export function EpisodeForm({
   const [episodeType, setEpisodeType] = useState<'full' | 'trailer' | 'bonus'>(
     (existing?.episodeType as 'full' | 'trailer' | 'bonus') ?? 'full'
   );
+  const [coverUrl, setCoverUrl] = useState<string>(existing?.coverUrl ?? '');
   const [file, setFile] = useState<File | null>(null);
   const [audioUrl, setAudioUrl] = useState<string>(existing?.audioUrl ?? '');
-  const [audioMode, setAudioMode] = useState<'upload' | 'url'>(existing?.audioUrl && !isEdit ? 'url' : 'upload');
+  const [audioMode, setAudioMode] = useState<'upload' | 'url'>('upload');
   const [duration, setDuration] = useState<number | null>(existing?.duration ?? null);
   const [audioError, setAudioError] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
@@ -153,6 +157,7 @@ export function EpisodeForm({
         id: existing.id,
         title: title.trim(),
         description: description.trim() || undefined,
+        coverUrl: coverUrl || undefined,
         audioUrl: audioUrl || undefined,
         duration: duration ?? undefined,
         episodeNumber: episodeNumber ? parseInt(episodeNumber) : undefined,
@@ -165,6 +170,7 @@ export function EpisodeForm({
         podcastId,
         title: title.trim(),
         description: description.trim() || undefined,
+        coverUrl: coverUrl || undefined,
         audioUrl,
         duration: duration ?? undefined,
         fileSize: file?.size,
@@ -209,50 +215,48 @@ export function EpisodeForm({
         </div>
 
         {audioMode === 'upload' ? (
-          <>
-            <div
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                const f = e.dataTransfer.files[0];
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              const f = e.dataTransfer.files[0];
+              if (f) handleFileSelect(f);
+            }}
+            onClick={() => fileRef.current?.click()}
+            className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition ${
+              file ? 'border-brand-500 bg-brand-600/5' : 'border-brand-700/30 hover:border-brand-600/50 bg-brand-950/40'
+            }`}
+          >
+            <input
+              ref={fileRef}
+              type="file"
+              accept="audio/*,.mp3,.m4a,.wav,.mp4"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
                 if (f) handleFileSelect(f);
               }}
-              onClick={() => fileRef.current?.click()}
-              className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition ${
-                file ? 'border-brand-500 bg-brand-600/5' : 'border-brand-700/30 hover:border-brand-600/50 bg-brand-950/40'
-              }`}
-            >
-              <input
-                ref={fileRef}
-                type="file"
-                accept="audio/*,.mp3,.m4a,.wav,.mp4"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) handleFileSelect(f);
-                }}
-                className="hidden"
-              />
-              {file ? (
-                <>
-                  <p className="text-2xl mb-1">🎙️</p>
-                  <p className="font-semibold text-sm">{file.name}</p>
-                  <p className={`text-xs mt-1 ${audioError ? 'text-red-400' : audioUrl ? 'text-green-400' : 'text-gray-500'}`}>
-                    {(file.size / (1024 * 1024)).toFixed(1)} MB
-                    {duration !== null && ` · ${formatDuration(duration)}`}
-                    {isUploading && ' · uploading...'}
-                    {audioUrl && !audioError && ' · uploaded ✓'}
-                    {audioError && ` · ${audioError}`}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="text-2xl mb-1">📁</p>
-                  <p className="text-gray-400 text-sm">Drag an audio file or click to browse</p>
-                  <p className="text-xs text-gray-600 mt-1">MP3, M4A, WAV — Max 64MB</p>
-                </>
-              )}
-            </div>
-          </>
+              className="hidden"
+            />
+            {file ? (
+              <>
+                <p className="text-2xl mb-1">🎙️</p>
+                <p className="font-semibold text-sm">{file.name}</p>
+                <p className={`text-xs mt-1 ${audioError ? 'text-red-400' : audioUrl ? 'text-green-400' : 'text-gray-500'}`}>
+                  {(file.size / (1024 * 1024)).toFixed(1)} MB
+                  {duration !== null && ` · ${formatDuration(duration)}`}
+                  {isUploading && ' · uploading...'}
+                  {audioUrl && !audioError && ' · uploaded ✓'}
+                  {audioError && ` · ${audioError}`}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-2xl mb-1">📁</p>
+                <p className="text-gray-400 text-sm">Drag an audio file or click to browse</p>
+                <p className="text-xs text-gray-600 mt-1">MP3, M4A, WAV — Max 64MB</p>
+              </>
+            )}
+          </div>
         ) : (
           <>
             <input
@@ -284,14 +288,20 @@ export function EpisodeForm({
 
       <div>
         <label className="block text-sm text-gray-400 mb-1">Show Notes</label>
-        <textarea
+        <RichTextEditor
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onChange={setDescription}
           placeholder="What this episode is about, links, timestamps..."
-          rows={4}
-          className="w-full bg-brand-950 border border-brand-800/30 rounded-xl px-4 py-3 text-white placeholder:text-gray-600 focus:border-brand-500 outline-none transition resize-none"
+          minHeight={160}
         />
       </div>
+
+      <CoverImageField
+        label="Episode Cover (optional)"
+        hint="Overrides the show cover for this episode. Apple recommends 3000×3000px."
+        value={coverUrl}
+        onChange={setCoverUrl}
+      />
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div>

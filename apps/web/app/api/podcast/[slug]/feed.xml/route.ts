@@ -65,6 +65,10 @@ function formatDuration(seconds: number | null): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 function audioMimeType(url: string): string {
   const lower = url.toLowerCase().split('?')[0];
   if (lower.endsWith('.mp3')) return 'audio/mpeg';
@@ -82,7 +86,7 @@ function generateRSS(show: ShowRow, episodes: EpisodeRow[]): string {
   const showUrl = `${SITE_URL}/podcast/${encodeURIComponent(show.slug)}`;
   const author = show.author ?? 'OPYNX Creator';
   const ownerEmail = show.ownerEmail ?? 'noreply@opynx.com';
-  const description = show.description ?? show.title;
+  const description = stripHtml(show.description ?? show.title);
   const lang = show.language || 'en';
   const explicit = show.explicit ? 'true' : 'false';
   const category = show.category ?? 'Music';
@@ -98,18 +102,27 @@ function generateRSS(show: ShowRow, episodes: EpisodeRow[]): string {
       const epType = ep.episodeType || 'full';
       const seasonTag = ep.seasonNumber ? `      <itunes:season>${ep.seasonNumber}</itunes:season>\n` : '';
       const episodeTag = ep.episodeNumber ? `      <itunes:episode>${ep.episodeNumber}</itunes:episode>\n` : '';
+      // Per-episode cover overrides show cover when present
+      const epImage = ep.coverUrl
+        ? `      <itunes:image href="${escapeXml(ep.coverUrl)}" />\n`
+        : '';
+      // Plain text for itunes:summary; HTML in content:encoded for rich rendering
+      const plainDesc = stripHtml(ep.description ?? '');
+      const htmlDesc = ep.description ?? '';
       return `    <item>
       <title>${escapeXml(ep.title)}</title>
       <link>${escapeXml(epUrl)}</link>
-      <description><![CDATA[${ep.description ?? ''}]]></description>
+      <description><![CDATA[${plainDesc}]]></description>
+      <content:encoded><![CDATA[${htmlDesc}]]></content:encoded>
       <pubDate>${formatRFC822(ep.publishedAt)}</pubDate>
       <enclosure url="${escapeXml(ep.audioUrl!)}" length="${length}" type="${enclosureType}" />
       <guid isPermaLink="false">opynx-ep-${ep.id}</guid>
       <itunes:title>${escapeXml(ep.title)}</itunes:title>
+      <itunes:summary>${escapeXml(plainDesc)}</itunes:summary>
       <itunes:duration>${formatDuration(ep.duration)}</itunes:duration>
       <itunes:explicit>${epExplicit}</itunes:explicit>
       <itunes:episodeType>${epType}</itunes:episodeType>
-${seasonTag}${episodeTag}    </item>`;
+${epImage}${seasonTag}${episodeTag}    </item>`;
     })
     .join('\n');
 

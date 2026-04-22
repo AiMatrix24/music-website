@@ -1,0 +1,1 @@
+ALTER TABLE "podcast_episodes" ADD COLUMN "cover_url" text;

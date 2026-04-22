@@ -42,3 +42,4 @@ coverage/
 OPYNX_spec.txt
 
 .vercel
+.env.vercel

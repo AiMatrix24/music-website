@@ -79,6 +79,7 @@ export const podcastEpisodes = pgTable(
     title: text('title').notNull(),
     slug: text('slug').notNull(),
     description: text('description'), // show notes (HTML/markdown)
+    coverUrl: text('cover_url'), // per-episode artwork (overrides show cover)
     episodeNumber: integer('episode_number'),
     seasonNumber: integer('season_number'),
     audioUrl: text('audio_url'), // processed MP3

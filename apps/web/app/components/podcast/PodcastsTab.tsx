@@ -234,6 +234,7 @@ export function PodcastsTab() {
                                 podcastId: ep.podcastId,
                                 title: ep.title,
                                 description: ep.description,
+                                coverUrl: ep.coverUrl,
                                 audioUrl: ep.audioUrl,
                                 duration: ep.duration,
                                 episodeNumber: ep.episodeNumber,
