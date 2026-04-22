@@ -472,14 +472,28 @@ const tracksRouter = createRouter({
         id: z.string().uuid(),
         title: z.string().min(1).max(200).optional(),
         genre: z.string().optional(),
+        bpm: z.number().int().min(1).max(999).optional(),
+        duration: z.number().int().min(0).optional(),
+        price: z.number().int().min(0).nullable().optional(),
         visibility: z.enum(['public', 'private', 'unlisted', 'subscribers_only']).optional(),
+        audioUrl: z.string().url().optional(),
+        coverUrl: z.string().url().nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const { id, ...data } = input;
+      const { id, audioUrl, ...rest } = input;
+      // Mirror audioUrl into both quality tiers when provided
+      const patch: Record<string, unknown> = {
+        ...rest,
+        updatedAt: new Date(),
+      };
+      if (audioUrl) {
+        patch.audioUrl128 = audioUrl;
+        patch.audioUrl320 = audioUrl;
+      }
       const [updated] = await db
         .update(tracks)
-        .set({ ...data, updatedAt: new Date() })
+        .set(patch)
         .where(and(eq(tracks.id, id), eq(tracks.userId, ctx.session.user.id)))
         .returning();
       return updated ?? null;

@@ -27,8 +27,11 @@ interface PlayerState {
   toggle: () => void;
   seek: (percent: number) => void;
   close: () => void;
+  /** Internal — exposed so MusicPlayerBar can attach to the same audio element. */
+  _audioRef: React.RefObject<HTMLAudioElement | null>;
 }
 
+const noopRef = { current: null };
 const PlayerContext = createContext<PlayerState>({
   track: null,
   isPlaying: false,
@@ -39,6 +42,7 @@ const PlayerContext = createContext<PlayerState>({
   toggle: () => {},
   seek: () => {},
   close: () => {},
+  _audioRef: noopRef,
 });
 
 export const usePlayer = () => useContext(PlayerContext);
@@ -54,8 +58,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  // Mirror current track into a ref so the timeupdate listener (set up once on
-  // mount) always reads the latest track without re-subscribing.
   const trackRef = useRef<Track | null>(null);
 
   // Play count tracking: increment after 30s of continuous play
@@ -63,36 +65,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const lastTickRef = useRef(0);
   const accumulatedRef = useRef(0);
 
-  // Build the audio element on mount (client only)
+  // Attach event listeners once the <audio> DOM element mounts
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const audio = new Audio();
-    // 'auto' so the file is ready to play the moment the user clicks — critical
-    // on iOS Safari where play() must be called synchronously in a gesture and
-    // can't wait for buffering.
-    audio.preload = 'auto';
-    // No crossOrigin — only needed for Web Audio / canvas, and breaks playback
-    // on CDNs that don't return Access-Control-Allow-Origin for media requests.
-    audioRef.current = audio;
+    const audio = audioRef.current;
+    if (!audio) return;
 
     const onTime = () => {
       setCurrentTime(audio.currentTime);
-    };
-    const onMeta = () => {
-      if (Number.isFinite(audio.duration)) setAudioDuration(audio.duration);
-    };
-    const onPlay = () => {
-      setIsPlaying(true);
-      lastTickRef.current = performance.now();
-    };
-    const onPause = () => {
-      setIsPlaying(false);
-      lastTickRef.current = 0;
-    };
-    const onEnded = () => {
-      setIsPlaying(false);
-    };
-    const onTickAccrual = () => {
+      // Play count accrual
       const t = trackRef.current;
       if (!audio.paused && t) {
         const now = performance.now();
@@ -110,9 +90,20 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         }
       }
     };
+    const onMeta = () => {
+      if (Number.isFinite(audio.duration)) setAudioDuration(audio.duration);
+    };
+    const onPlay = () => {
+      setIsPlaying(true);
+      lastTickRef.current = performance.now();
+    };
+    const onPause = () => {
+      setIsPlaying(false);
+      lastTickRef.current = 0;
+    };
+    const onEnded = () => setIsPlaying(false);
 
     audio.addEventListener('timeupdate', onTime);
-    audio.addEventListener('timeupdate', onTickAccrual);
     audio.addEventListener('loadedmetadata', onMeta);
     audio.addEventListener('play', onPlay);
     audio.addEventListener('pause', onPause);
@@ -120,14 +111,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     return () => {
       audio.removeEventListener('timeupdate', onTime);
-      audio.removeEventListener('timeupdate', onTickAccrual);
       audio.removeEventListener('loadedmetadata', onMeta);
       audio.removeEventListener('play', onPlay);
       audio.removeEventListener('pause', onPause);
       audio.removeEventListener('ended', onEnded);
-      audio.pause();
-      audio.src = '';
-      audioRef.current = null;
     };
   }, []);
 
@@ -152,33 +139,30 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Only re-load if the URL actually changed (preserves position when toggling)
     if (audio.src !== t.audioUrl) {
       audio.src = t.audioUrl;
       audio.load();
     }
 
-    // Synchronous play() inside the gesture — required for iOS / autoplay policies
     const playPromise = audio.play();
     if (playPromise && typeof playPromise.then === 'function') {
-      playPromise.catch(() => {
-        // Autoplay blocked or media error — surface state, don't crash
+      playPromise.catch((err) => {
+        console.warn('[MusicPlayer] play() rejected:', err?.name, err?.message);
         setIsPlaying(false);
       });
     }
   };
 
-  /**
-   * toggle() — pause/resume current track. Must also run synchronously inside
-   * a click handler so iOS unlocks audio if it hasn't already.
-   */
   const toggle = () => {
     const audio = audioRef.current;
     if (!audio) return;
     if (audio.paused) {
       const p = audio.play();
       if (p && typeof p.then === 'function') {
-        p.catch(() => setIsPlaying(false));
+        p.catch((err) => {
+          console.warn('[MusicPlayer] play() rejected:', err?.name, err?.message);
+          setIsPlaying(false);
+        });
       }
     } else {
       audio.pause();
@@ -199,6 +183,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (audio) {
       audio.pause();
       audio.removeAttribute('src');
+      audio.load();
     }
     setTrack(null);
     setIsPlaying(false);
@@ -213,8 +198,33 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   return (
     <PlayerContext.Provider
-      value={{ track, isPlaying, progress, currentTime, audioDuration: effectiveDuration, play, toggle, seek, close }}
+      value={{
+        track,
+        isPlaying,
+        progress,
+        currentTime,
+        audioDuration: effectiveDuration,
+        play,
+        toggle,
+        seek,
+        close,
+        _audioRef: audioRef,
+      }}
     >
+      {/*
+        Render the audio element once at the provider level so iOS Safari sees
+        a real DOM-attached HTMLAudioElement. Keep it always mounted (no key
+        changes, no conditional rendering) so the audio context unlocks on the
+        very first user gesture and stays unlocked.
+        playsInline + webkit-playsinline are belt-and-suspenders for iOS.
+      */}
+      <audio
+        ref={audioRef}
+        preload="auto"
+        playsInline
+        {...({ 'webkit-playsinline': 'true' } as Record<string, string>)}
+        className="hidden"
+      />
       {children}
     </PlayerContext.Provider>
   );

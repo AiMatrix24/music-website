@@ -7,6 +7,7 @@ import { useState, useRef } from 'react';
 import { useToast } from '@/app/components/Toast';
 import { PodcastsTab } from '@/app/components/podcast/PodcastsTab';
 import { CoverImageField } from '@/app/components/podcast/CoverImageField';
+import { TrackEditForm, type EditableTrack } from '@/app/components/track/TrackEditForm';
 import { useUploadThing } from '@/lib/uploadthing-client';
 
 export default function ArtistDashboard() {
@@ -100,7 +101,51 @@ export default function ArtistDashboard() {
 }
 
 /* ─── My Tracks Tab ─── */
-function MyTracksTab({ tracks }: { tracks: Array<{ id: string; title: string; genre: string | null; status: string; playCount: number | null }> }) {
+type MyTracksTabTrack = {
+  id: string;
+  title: string;
+  genre: string | null;
+  bpm?: number | null;
+  duration?: number | null;
+  visibility?: 'public' | 'private' | 'unlisted' | 'subscribers_only';
+  status: string;
+  playCount: number | null;
+  price?: number | null;
+  audioUrl?: string | null;
+  coverUrl?: string | null;
+};
+
+function MyTracksTab({ tracks }: { tracks: Array<MyTracksTabTrack> }) {
+  const { toast } = useToast();
+  const utils = trpc.useUtils();
+  const [editing, setEditing] = useState<EditableTrack | null>(null);
+
+  const deleteMutation = trpc.tracks.delete.useMutation({
+    onSuccess: () => {
+      toast('Track deleted', 'success');
+      utils.tracks.list.invalidate();
+    },
+    onError: (err) => toast(err.message || 'Delete failed', 'error'),
+  });
+
+  if (editing) {
+    return (
+      <div className="space-y-4">
+        <button onClick={() => setEditing(null)} className="text-sm text-gray-400 hover:text-white">
+          ← Back to tracks
+        </button>
+        <TrackEditForm
+          track={editing}
+          onSaved={() => {
+            setEditing(null);
+            utils.tracks.list.invalidate();
+          }}
+          onCancel={() => setEditing(null)}
+        />
+      </div>
+    );
+  }
+
   if (tracks.length === 0) {
     return (
       <div className="rounded-2xl bg-[#15151f] p-12 text-center">
@@ -115,22 +160,56 @@ function MyTracksTab({ tracks }: { tracks: Array<{ id: string; title: string; ge
     <div className="rounded-2xl bg-[#15151f] overflow-hidden">
       <div className="divide-y divide-brand-800/10">
         {tracks.map((track) => (
-          <Link
-            key={track.id}
-            href={`/track/${track.id}`}
-            className="flex items-center justify-between px-6 py-4 transition hover:bg-brand-950/50"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-sm font-bold">
-                {track.genre?.charAt(0) ?? '♪'}
+          <div key={track.id} className="flex items-center justify-between gap-3 px-6 py-4 transition hover:bg-brand-950/50">
+            <Link href={`/track/${track.id}`} className="flex items-center gap-4 flex-1 min-w-0">
+              {track.coverUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={track.coverUrl} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
+              ) : (
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-sm font-bold shrink-0">
+                  {track.genre?.charAt(0) ?? '♪'}
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="font-semibold truncate">{track.title}</p>
+                <p className="text-xs text-gray-500 truncate">
+                  {track.genre ?? 'No genre'} · {track.status}
+                  {!track.audioUrl && <span className="text-amber-400"> · no audio</span>}
+                </p>
               </div>
-              <div>
-                <p className="font-semibold">{track.title}</p>
-                <p className="text-xs text-gray-500">{track.genre ?? 'No genre'} · {track.status}</p>
-              </div>
+            </Link>
+            <span className="text-sm text-gray-400 hidden sm:block shrink-0">{formatPlays(track.playCount ?? 0)} plays</span>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={() =>
+                  setEditing({
+                    id: track.id,
+                    title: track.title,
+                    genre: track.genre,
+                    bpm: track.bpm ?? null,
+                    duration: track.duration ?? null,
+                    visibility: (track.visibility as EditableTrack['visibility']) ?? 'public',
+                    price: track.price ?? null,
+                    audioUrl: track.audioUrl ?? null,
+                    coverUrl: track.coverUrl ?? null,
+                  })
+                }
+                className="text-xs px-3 py-1 rounded-full bg-brand-950 border border-brand-800/30 text-gray-300 hover:text-white transition"
+              >
+                Edit
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm(`Delete "${track.title}"?`)) {
+                    deleteMutation.mutate({ id: track.id });
+                  }
+                }}
+                className="text-xs px-3 py-1 rounded-full bg-red-950/40 border border-red-800/30 text-red-400 hover:bg-red-900/40 hover:text-red-300 transition"
+              >
+                Delete
+              </button>
             </div>
-            <span className="text-sm text-gray-400">{formatPlays(track.playCount ?? 0)} plays</span>
-          </Link>
+          </div>
         ))}
       </div>
     </div>
