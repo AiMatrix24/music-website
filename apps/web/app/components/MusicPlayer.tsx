@@ -219,14 +219,20 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         playsInline + webkit-playsinline are belt-and-suspenders for iOS.
       */}
       {/*
-        DO NOT set display:none / className="hidden" on this element — iOS
-        Safari silently refuses to play <audio> with display:none. Use sr-only
-        style positioning so it stays in the layout but is invisible.
+        Two iOS-Safari-specific requirements baked in here:
+
+        1. NOT display:none — iOS silently refuses to play <audio> with
+           display:none. Off-screen positioning instead.
+        2. crossOrigin="anonymous" — iOS makes opaque (no-cors) requests by
+           default for cross-origin media, then sometimes refuses to play
+           the response. Setting crossOrigin forces a proper CORS request,
+           which the UploadThing CDN supports (Access-Control-Allow-Origin: *).
       */}
       <audio
         ref={audioRef}
         preload="auto"
         playsInline
+        crossOrigin="anonymous"
         {...({ 'webkit-playsinline': 'true' } as Record<string, string>)}
         style={{ position: 'fixed', left: -9999, width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
       />

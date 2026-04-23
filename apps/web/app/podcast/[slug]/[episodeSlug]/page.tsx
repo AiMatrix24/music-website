@@ -99,6 +99,8 @@ export default function EpisodeDetailPage() {
             <audio
               controls
               preload="metadata"
+              playsInline
+              crossOrigin="anonymous"
               src={ep.audioUrl}
               onPlay={handlePlay}
               className="w-full"
