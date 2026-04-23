@@ -102,27 +102,77 @@ function sortObjectKeys(obj: Record<string, unknown>): Record<string, unknown> {
 
 async function handleSubscriptionPayment(
   orderId: string,
-  payload: NowPaymentsIPNPayload
+  payload: NowPaymentsIPNPayload,
+  status: PaymentStatus
 ): Promise<void> {
   // orderId format: sub_{subscriptionId}_{tier}
-  // e.g. sub_abc123_premium or sub_abc123_bundle
+  // The subscription row was created by /api/subscribe with status='inactive'
+  // (our pending state — the DB enum lacks an explicit 'pending' value).
   const parts = orderId.split('_');
   const subscriptionId = parts[1];
   const tierRaw = parts[2] ?? 'premium';
 
-  console.log(
-    `[NOWPayments Webhook] Processing subscription payment: ${orderId} tier=${tierRaw}`
-  );
+  if (!subscriptionId || !/^[0-9a-f-]{36}$/i.test(subscriptionId)) {
+    console.error(`[NOWPayments Webhook] Malformed subscription order_id: ${orderId}`);
+    return;
+  }
 
-  // Map tier names to commission engine tiers
-  const tier = tierRaw === 'bundle' ? 'superfan_bundle' : 'standard';
+  // Look up the subscription (must already exist; created at checkout)
+  const existingSub = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.id, subscriptionId),
+  });
 
-  // Parse metadata from order_description if available
-  // Format: creatorId:{id},facilitatorId:{id},outlierId:{id},geoVerified:{bool},facilitatorTier:{tier}
+  if (!existingSub) {
+    console.warn(
+      `[NOWPayments Webhook] Subscription ${subscriptionId} not found in DB; ` +
+        `cannot process status=${status}`
+    );
+    return;
+  }
+
+  // ── Handle terminal failure states first ──
+  if (status === 'failed' || status === 'expired') {
+    // Only mark cancelled if still pending — don't override active subs
+    if (existingSub.status === 'inactive') {
+      await db
+        .update(subscriptions)
+        .set({ status: 'cancelled', updatedAt: new Date() })
+        .where(eq(subscriptions.id, subscriptionId));
+      await db.insert(subEvents).values({
+        subscriptionId,
+        event: 'cancelled',
+        metadata: JSON.stringify({ source: 'nowpayments', reason: status, paymentId: payload.payment_id }),
+      });
+      console.log(
+        `[NOWPayments Webhook] Pending subscription ${subscriptionId} cancelled (status=${status})`
+      );
+    }
+    return;
+  }
+
+  if (status === 'refunded') {
+    await db
+      .update(subscriptions)
+      .set({ status: 'cancelled', updatedAt: new Date() })
+      .where(eq(subscriptions.id, subscriptionId));
+    await db.insert(subEvents).values({
+      subscriptionId,
+      event: 'refunded',
+      metadata: JSON.stringify({ source: 'nowpayments', paymentId: payload.payment_id }),
+    });
+    console.log(`[NOWPayments Webhook] Subscription ${subscriptionId} refunded`);
+    // TODO: reverse commission waterfall on refund
+    return;
+  }
+
+  // ── status === 'finished': activate or renew ──
+  const wasPending = existingSub.status === 'inactive';
+
+  // Run the commission waterfall (only if metadata is present — embedded in
+  // order_description at checkout time as colon-comma key:value pairs)
   const metadata = parseOrderMetadata(payload.order_description);
-
-  // Process commission waterfall
-  if (tier === 'standard' && metadata.creatorId) {
+  const commissionTier = tierRaw === 'bundle' ? 'superfan_bundle' : 'standard';
+  if (commissionTier === 'standard' && metadata.creatorId) {
     await processCommissionWaterfall({
       subscriptionId,
       tier: 'standard',
@@ -130,60 +180,49 @@ async function handleSubscriptionPayment(
       facilitatorId: metadata.facilitatorId,
       outlierId: metadata.outlierId,
       geoVerified: metadata.geoVerified ?? false,
-      facilitatorTier: (metadata.facilitatorTier as 'silver' | 'gold' | 'platinum') ?? 'silver',
+      facilitatorTier:
+        (metadata.facilitatorTier as 'silver' | 'gold' | 'platinum') ?? 'silver',
     });
-  } else if (tier === 'superfan_bundle' && metadata.creatorIds) {
+  } else if (commissionTier === 'superfan_bundle' && metadata.creatorIds) {
     await processCommissionWaterfall({
       subscriptionId,
       tier: 'superfan_bundle',
       creatorIds: metadata.creatorIds,
       geoVerified: metadata.geoVerified ?? false,
-      facilitatorTier: (metadata.facilitatorTier as 'silver' | 'gold' | 'platinum') ?? 'silver',
+      facilitatorTier:
+        (metadata.facilitatorTier as 'silver' | 'gold' | 'platinum') ?? 'silver',
       facilitatorId: metadata.facilitatorId,
     });
   }
 
-  // Activate or renew subscription in DB
-  const existingSub = await db.query.subscriptions.findFirst({
-    where: eq(subscriptions.id, subscriptionId),
+  const now = new Date();
+  const periodEnd = new Date(now);
+  periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+  await db
+    .update(subscriptions)
+    .set({
+      status: 'active',
+      periodStart: now,
+      periodEnd,
+      updatedAt: now,
+    })
+    .where(eq(subscriptions.id, subscriptionId));
+
+  await db.insert(subEvents).values({
+    subscriptionId,
+    event: wasPending ? 'created' : 'renewed',
+    metadata: JSON.stringify({
+      source: 'nowpayments',
+      paymentId: payload.payment_id,
+      actuallyPaid: payload.actually_paid,
+      payCurrency: payload.pay_currency,
+    }),
   });
 
-  if (existingSub) {
-    // Renewal
-    const now = new Date();
-    const periodEnd = new Date(now);
-    periodEnd.setMonth(periodEnd.getMonth() + 1);
-
-    await db
-      .update(subscriptions)
-      .set({
-        status: 'active',
-        periodStart: now,
-        periodEnd,
-        updatedAt: now,
-      })
-      .where(eq(subscriptions.id, subscriptionId));
-
-    await db.insert(subEvents).values({
-      subscriptionId: existingSub.id,
-      event: 'renewed',
-      metadata: JSON.stringify({
-        source: 'nowpayments',
-        paymentId: payload.payment_id,
-        actuallyPaid: payload.actually_paid,
-        payCurrency: payload.pay_currency,
-      }),
-    });
-
-    console.log(`[NOWPayments Webhook] Subscription renewed: ${subscriptionId}`);
-  } else {
-    // New subscription — the subscription row should already exist from checkout flow
-    // but if not, log a warning
-    console.warn(
-      `[NOWPayments Webhook] Subscription ${subscriptionId} not found in DB. ` +
-        `Payment confirmed but subscription may need manual activation.`
-    );
-  }
+  console.log(
+    `[NOWPayments Webhook] Subscription ${subscriptionId} ${wasPending ? 'activated' : 'renewed'} (tier=${tierRaw})`
+  );
 }
 
 async function handleTicketPurchase(
@@ -393,7 +432,7 @@ export async function POST(request: NextRequest) {
         const orderId = payload.order_id;
 
         if (orderId.startsWith('sub_')) {
-          await handleSubscriptionPayment(orderId, payload);
+          await handleSubscriptionPayment(orderId, payload, 'finished');
         } else if (orderId.startsWith('ticket_')) {
           await handleTicketPurchase(orderId, payload, 'finished');
         } else if (orderId.startsWith('merch_')) {
@@ -412,11 +451,15 @@ export async function POST(request: NextRequest) {
         console.warn(
           `[NOWPayments Webhook] Payment ${payload.payment_status}: ${payload.order_id}`
         );
-        // Release inventory on ticket failure/expiry/refund
-        if (payload.order_id.startsWith('ticket_')) {
+        if (payload.order_id.startsWith('sub_')) {
+          await handleSubscriptionPayment(
+            payload.order_id,
+            payload,
+            payload.payment_status
+          );
+        } else if (payload.order_id.startsWith('ticket_')) {
           await handleTicketPurchase(payload.order_id, payload, payload.payment_status);
         }
-        // TODO: handle subscription refunds (cancel subscription, reverse commission)
         break;
       }
 
