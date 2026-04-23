@@ -7,9 +7,13 @@
  * - Background sync for offline scan queue
  */
 
-const CACHE_NAME = 'opynx-v1';
-const STATIC_CACHE = 'opynx-static-v1';
-const API_CACHE = 'opynx-api-v1';
+// Bumped from v1 → v2 to force iOS clients to invalidate the old SW that was
+// caching media (.mp3/.wav) without proper Range request support, which broke
+// HTML5 audio playback on iOS Safari. Old caches are deleted in the activate
+// handler when names don't match `allowedCaches`.
+const CACHE_NAME = 'opynx-v2';
+const STATIC_CACHE = 'opynx-static-v2';
+const API_CACHE = 'opynx-api-v2';
 
 // Static assets to pre-cache on install
 const PRECACHE_URLS = [
@@ -53,6 +57,17 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET requests (POST, PUT, etc.)
   if (request.method !== 'GET') return;
 
+  // ── DO NOT intercept cross-origin requests ──
+  // The browser handles these natively with proper Range request support, which
+  // is required for HTML5 audio/video on iOS Safari. Caching cross-origin
+  // media via the SW returns opaque responses that iOS refuses to play.
+  if (url.origin !== self.location.origin) return;
+
+  // ── DO NOT intercept media requests, even same-origin ──
+  // Audio/video need partial-content (Range) responses to seek/buffer.
+  // Cached responses break this on iOS.
+  if (isMediaRequest(request, url.pathname)) return;
+
   // API calls: stale-while-revalidate
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(staleWhileRevalidate(request, API_CACHE));
@@ -68,6 +83,17 @@ self.addEventListener('fetch', (event) => {
   // Navigation and other requests: network-first with offline fallback
   event.respondWith(networkFirst(request));
 });
+
+function isMediaRequest(request, pathname) {
+  // Match by Accept header (browser explicitly asks for media)
+  const accept = request.headers.get('accept') || '';
+  if (accept.startsWith('audio/') || accept.startsWith('video/')) return true;
+  // Match by Range header (typical for media seeking/buffering)
+  if (request.headers.has('range')) return true;
+  // Match by file extension
+  if (/\.(mp3|wav|m4a|mp4|ogg|webm|flac|aac)$/i.test(pathname)) return true;
+  return false;
+}
 
 // ─── Cache-First Strategy ───
 // Best for static assets that rarely change (versioned JS/CSS bundles, images)
@@ -136,7 +162,9 @@ async function networkFirst(request) {
 // ─── Helpers ───
 
 function isStaticAsset(pathname) {
-  return /\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|webp|avif|mp3|wav)$/i.test(
+  // Audio/video deliberately excluded — handled by isMediaRequest() above
+  // and passed straight to the browser for proper Range request support.
+  return /\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|webp|avif)$/i.test(
     pathname
   );
 }
