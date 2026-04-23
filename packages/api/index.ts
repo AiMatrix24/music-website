@@ -895,23 +895,34 @@ const ticketsRouter = createRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Use atomic UPDATE to prevent overselling via race conditions.
-      // The WHERE clause ensures sold < quantity, and the UPDATE + check
-      // happen in a single atomic SQL statement.
-      const result = await db.execute(
-        sql`UPDATE ticket_types SET sold = sold + 1 WHERE id = ${input.ticketTypeId} AND sold < quantity`
-      );
-
-      // If no rows were affected, the ticket type is sold out
-      const rowsAffected = Number((result as any).rowCount ?? (result as any).count ?? result.length ?? 0);
-      if (rowsAffected === 0) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'Tickets are sold out',
-        });
+      // Look up the ticket type to determine whether payment is required
+      const ticketType = await db.query.ticketTypes.findFirst({
+        where: eq(ticketTypes.id, input.ticketTypeId),
+      });
+      if (!ticketType) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Ticket type not found' });
+      }
+      if (ticketType.eventId !== input.eventId) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Ticket type does not belong to this event' });
       }
 
+      // Atomic inventory decrement — guards against overselling under concurrent
+      // purchases. This runs BEFORE payment; if the user abandons checkout the
+      // `sold` count stays incremented (ticket stays 'pending'), and the
+      // NOWPayments webhook releases inventory on failed/expired payments.
+      const result = await db.execute(
+        sql`UPDATE ticket_types SET sold = sold + 1 WHERE id = ${input.ticketTypeId} AND (quantity IS NULL OR sold < quantity)`
+      );
+      const rowsAffected = Number(
+        (result as any).rowCount ?? (result as any).count ?? result.length ?? 0
+      );
+      if (rowsAffected === 0) {
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Tickets are sold out' });
+      }
+
+      const isFree = ticketType.price === 0;
       const qrToken = `opynx_ticket_${Date.now()}_${ctx.session.user.id}`;
+
       const [ticket] = await db
         .insert(tickets)
         .values({
@@ -919,11 +930,76 @@ const ticketsRouter = createRouter({
           attendeeId: ctx.session.user.id,
           eventId: input.eventId,
           qrToken,
-          status: 'valid',
+          // Free tickets skip payment; paid tickets wait for webhook confirmation
+          status: isFree ? 'valid' : 'pending',
         })
         .returning();
 
-      return ticket;
+      // Free ticket: done
+      if (isFree) {
+        return { ticket, paymentUrl: null };
+      }
+
+      // Paid ticket: create NOWPayments charge. If this fails we release inventory.
+      const apiKey = process.env.NOWPAYMENTS_API_KEY;
+      if (!apiKey) {
+        // Roll back: release inventory + delete the pending ticket
+        await db.delete(tickets).where(eq(tickets.id, ticket.id));
+        await db.execute(
+          sql`UPDATE ticket_types SET sold = GREATEST(sold - 1, 0) WHERE id = ${input.ticketTypeId}`
+        );
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Payment not configured' });
+      }
+
+      try {
+        const priceUsd = ticketType.price / 100;
+        const response = await fetch('https://api.nowpayments.io/v1/payment', {
+          method: 'POST',
+          headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            price_amount: priceUsd,
+            price_currency: 'usd',
+            pay_currency: 'usdcmatic',
+            // IMPORTANT: order_id encodes the PENDING ticket's UUID. The
+            // webhook at /api/webhooks/nowpayments parses this to find and
+            // activate the ticket.
+            order_id: `ticket_${ticket.id}`,
+            order_description: `OPYNX ticket: ${ticketType.name} — $${priceUsd.toFixed(2)}`,
+            ipn_callback_url: 'https://opynx.com/api/webhooks/nowpayments',
+            success_url: `https://opynx.com/tickets/confirmation?ticketId=${ticket.id}`,
+            cancel_url: `https://opynx.com/tickets/${input.eventId}?cancelled=true`,
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.payment_id) {
+          // Roll back on NOWPayments failure
+          await db.delete(tickets).where(eq(tickets.id, ticket.id));
+          await db.execute(
+            sql`UPDATE ticket_types SET sold = GREATEST(sold - 1, 0) WHERE id = ${input.ticketTypeId}`
+          );
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Payment creation failed',
+          });
+        }
+
+        return {
+          ticket,
+          paymentUrl: `https://nowpayments.io/payment/?iid=${data.payment_id}`,
+        };
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        // Roll back on network error
+        await db.delete(tickets).where(eq(tickets.id, ticket.id));
+        await db.execute(
+          sql`UPDATE ticket_types SET sold = GREATEST(sold - 1, 0) WHERE id = ${input.ticketTypeId}`
+        );
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Payment service unavailable',
+        });
+      }
     }),
 
   getMyTickets: protectedProcedure.query(async ({ ctx }) => {

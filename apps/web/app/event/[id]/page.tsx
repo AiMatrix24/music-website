@@ -25,9 +25,14 @@ export default function EventDetailPage() {
   const [step, setStep] = useState<'browse' | 'checkout' | 'confirmation'>('browse');
 
   const purchaseMutation = trpc.tickets.purchase.useMutation({
-    onSuccess: () => {
-      setStep('confirmation');
-      toast('Tickets secured! Check your email for QR codes.', 'success');
+    onSuccess: (result) => {
+      if (result.paymentUrl) {
+        // Paid ticket — redirect to NOWPayments. Ticket activates via webhook.
+        window.location.href = result.paymentUrl;
+      } else {
+        setStep('confirmation');
+        toast('Tickets secured! Check your email for QR codes.', 'success');
+      }
     },
     onError: (err) => {
       toast(err.message ?? 'Purchase failed. Try again.', 'error');

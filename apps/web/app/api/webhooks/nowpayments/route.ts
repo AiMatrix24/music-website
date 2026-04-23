@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { db, subscriptions, subEvents } from '@opynx/db';
-import { eq } from 'drizzle-orm';
+import { tickets, ticketTypes } from '@opynx/db/schema';
+import { eq, sql } from 'drizzle-orm';
 import { processCommissionWaterfall } from '@/lib/services/commissions';
 import { captureError, startTransaction } from '@/lib/services/monitoring';
 
@@ -187,18 +188,55 @@ async function handleSubscriptionPayment(
 
 async function handleTicketPurchase(
   orderId: string,
-  payload: NowPaymentsIPNPayload
+  payload: NowPaymentsIPNPayload,
+  status: PaymentStatus
 ): Promise<void> {
-  // orderId format: ticket_{ticketId}
+  // orderId format: ticket_{ticketId} — the ticketId is a UUID for a ticket
+  // row with status='pending' created at checkout.
   const ticketId = orderId.replace('ticket_', '');
+  if (!/^[0-9a-f-]{36}$/i.test(ticketId)) {
+    console.error(`[NOWPayments Webhook] Malformed ticket order_id: ${orderId}`);
+    return;
+  }
 
-  console.log(
-    `[NOWPayments Webhook] Ticket purchase confirmed: ${ticketId} ` +
-      `paid=${payload.actually_paid} ${payload.pay_currency}`
-  );
+  const ticket = await db.query.tickets.findFirst({
+    where: eq(tickets.id, ticketId),
+  });
+  if (!ticket) {
+    console.warn(`[NOWPayments Webhook] Ticket ${ticketId} not found`);
+    return;
+  }
 
-  // TODO: Update ticket status in DB, send confirmation email
-  // This will be implemented when the ticket purchase flow is connected
+  if (status === 'finished') {
+    // Payment complete — activate the ticket
+    if (ticket.status === 'valid') {
+      console.log(`[NOWPayments Webhook] Ticket ${ticketId} already valid (idempotent)`);
+      return;
+    }
+    await db.update(tickets).set({ status: 'valid' }).where(eq(tickets.id, ticketId));
+    console.log(
+      `[NOWPayments Webhook] Ticket ${ticketId} activated, paid=${payload.actually_paid} ${payload.pay_currency}`
+    );
+    // TODO: send confirmation email with QR code
+  } else if (status === 'failed' || status === 'expired' || status === 'refunded') {
+    // Release inventory + cancel the pending ticket (only if still pending)
+    if (ticket.status === 'pending') {
+      await db.update(tickets).set({ status: 'cancelled' }).where(eq(tickets.id, ticketId));
+      await db.execute(
+        sql`UPDATE ticket_types SET sold = GREATEST(sold - 1, 0) WHERE id = ${ticket.ticketTypeId}`
+      );
+      console.log(
+        `[NOWPayments Webhook] Ticket ${ticketId} cancelled, inventory released (status=${status})`
+      );
+    } else if (status === 'refunded') {
+      // Already-activated ticket refunded: mark refunded + release inventory
+      await db.update(tickets).set({ status: 'refunded' }).where(eq(tickets.id, ticketId));
+      await db.execute(
+        sql`UPDATE ticket_types SET sold = GREATEST(sold - 1, 0) WHERE id = ${ticket.ticketTypeId}`
+      );
+      console.log(`[NOWPayments Webhook] Ticket ${ticketId} refunded, inventory released`);
+    }
+  }
 }
 
 async function handleMarketplaceOrder(
@@ -357,7 +395,7 @@ export async function POST(request: NextRequest) {
         if (orderId.startsWith('sub_')) {
           await handleSubscriptionPayment(orderId, payload);
         } else if (orderId.startsWith('ticket_')) {
-          await handleTicketPurchase(orderId, payload);
+          await handleTicketPurchase(orderId, payload, 'finished');
         } else if (orderId.startsWith('merch_')) {
           await handleMarketplaceOrder(orderId, payload);
         } else {
@@ -369,23 +407,18 @@ export async function POST(request: NextRequest) {
       }
 
       case 'failed':
-        console.error(
-          `[NOWPayments Webhook] Payment failed: ${payload.order_id}`
-        );
-        break;
-
-      case 'refunded':
-        console.warn(
-          `[NOWPayments Webhook] Payment refunded: ${payload.order_id}`
-        );
-        // TODO: Handle refund — cancel subscription, reverse commission
-        break;
-
       case 'expired':
+      case 'refunded': {
         console.warn(
-          `[NOWPayments Webhook] Payment expired: ${payload.order_id}`
+          `[NOWPayments Webhook] Payment ${payload.payment_status}: ${payload.order_id}`
         );
+        // Release inventory on ticket failure/expiry/refund
+        if (payload.order_id.startsWith('ticket_')) {
+          await handleTicketPurchase(payload.order_id, payload, payload.payment_status);
+        }
+        // TODO: handle subscription refunds (cancel subscription, reverse commission)
         break;
+      }
 
       default:
         console.warn(
