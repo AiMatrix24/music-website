@@ -9,3 +9,4 @@ export * from './articles';
 export * from './broadcasts';
 export * from './beats';
 export * from './podcasts';
+export * from './tips';

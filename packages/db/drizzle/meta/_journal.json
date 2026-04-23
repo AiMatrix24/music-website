@@ -36,6 +36,13 @@
       "when": 1776967400903,
       "tag": "0004_smiling_george_stacy",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1776968808483,
+      "tag": "0005_light_sabretooth",
+      "breakpoints": true
     }
   ]
 }

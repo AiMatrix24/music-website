@@ -21,6 +21,7 @@ import {
   payoutBatches,
   tracks,
   trackPurchases,
+  tips,
   albums,
   albumTracks,
   playlists,
@@ -2110,6 +2111,153 @@ const trackPurchasesRouter = createRouter({
   }),
 });
 
+// ─── Tips Router ───
+/**
+ * Creator support tips. One-time payment from a fan to a creator (one user
+ * sending another user money). Same pending → completed flow as tickets,
+ * subscriptions, and track purchases. Webhook flips status on payment events.
+ */
+const tipsRouter = createRouter({
+  send: protectedProcedure
+    .input(
+      z.object({
+        recipientUserId: z.string().uuid(),
+        amount: z.number().int().min(50).max(50000), // $0.50 to $500 in cents
+        trackId: z.string().uuid().optional(),
+        message: z.string().max(500).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const tipperUserId = ctx.session.user.id;
+
+      if (tipperUserId === input.recipientUserId) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Cannot tip yourself' });
+      }
+
+      // Verify recipient exists
+      const recipient = await db.query.users.findFirst({
+        where: eq(users.id, input.recipientUserId),
+      });
+      if (!recipient) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Recipient not found' });
+      }
+
+      const apiKey = process.env.NOWPAYMENTS_API_KEY;
+      if (!apiKey) {
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Payment not configured' });
+      }
+
+      // Create pending tip — webhook activates it
+      const [tip] = await db
+        .insert(tips)
+        .values({
+          tipperUserId,
+          recipientUserId: input.recipientUserId,
+          trackId: input.trackId ?? null,
+          amount: input.amount,
+          message: input.message?.trim() || null,
+          status: 'pending',
+        })
+        .returning();
+
+      try {
+        const priceUsd = input.amount / 100;
+        // Successful redirect lands back on the track page if we have one,
+        // otherwise on the recipient's creator profile page.
+        const successUrl = input.trackId
+          ? `https://opynx.com/track/${input.trackId}?tipped=true`
+          : `https://opynx.com/artist/${input.recipientUserId}?tipped=true`;
+        const cancelUrl = input.trackId
+          ? `https://opynx.com/track/${input.trackId}?tipCancelled=true`
+          : `https://opynx.com/artist/${input.recipientUserId}?tipCancelled=true`;
+
+        const response = await fetch('https://api.nowpayments.io/v1/payment', {
+          method: 'POST',
+          headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            price_amount: priceUsd,
+            price_currency: 'usd',
+            pay_currency: 'usdcmatic',
+            // order_id format parsed by webhook: tip_{tipId}
+            order_id: `tip_${tip.id}`,
+            order_description: `OPYNX tip — $${priceUsd.toFixed(2)} to ${recipient.name ?? recipient.id}`,
+            ipn_callback_url: 'https://opynx.com/api/webhooks/nowpayments',
+            success_url: successUrl,
+            cancel_url: cancelUrl,
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.payment_id) {
+          await db.delete(tips).where(eq(tips.id, tip.id));
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Payment creation failed' });
+        }
+
+        await db
+          .update(tips)
+          .set({ paymentId: String(data.payment_id) })
+          .where(eq(tips.id, tip.id));
+
+        return {
+          tip,
+          paymentUrl: `https://nowpayments.io/payment/?iid=${data.payment_id}`,
+        };
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        await db.delete(tips).where(eq(tips.id, tip.id));
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Payment service unavailable',
+        });
+      }
+    }),
+
+  /**
+   * List tips received by the current user (creator dashboard view). Returns
+   * completed tips only — pending and cancelled don't represent real money.
+   */
+  received: protectedProcedure.query(async ({ ctx }) => {
+    return db
+      .select({
+        tipId: tips.id,
+        amount: tips.amount,
+        message: tips.message,
+        receivedAt: tips.createdAt,
+        trackId: tips.trackId,
+        tipperName: users.name,
+      })
+      .from(tips)
+      .leftJoin(users, eq(tips.tipperUserId, users.id))
+      .where(and(
+        eq(tips.recipientUserId, ctx.session.user.id),
+        eq(tips.status, 'completed')
+      ))
+      .orderBy(desc(tips.createdAt));
+  }),
+
+  /**
+   * List tips the current user has sent (fan history view).
+   */
+  sent: protectedProcedure.query(async ({ ctx }) => {
+    return db
+      .select({
+        tipId: tips.id,
+        amount: tips.amount,
+        message: tips.message,
+        sentAt: tips.createdAt,
+        trackId: tips.trackId,
+        recipientName: users.name,
+      })
+      .from(tips)
+      .leftJoin(users, eq(tips.recipientUserId, users.id))
+      .where(and(
+        eq(tips.tipperUserId, ctx.session.user.id),
+        eq(tips.status, 'completed')
+      ))
+      .orderBy(desc(tips.createdAt));
+  }),
+});
+
 // ─── App Router ───
 export const appRouter = createRouter({
   auth: authRouter,
@@ -2132,6 +2280,7 @@ export const appRouter = createRouter({
   podcasts: podcastsRouter,
   podcastEpisodes: podcastEpisodesRouter,
   trackPurchases: trackPurchasesRouter,
+  tips: tipsRouter,
 });
 
 export type AppRouter = typeof appRouter;

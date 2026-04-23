@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { db, subscriptions, subEvents } from '@opynx/db';
-import { tickets, ticketTypes, trackPurchases } from '@opynx/db/schema';
+import { tickets, ticketTypes, trackPurchases, tips } from '@opynx/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { processCommissionWaterfall } from '@/lib/services/commissions';
 import { captureError, startTransaction } from '@/lib/services/monitoring';
@@ -330,6 +330,54 @@ async function handleTrackPurchase(
   }
 }
 
+async function handleTipPayment(
+  orderId: string,
+  payload: NowPaymentsIPNPayload,
+  status: PaymentStatus
+): Promise<void> {
+  // orderId format: tip_{tipId}
+  const tipId = orderId.replace('tip_', '');
+  if (!/^[0-9a-f-]{36}$/i.test(tipId)) {
+    console.error(`[NOWPayments Webhook] Malformed tip order_id: ${orderId}`);
+    return;
+  }
+
+  const tip = await db.query.tips.findFirst({ where: eq(tips.id, tipId) });
+  if (!tip) {
+    console.warn(`[NOWPayments Webhook] Tip ${tipId} not found`);
+    return;
+  }
+
+  if (status === 'finished') {
+    if (tip.status === 'completed') {
+      console.log(`[NOWPayments Webhook] Tip ${tipId} already completed (idempotent)`);
+      return;
+    }
+    await db
+      .update(tips)
+      .set({ status: 'completed', updatedAt: new Date() })
+      .where(eq(tips.id, tipId));
+    console.log(
+      `[NOWPayments Webhook] Tip ${tipId} completed: ${tip.amount} cents to ${tip.recipientUserId}`
+    );
+    // TODO: notify creator of tip received
+  } else if (status === 'failed' || status === 'expired') {
+    if (tip.status === 'pending') {
+      await db
+        .update(tips)
+        .set({ status: 'cancelled', updatedAt: new Date() })
+        .where(eq(tips.id, tipId));
+      console.log(`[NOWPayments Webhook] Tip ${tipId} cancelled (status=${status})`);
+    }
+  } else if (status === 'refunded') {
+    await db
+      .update(tips)
+      .set({ status: 'refunded', updatedAt: new Date() })
+      .where(eq(tips.id, tipId));
+    console.log(`[NOWPayments Webhook] Tip ${tipId} refunded`);
+  }
+}
+
 async function handleMarketplaceOrder(
   orderId: string,
   payload: NowPaymentsIPNPayload
@@ -489,6 +537,8 @@ export async function POST(request: NextRequest) {
           await handleTicketPurchase(orderId, payload, 'finished');
         } else if (orderId.startsWith('trackbuy_')) {
           await handleTrackPurchase(orderId, payload, 'finished');
+        } else if (orderId.startsWith('tip_')) {
+          await handleTipPayment(orderId, payload, 'finished');
         } else if (orderId.startsWith('merch_')) {
           await handleMarketplaceOrder(orderId, payload);
         } else {
@@ -515,6 +565,8 @@ export async function POST(request: NextRequest) {
           await handleTicketPurchase(payload.order_id, payload, payload.payment_status);
         } else if (payload.order_id.startsWith('trackbuy_')) {
           await handleTrackPurchase(payload.order_id, payload, payload.payment_status);
+        } else if (payload.order_id.startsWith('tip_')) {
+          await handleTipPayment(payload.order_id, payload, payload.payment_status);
         }
         break;
       }
