@@ -333,7 +333,7 @@ const tracksRouter = createRouter({
       const conditions = [eq(tracks.status, 'published')];
       if (input.userId) conditions.push(eq(tracks.userId, input.userId));
 
-      return db
+      const rows = await db
         .select({
           id: tracks.id,
           userId: tracks.userId,
@@ -349,7 +349,7 @@ const tracksRouter = createRouter({
           createdAt: tracks.createdAt,
           artistName: users.name,
           coverUrl: tracks.coverUrl,
-          audioUrl: sql<string | null>`COALESCE(${tracks.audioUrl320}, ${tracks.audioUrl128})`,
+          rawAudioUrl: sql<string | null>`COALESCE(${tracks.audioUrl320}, ${tracks.audioUrl128})`,
         })
         .from(tracks)
         .leftJoin(users, eq(tracks.userId, users.id))
@@ -357,6 +357,12 @@ const tracksRouter = createRouter({
         .orderBy(desc(tracks.createdAt))
         .limit(input.limit)
         .offset(input.offset);
+      // Rewrite audioUrl through the same-origin proxy (eliminates iOS Safari
+      // cross-origin/CORS quirks). Direct CDN URL is hidden from clients.
+      return rows.map(({ rawAudioUrl, ...r }) => ({
+        ...r,
+        audioUrl: rawAudioUrl ? `/api/media/track/${r.id}` : null,
+      }));
     }),
 
   getById: publicProcedure
@@ -379,13 +385,19 @@ const tracksRouter = createRouter({
           updatedAt: tracks.updatedAt,
           artistName: users.name,
           coverUrl: tracks.coverUrl,
-          audioUrl: sql<string | null>`COALESCE(${tracks.audioUrl320}, ${tracks.audioUrl128})`,
+          rawAudioUrl: sql<string | null>`COALESCE(${tracks.audioUrl320}, ${tracks.audioUrl128})`,
         })
         .from(tracks)
         .leftJoin(users, eq(tracks.userId, users.id))
         .where(eq(tracks.id, input.id))
         .limit(1);
-      return rows[0] ?? null;
+      const row = rows[0];
+      if (!row) return null;
+      const { rawAudioUrl, ...rest } = row;
+      return {
+        ...rest,
+        audioUrl: rawAudioUrl ? `/api/media/track/${row.id}` : null,
+      };
     }),
 
   create: protectedProcedure
@@ -1595,7 +1607,12 @@ const podcastsRouter = createRouter({
         .from(podcastEpisodes)
         .where(and(eq(podcastEpisodes.podcastId, show.id), eq(podcastEpisodes.status, 'published')))
         .orderBy(desc(podcastEpisodes.publishedAt));
-      return { ...show, episodes };
+      // Rewrite each episode's audioUrl through same-origin proxy (iOS compat)
+      const rewritten = episodes.map((ep) => ({
+        ...ep,
+        audioUrl: ep.audioUrl ? `/api/media/episode/${ep.id}` : null,
+      }));
+      return { ...show, episodes: rewritten };
     }),
 
   create: protectedProcedure
@@ -1760,7 +1777,12 @@ const podcastEpisodesRouter = createRouter({
         .where(and(eq(podcastEpisodes.podcastId, show.id), eq(podcastEpisodes.slug, input.episodeSlug)))
         .limit(1);
       if (!episode) throw new TRPCError({ code: 'NOT_FOUND', message: 'Episode not found' });
-      return { ...episode, podcast: show };
+      // Rewrite audioUrl through same-origin proxy
+      return {
+        ...episode,
+        audioUrl: episode.audioUrl ? `/api/media/episode/${episode.id}` : null,
+        podcast: show,
+      };
     }),
 
   update: protectedProcedure
