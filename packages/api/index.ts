@@ -218,6 +218,54 @@ const usersRouter = createRouter({
         .where(eq(follows.followeeId, input.userId));
       return result[0]?.count ?? 0;
     }),
+
+  /**
+   * Followers of the current user (the people who follow ME). Used by
+   * /dashboard/fans to show the creator who their actual audience is.
+   * Joins users for follower display name + role.
+   */
+  myFollowers: protectedProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(50),
+        offset: z.number().min(0).default(0),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+      const [list, totals] = await Promise.all([
+        db
+          .select({
+            followerId: follows.followerId,
+            followedAt: follows.createdAt,
+            name: users.name,
+            avatar: users.avatar,
+            role: users.role,
+          })
+          .from(follows)
+          .innerJoin(users, eq(follows.followerId, users.id))
+          .where(eq(follows.followeeId, userId))
+          .orderBy(desc(follows.createdAt))
+          .limit(input.limit)
+          .offset(input.offset),
+        db
+          .select({
+            total: sql<number>`COUNT(*)::int`,
+            recent: sql<number>`COUNT(CASE WHEN ${follows.createdAt} >= ${thirtyDaysAgo} THEN 1 END)::int`,
+          })
+          .from(follows)
+          .where(eq(follows.followeeId, userId)),
+      ]);
+
+      const t = totals[0] ?? { total: 0, recent: 0 };
+      return {
+        followers: list,
+        total: t.total,
+        recentLast30Days: t.recent,
+      };
+    }),
 });
 
 // ─── Subscriptions Router ───
@@ -833,7 +881,11 @@ const eventsRouter = createRouter({
           timezone: input.timezone ?? null,
           capacity: input.capacity ?? null,
           coverUrl: input.coverUrl ?? null,
-          status: 'draft',
+          // Default to 'published' — the create-event UI is a one-shot "set up
+          // everything and publish" flow, and users expect the "Publish Event"
+          // button to actually make the event visible. If a drafts-first flow
+          // is added later, pass status: 'draft' from the mutation input.
+          status: 'published',
         })
         .returning();
       return event;
@@ -1166,6 +1218,162 @@ const marketplaceRouter = createRouter({
         .limit(1);
       return rows[0] ?? null;
     }),
+
+  /**
+   * Purchase a marketplace listing. Creates a pending order + NOWPayments charge.
+   * Webhook flips 'pending' → 'paid' on payment.finished. Seller handles shipping
+   * out-of-band for now (MVP).
+   */
+  buy: protectedProcedure
+    .input(
+      z.object({
+        listingId: z.string().uuid(),
+        quantity: z.number().int().min(1).max(10).default(1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const buyerId = ctx.session.user.id;
+
+      const listing = await db.query.listings.findFirst({
+        where: eq(listings.id, input.listingId),
+      });
+      if (!listing) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Listing not found' });
+      }
+      if (listing.status !== 'active') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Listing is not available' });
+      }
+      if (listing.sellerId === buyerId) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'You cannot buy your own listing' });
+      }
+      if (listing.stock !== null && listing.stock < input.quantity) {
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Insufficient stock' });
+      }
+
+      const apiKey = process.env.NOWPAYMENTS_API_KEY;
+      if (!apiKey) {
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Payment not configured' });
+      }
+
+      const unitPrice = listing.price;
+      const subtotal = unitPrice * input.quantity;
+      // Platform commission: 15% flat for marketplace (consistent with track
+      // sales). Seller sees 85%.
+      const commissionCents = Math.floor(subtotal * 0.15);
+
+      // Atomic stock decrement (guards against concurrent purchases)
+      const stockResult = await db.execute(
+        sql`UPDATE listings SET stock = stock - ${input.quantity} WHERE id = ${input.listingId} AND (stock IS NULL OR stock >= ${input.quantity}) AND status = 'active'`
+      );
+      const affected = Number(
+        (stockResult as any).rowCount ?? (stockResult as any).count ?? stockResult.length ?? 0
+      );
+      if (affected === 0) {
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Out of stock' });
+      }
+
+      // Create pending order
+      const [order] = await db
+        .insert(orders)
+        .values({
+          buyerId,
+          sellerId: listing.sellerId,
+          totalAmount: subtotal,
+          commission: commissionCents,
+          paymentMethod: 'nowpayments',
+          status: 'pending',
+        })
+        .returning();
+
+      await db.insert(orderItems).values({
+        orderId: order.id,
+        listingId: listing.id,
+        quantity: input.quantity,
+        unitPrice,
+      });
+
+      try {
+        const priceUsd = subtotal / 100;
+        const response = await fetch('https://api.nowpayments.io/v1/payment', {
+          method: 'POST',
+          headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            price_amount: priceUsd,
+            price_currency: 'usd',
+            pay_currency: 'usdcmatic',
+            order_id: `merch_${order.id}`,
+            order_description: `OPYNX marketplace: ${listing.title} x${input.quantity} — $${priceUsd.toFixed(2)}`,
+            ipn_callback_url: 'https://opynx.com/api/webhooks/nowpayments',
+            success_url: `https://opynx.com/marketplace/${listing.id}?purchased=true`,
+            cancel_url: `https://opynx.com/marketplace/${listing.id}?cancelled=true`,
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.payment_id) {
+          // Roll back stock + order
+          await db.delete(orderItems).where(eq(orderItems.orderId, order.id));
+          await db.delete(orders).where(eq(orders.id, order.id));
+          await db.execute(
+            sql`UPDATE listings SET stock = stock + ${input.quantity} WHERE id = ${input.listingId}`
+          );
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Payment creation failed',
+          });
+        }
+
+        await db
+          .update(orders)
+          .set({ paymentId: String(data.payment_id) })
+          .where(eq(orders.id, order.id));
+
+        return {
+          order,
+          paymentUrl: `https://nowpayments.io/payment/?iid=${data.payment_id}`,
+        };
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        // Roll back on any other error
+        await db.delete(orderItems).where(eq(orderItems.orderId, order.id));
+        await db.delete(orders).where(eq(orders.id, order.id));
+        await db.execute(
+          sql`UPDATE listings SET stock = stock + ${input.quantity} WHERE id = ${input.listingId}`
+        );
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Payment service unavailable',
+        });
+      }
+    }),
+
+  /** List the current user's own orders (purchases they've made) */
+  myOrders: protectedProcedure.query(async ({ ctx }) => {
+    return db
+      .select({
+        order: orders,
+        listingTitle: listings.title,
+      })
+      .from(orders)
+      .leftJoin(orderItems, eq(orderItems.orderId, orders.id))
+      .leftJoin(listings, eq(listings.id, orderItems.listingId))
+      .where(eq(orders.buyerId, ctx.session.user.id))
+      .orderBy(desc(orders.createdAt));
+  }),
+
+  /** List the current user's incoming sales (where they're the seller) */
+  mySales: protectedProcedure.query(async ({ ctx }) => {
+    return db
+      .select({
+        order: orders,
+        listingTitle: listings.title,
+      })
+      .from(orders)
+      .leftJoin(orderItems, eq(orderItems.orderId, orders.id))
+      .leftJoin(listings, eq(listings.id, orderItems.listingId))
+      .where(eq(orders.sellerId, ctx.session.user.id))
+      .orderBy(desc(orders.createdAt));
+  }),
 
   createListing: protectedProcedure
     .input(
@@ -2258,6 +2466,203 @@ const tipsRouter = createRouter({
   }),
 });
 
+// ─── Earnings Router ───
+/**
+ * Aggregates creator earnings across all active revenue streams. Pulls from
+ * persisted payment data: tips received, track purchases of tracks the user
+ * owns, ticket sales for events the user hosts, and marketplace order revenue
+ * where the user is the seller.
+ *
+ * Subscription commissions are NOT included yet — the waterfall engine
+ * calculates splits but doesn't persist them to the `commissions` table.
+ * Flagged as TODO until that's fixed.
+ */
+const earningsRouter = createRouter({
+  /**
+   * Lifetime + 30-day totals broken down by revenue source.
+   * All amounts in INTEGER CENTS.
+   */
+  summary: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    // Tips received (completed)
+    const tipsTotal = await db
+      .select({
+        lifetime: sql<number>`COALESCE(SUM(${tips.amount}), 0)::int`,
+        recent: sql<number>`COALESCE(SUM(CASE WHEN ${tips.createdAt} >= ${thirtyDaysAgo} THEN ${tips.amount} ELSE 0 END), 0)::int`,
+        count: sql<number>`COUNT(*)::int`,
+      })
+      .from(tips)
+      .where(and(eq(tips.recipientUserId, userId), eq(tips.status, 'completed')));
+
+    // Track purchases (buyer paid for tracks this user owns)
+    const trackTotal = await db
+      .select({
+        lifetime: sql<number>`COALESCE(SUM(${trackPurchases.pricePaid}), 0)::int`,
+        recent: sql<number>`COALESCE(SUM(CASE WHEN ${trackPurchases.createdAt} >= ${thirtyDaysAgo} THEN ${trackPurchases.pricePaid} ELSE 0 END), 0)::int`,
+        count: sql<number>`COUNT(*)::int`,
+      })
+      .from(trackPurchases)
+      .innerJoin(tracks, eq(trackPurchases.trackId, tracks.id))
+      .where(and(eq(tracks.userId, userId), eq(trackPurchases.status, 'completed')));
+
+    // Ticket sales (buyer paid for tickets to events this user hosts)
+    const ticketTotal = await db
+      .select({
+        lifetime: sql<number>`COALESCE(SUM(${ticketTypes.price}), 0)::int`,
+        recent: sql<number>`COALESCE(SUM(CASE WHEN ${tickets.createdAt} >= ${thirtyDaysAgo} THEN ${ticketTypes.price} ELSE 0 END), 0)::int`,
+        count: sql<number>`COUNT(*)::int`,
+      })
+      .from(tickets)
+      .innerJoin(events, eq(tickets.eventId, events.id))
+      .innerJoin(ticketTypes, eq(tickets.ticketTypeId, ticketTypes.id))
+      .where(and(eq(events.hostId, userId), eq(tickets.status, 'valid')));
+
+    // Marketplace orders (user is the seller, payment landed)
+    const merchTotal = await db
+      .select({
+        lifetime: sql<number>`COALESCE(SUM(${orders.totalAmount}), 0)::int`,
+        recent: sql<number>`COALESCE(SUM(CASE WHEN ${orders.createdAt} >= ${thirtyDaysAgo} THEN ${orders.totalAmount} ELSE 0 END), 0)::int`,
+        count: sql<number>`COUNT(*)::int`,
+      })
+      .from(orders)
+      .where(and(
+        eq(orders.sellerId, userId),
+        sql`${orders.status} IN ('paid', 'shipped', 'delivered')`
+      ));
+
+    const t = tipsTotal[0] ?? { lifetime: 0, recent: 0, count: 0 };
+    const tr = trackTotal[0] ?? { lifetime: 0, recent: 0, count: 0 };
+    const tk = ticketTotal[0] ?? { lifetime: 0, recent: 0, count: 0 };
+    const m = merchTotal[0] ?? { lifetime: 0, recent: 0, count: 0 };
+
+    return {
+      lifetime: t.lifetime + tr.lifetime + tk.lifetime + m.lifetime,
+      thirtyDay: t.recent + tr.recent + tk.recent + m.recent,
+      bySource: {
+        tips: { lifetime: t.lifetime, recent: t.recent, count: t.count },
+        tracks: { lifetime: tr.lifetime, recent: tr.recent, count: tr.count },
+        tickets: { lifetime: tk.lifetime, recent: tk.recent, count: tk.count },
+        marketplace: { lifetime: m.lifetime, recent: m.recent, count: m.count },
+        // Subscriptions not persisted yet — waterfall calculates but doesn't
+        // insert into commissions table. See TODO in nowpayments webhook.
+        subscriptions: { lifetime: 0, recent: 0, count: 0, todo: 'Commission persistence not wired yet' as const },
+      },
+    };
+  }),
+
+  /**
+   * Recent transactions (last 30 days, limit 50) across all revenue streams,
+   * unioned and sorted by date. For the earnings page's "recent activity" feed.
+   */
+  recentTransactions: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    // Four queries in parallel, then merge + sort in app layer (simpler than SQL UNION)
+    const [tipRows, trackRows, ticketRows, merchRows] = await Promise.all([
+      db
+        .select({
+          id: tips.id,
+          amount: tips.amount,
+          createdAt: tips.createdAt,
+          message: tips.message,
+        })
+        .from(tips)
+        .where(and(
+          eq(tips.recipientUserId, userId),
+          eq(tips.status, 'completed'),
+          sql`${tips.createdAt} >= ${thirtyDaysAgo}`
+        ))
+        .orderBy(desc(tips.createdAt))
+        .limit(20),
+      db
+        .select({
+          id: trackPurchases.id,
+          amount: trackPurchases.pricePaid,
+          createdAt: trackPurchases.createdAt,
+          trackTitle: tracks.title,
+        })
+        .from(trackPurchases)
+        .innerJoin(tracks, eq(trackPurchases.trackId, tracks.id))
+        .where(and(
+          eq(tracks.userId, userId),
+          eq(trackPurchases.status, 'completed'),
+          sql`${trackPurchases.createdAt} >= ${thirtyDaysAgo}`
+        ))
+        .orderBy(desc(trackPurchases.createdAt))
+        .limit(20),
+      db
+        .select({
+          id: tickets.id,
+          amount: ticketTypes.price,
+          createdAt: tickets.createdAt,
+          eventTitle: events.title,
+          ticketTypeName: ticketTypes.name,
+        })
+        .from(tickets)
+        .innerJoin(events, eq(tickets.eventId, events.id))
+        .innerJoin(ticketTypes, eq(tickets.ticketTypeId, ticketTypes.id))
+        .where(and(
+          eq(events.hostId, userId),
+          eq(tickets.status, 'valid'),
+          sql`${tickets.createdAt} >= ${thirtyDaysAgo}`
+        ))
+        .orderBy(desc(tickets.createdAt))
+        .limit(20),
+      db
+        .select({
+          id: orders.id,
+          amount: orders.totalAmount,
+          createdAt: orders.createdAt,
+        })
+        .from(orders)
+        .where(and(
+          eq(orders.sellerId, userId),
+          sql`${orders.status} IN ('paid', 'shipped', 'delivered')`,
+          sql`${orders.createdAt} >= ${thirtyDaysAgo}`
+        ))
+        .orderBy(desc(orders.createdAt))
+        .limit(20),
+    ]);
+
+    const txns = [
+      ...tipRows.map((r) => ({
+        id: r.id,
+        source: 'tip' as const,
+        amount: r.amount,
+        createdAt: r.createdAt,
+        label: r.message ? `Tip: "${r.message.slice(0, 40)}..."` : 'Tip received',
+      })),
+      ...trackRows.map((r) => ({
+        id: r.id,
+        source: 'track' as const,
+        amount: r.amount,
+        createdAt: r.createdAt,
+        label: `Track sale: ${r.trackTitle}`,
+      })),
+      ...ticketRows.map((r) => ({
+        id: r.id,
+        source: 'ticket' as const,
+        amount: r.amount,
+        createdAt: r.createdAt,
+        label: `Ticket: ${r.eventTitle} (${r.ticketTypeName})`,
+      })),
+      ...merchRows.map((r) => ({
+        id: r.id,
+        source: 'marketplace' as const,
+        amount: r.amount,
+        createdAt: r.createdAt,
+        label: 'Marketplace sale',
+      })),
+    ];
+
+    txns.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return txns.slice(0, 50);
+  }),
+});
+
 // ─── App Router ───
 export const appRouter = createRouter({
   auth: authRouter,
@@ -2281,6 +2686,7 @@ export const appRouter = createRouter({
   podcastEpisodes: podcastEpisodesRouter,
   trackPurchases: trackPurchasesRouter,
   tips: tipsRouter,
+  earnings: earningsRouter,
 });
 
 export type AppRouter = typeof appRouter;

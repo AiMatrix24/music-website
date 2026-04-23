@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { db, subscriptions, subEvents } from '@opynx/db';
-import { tickets, ticketTypes, trackPurchases, tips } from '@opynx/db/schema';
+import { tickets, ticketTypes, trackPurchases, tips, orders, orderItems, listings } from '@opynx/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { processCommissionWaterfall } from '@/lib/services/commissions';
 import { captureError, startTransaction } from '@/lib/services/monitoring';
@@ -380,18 +380,64 @@ async function handleTipPayment(
 
 async function handleMarketplaceOrder(
   orderId: string,
-  payload: NowPaymentsIPNPayload
+  payload: NowPaymentsIPNPayload,
+  status: PaymentStatus
 ): Promise<void> {
   // orderId format: merch_{orderId}
   const merchOrderId = orderId.replace('merch_', '');
+  if (!/^[0-9a-f-]{36}$/i.test(merchOrderId)) {
+    console.error(`[NOWPayments Webhook] Malformed marketplace order_id: ${orderId}`);
+    return;
+  }
 
-  console.log(
-    `[NOWPayments Webhook] Marketplace order confirmed: ${merchOrderId} ` +
-      `paid=${payload.actually_paid} ${payload.pay_currency}`
-  );
+  const order = await db.query.orders.findFirst({
+    where: eq(orders.id, merchOrderId),
+  });
+  if (!order) {
+    console.warn(`[NOWPayments Webhook] Marketplace order ${merchOrderId} not found`);
+    return;
+  }
 
-  // TODO: Update order status in DB, trigger fulfillment
-  // This will be implemented when the marketplace checkout flow is connected
+  if (status === 'finished') {
+    if (order.status === 'paid' || order.status === 'shipped' || order.status === 'delivered') {
+      console.log(`[NOWPayments Webhook] Marketplace order ${merchOrderId} already paid (idempotent)`);
+      return;
+    }
+    await db
+      .update(orders)
+      .set({ status: 'paid', updatedAt: new Date() })
+      .where(eq(orders.id, merchOrderId));
+    console.log(
+      `[NOWPayments Webhook] Marketplace order ${merchOrderId} paid: $${(order.totalAmount / 100).toFixed(2)} to seller ${order.sellerId}`
+    );
+    // TODO: notify seller of sale, send buyer confirmation email
+  } else if (status === 'failed' || status === 'expired') {
+    if (order.status === 'pending') {
+      // Release stock: look up order items and add back
+      const items = await db
+        .select()
+        .from(orderItems)
+        .where(eq(orderItems.orderId, merchOrderId));
+      for (const item of items) {
+        await db.execute(
+          sql`UPDATE listings SET stock = stock + ${item.quantity} WHERE id = ${item.listingId}`
+        );
+      }
+      await db
+        .update(orders)
+        .set({ status: 'refunded', updatedAt: new Date() })
+        .where(eq(orders.id, merchOrderId));
+      console.log(
+        `[NOWPayments Webhook] Marketplace order ${merchOrderId} cancelled (status=${status}), stock released`
+      );
+    }
+  } else if (status === 'refunded') {
+    await db
+      .update(orders)
+      .set({ status: 'refunded', updatedAt: new Date() })
+      .where(eq(orders.id, merchOrderId));
+    console.log(`[NOWPayments Webhook] Marketplace order ${merchOrderId} refunded`);
+  }
 }
 
 // ─── Metadata Parser ───
@@ -540,7 +586,7 @@ export async function POST(request: NextRequest) {
         } else if (orderId.startsWith('tip_')) {
           await handleTipPayment(orderId, payload, 'finished');
         } else if (orderId.startsWith('merch_')) {
-          await handleMarketplaceOrder(orderId, payload);
+          await handleMarketplaceOrder(orderId, payload, 'finished');
         } else {
           console.warn(
             `[NOWPayments Webhook] Unknown order type: ${orderId}`
@@ -567,6 +613,8 @@ export async function POST(request: NextRequest) {
           await handleTrackPurchase(payload.order_id, payload, payload.payment_status);
         } else if (payload.order_id.startsWith('tip_')) {
           await handleTipPayment(payload.order_id, payload, payload.payment_status);
+        } else if (payload.order_id.startsWith('merch_')) {
+          await handleMarketplaceOrder(payload.order_id, payload, payload.payment_status);
         }
         break;
       }

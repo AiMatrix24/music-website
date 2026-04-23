@@ -36,7 +36,17 @@ function CheckoutContent() {
   const [shippingState, setShippingState] = useState('');
   const [shippingZip, setShippingZip] = useState('');
   const [processing, setProcessing] = useState(false);
-  const [orderComplete, setOrderComplete] = useState(false);
+
+  const buyMutation = trpc.marketplace.buy.useMutation({
+    onSuccess: (result) => {
+      // Redirect to NOWPayments USDC checkout — order activates via webhook
+      window.location.href = result.paymentUrl;
+    },
+    onError: (err) => {
+      toast(err.message || 'Purchase failed', 'error');
+      setProcessing(false);
+    },
+  });
 
   if (status !== 'authenticated') {
     return (
@@ -81,52 +91,18 @@ function CheckoutContent() {
       return;
     }
     setProcessing(true);
-    setTimeout(() => {
-      setProcessing(false);
-      setOrderComplete(true);
-      toast('Order placed!', 'success');
-    }, 2000);
+    // NOTE: shipping details are collected but NOT yet persisted server-side.
+    // Seller will contact buyer via platform messaging post-sale until we add
+    // a shipping_addresses table. Tracked as TODO.
+    buyMutation.mutate({
+      listingId: listing.id,
+      quantity,
+    });
   };
 
-  if (orderComplete) {
-    return (
-      <div className="min-h-screen py-16 px-6">
-        <div className="max-w-lg mx-auto text-center">
-          <div className="w-24 h-24 rounded-full bg-green-600/20 flex items-center justify-center text-5xl mx-auto mb-6">✅</div>
-          <h1 className="text-3xl font-black mb-2">Order Confirmed!</h1>
-          <p className="text-gray-400 mb-8">Your order has been placed and the creator has been notified.</p>
-
-          <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6 text-left mb-8">
-            <h2 className="font-bold mb-4">Order Summary</h2>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between"><span className="text-gray-400">Item</span><span>{listing.title}</span></div>
-              <div className="flex justify-between"><span className="text-gray-400">Quantity</span><span>{quantity}</span></div>
-              <div className="flex justify-between"><span className="text-gray-400">Payment</span><span>{payMethod === 'usdc' ? 'USDC (Polygon)' : 'Card'}</span></div>
-              <div className="flex justify-between font-bold border-t border-brand-800/20 pt-3"><span>Total</span><span className="text-red-400">${total.toFixed(2)}</span></div>
-            </div>
-            <div className="mt-4 p-3 bg-brand-950/50 rounded-lg text-xs text-gray-400">
-              Creator receives: <span className="text-red-400 font-bold">${artistEarns.toFixed(2)}</span> (85%) — verified on Polygon
-            </div>
-          </div>
-
-          {needsShipping && (
-            <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6 text-left mb-8">
-              <h2 className="font-bold mb-2">Shipping To</h2>
-              <p className="text-sm text-gray-400">{shippingName}</p>
-              <p className="text-sm text-gray-400">{shippingAddress}</p>
-              <p className="text-sm text-gray-400">{shippingCity}, {shippingState} {shippingZip}</p>
-              <p className="text-xs text-gray-500 mt-2">Estimated delivery: 5-10 business days</p>
-            </div>
-          )}
-
-          <div className="space-y-3">
-            <Link href="/explore" className="block w-full rounded-full bg-red-600 py-3 font-semibold text-white text-center hover:bg-red-500 transition">Continue Shopping</Link>
-            <Link href="/dashboard" className="block w-full rounded-full border border-brand-800/30 py-3 font-semibold text-center hover:border-red-600 transition">View Orders</Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // NOTE: the old orderComplete mock success state was removed. After Buy,
+  // user is redirected to NOWPayments, then back to the listing page with
+  // ?purchased=true — success messaging lives there now.
 
   return (
     <div className="min-h-screen py-16 px-6">
