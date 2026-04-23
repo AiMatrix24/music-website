@@ -218,12 +218,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         very first user gesture and stays unlocked.
         playsInline + webkit-playsinline are belt-and-suspenders for iOS.
       */}
+      {/*
+        DO NOT set display:none / className="hidden" on this element — iOS
+        Safari silently refuses to play <audio> with display:none. Use sr-only
+        style positioning so it stays in the layout but is invisible.
+      */}
       <audio
         ref={audioRef}
         preload="auto"
         playsInline
         {...({ 'webkit-playsinline': 'true' } as Record<string, string>)}
-        className="hidden"
+        style={{ position: 'fixed', left: -9999, width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
       />
       {children}
     </PlayerContext.Provider>
