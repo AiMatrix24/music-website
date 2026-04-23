@@ -32,9 +32,15 @@ export const commissions = pgTable(
   'commissions',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    attributionId: uuid('attribution_id')
-      .references(() => attributions.id)
-      .notNull(),
+    // Attribution is the QR-scan provenance link. Now nullable: subscriptions
+    // can be made without prior attribution (the recipientId column is the
+    // source of truth for "who gets paid"; attribution is only metadata about
+    // how the relationship was formed).
+    attributionId: uuid('attribution_id').references(() => attributions.id),
+    // Source identifier — for subscriptions, the subscription UUID; lets us
+    // group commission rows by triggering payment and find them on refund.
+    sourceType: text('source_type'), // 'subscription' | 'tip' | 'track' | 'ticket' | 'merch'
+    sourceId: uuid('source_id'),
     recipientId: uuid('recipient_id')
       .references(() => users.id)
       .notNull(),
@@ -59,6 +65,7 @@ export const commissions = pgTable(
     index('comm_status_idx').on(t.status),
     index('comm_tier_idx').on(t.tier),
     index('comm_batch_idx').on(t.payoutBatchId),
+    index('comm_source_idx').on(t.sourceType, t.sourceId),
   ]
 );
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { db, subscriptions, subEvents } from '@opynx/db';
-import { tickets, ticketTypes, trackPurchases, tips, orders, orderItems, listings } from '@opynx/db/schema';
+import { tickets, ticketTypes, trackPurchases, tips, orders, orderItems, listings, commissions } from '@opynx/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { processCommissionWaterfall } from '@/lib/services/commissions';
 import { captureError, startTransaction } from '@/lib/services/monitoring';
@@ -172,8 +172,9 @@ async function handleSubscriptionPayment(
   // order_description at checkout time as colon-comma key:value pairs)
   const metadata = parseOrderMetadata(payload.order_description);
   const commissionTier = tierRaw === 'bundle' ? 'superfan_bundle' : 'standard';
+  let waterfallResult: Awaited<ReturnType<typeof processCommissionWaterfall>> | null = null;
   if (commissionTier === 'standard' && metadata.creatorId) {
-    await processCommissionWaterfall({
+    waterfallResult = await processCommissionWaterfall({
       subscriptionId,
       tier: 'standard',
       creatorId: metadata.creatorId,
@@ -184,7 +185,7 @@ async function handleSubscriptionPayment(
         (metadata.facilitatorTier as 'silver' | 'gold' | 'platinum') ?? 'silver',
     });
   } else if (commissionTier === 'superfan_bundle' && metadata.creatorIds) {
-    await processCommissionWaterfall({
+    waterfallResult = await processCommissionWaterfall({
       subscriptionId,
       tier: 'superfan_bundle',
       creatorIds: metadata.creatorIds,
@@ -193,6 +194,28 @@ async function handleSubscriptionPayment(
         (metadata.facilitatorTier as 'silver' | 'gold' | 'platinum') ?? 'silver',
       facilitatorId: metadata.facilitatorId,
     });
+  }
+
+  // Persist commission rows so they show up on creator earnings dashboards
+  // and can be aggregated into payout batches. Only persist non-platform
+  // splits — platform revenue is implicit (not paid out to anyone).
+  if (waterfallResult) {
+    const persistRows = waterfallResult.splits
+      .filter((s) => s.role !== 'platform' && s.recipientId !== 'platform' && s.amount > 0)
+      .map((s) => ({
+        recipientId: s.recipientId,
+        tier: s.role as 'creator' | 'facilitator' | 'outlier',
+        amount: s.amount,
+        status: 'approved' as const, // Skip 'pending' — payment already confirmed by NOWPayments
+        sourceType: 'subscription',
+        sourceId: subscriptionId,
+      }));
+    if (persistRows.length > 0) {
+      await db.insert(commissions).values(persistRows);
+      console.log(
+        `[NOWPayments Webhook] Persisted ${persistRows.length} commission rows for subscription ${subscriptionId}`
+      );
+    }
   }
 
   const now = new Date();

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { trpc } from '@/lib/trpc/client';
 
 const SOURCE_LABELS: Record<string, { label: string; icon: string; color: string }> = {
+  subscriptions: { label: 'Subscriptions', icon: '📅', color: 'bg-red-700' },
   tips: { label: 'Tips', icon: '💰', color: 'bg-red-600' },
   tracks: { label: 'Track sales', icon: '🎵', color: 'bg-red-500' },
   tickets: { label: 'Tickets', icon: '🎫', color: 'bg-red-400' },
@@ -49,7 +50,6 @@ export default function EarningsPage() {
   // Compute per-source percentages of lifetime
   const sources = bySource
     ? Object.entries(bySource)
-        .filter(([key]) => key !== 'subscriptions')
         .map(([key, v]) => ({
           key,
           lifetime: (v as { lifetime: number }).lifetime,
@@ -136,18 +136,6 @@ export default function EarningsPage() {
             )}
           </div>
 
-          {/* Subscriptions placeholder */}
-          <div className="rounded-2xl bg-amber-950/20 border border-amber-800/30 p-5 mb-8">
-            <p className="text-sm font-semibold text-amber-300">
-              📊 Subscription commissions — coming soon
-            </p>
-            <p className="text-xs text-amber-200/60 mt-1">
-              The commission waterfall engine calculates your share of every fan subscription,
-              but the amounts aren&apos;t yet persisted to your earnings. Once persistence lands,
-              this page will show subscription income automatically.
-            </p>
-          </div>
-
           {/* Recent transactions */}
           <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6">
             <h2 className="font-bold mb-4">Recent activity (last 30 days)</h2>
@@ -160,7 +148,14 @@ export default function EarningsPage() {
             ) : (
               <div className="divide-y divide-brand-800/20">
                 {recent!.map((t) => {
-                  const meta = SOURCE_LABELS[t.source === 'tip' ? 'tips' : t.source + 's'] ?? {
+                  // Normalize singular txn source → plural SOURCE_LABELS key
+                  const labelKey =
+                    t.source === 'tip' ? 'tips' :
+                    t.source === 'track' ? 'tracks' :
+                    t.source === 'ticket' ? 'tickets' :
+                    t.source === 'subscription' ? 'subscriptions' :
+                    t.source; // marketplace stays as-is
+                  const meta = SOURCE_LABELS[labelKey] ?? {
                     label: t.source,
                     icon: '•',
                     color: 'bg-gray-500',

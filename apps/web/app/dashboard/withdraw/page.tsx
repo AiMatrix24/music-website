@@ -4,25 +4,62 @@ import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useState } from 'react';
 import { useToast } from '@/app/components/Toast';
+import { trpc } from '@/lib/trpc/client';
 
-const MOCK_WITHDRAWALS = [
-  { id: '1', date: '2025-12-01', amount: 75.0, method: 'USDC', status: 'completed' as const, txHash: '0x8a3f...e21b' },
-  { id: '2', date: '2025-11-15', amount: 50.0, method: 'ACH', status: 'completed' as const, txHash: null },
-  { id: '3', date: '2025-11-01', amount: 100.0, method: 'USDC', status: 'completed' as const, txHash: '0x4c7d...f93a' },
-  { id: '4', date: '2025-10-20', amount: 35.0, method: 'USDC', status: 'processing' as const, txHash: null },
-];
+const STATUS_LABELS: Record<string, { label: string; className: string }> = {
+  pending: { label: 'Pending', className: 'bg-amber-600/20 text-amber-400 border-amber-600/30' },
+  processing: { label: 'Processing', className: 'bg-blue-600/20 text-blue-400 border-blue-600/30' },
+  paid: { label: 'Paid', className: 'bg-green-600/20 text-green-400 border-green-600/30' },
+  rejected: { label: 'Rejected', className: 'bg-red-600/20 text-red-400 border-red-600/30' },
+  cancelled: { label: 'Cancelled', className: 'bg-gray-600/20 text-gray-400 border-gray-600/30' },
+};
+
+const MIN_PAYOUT_USD = 10;
 
 export default function WithdrawPage() {
-  const { data: session, status } = useSession();
+  const { status: sessionStatus } = useSession();
   const { toast } = useToast();
+  const utils = trpc.useUtils();
+
+  const { data: summary, isLoading: summaryLoading } = trpc.payouts.summary.useQuery(
+    undefined,
+    { enabled: sessionStatus === 'authenticated' }
+  );
+  const { data: history, isLoading: historyLoading } = trpc.payouts.history.useQuery(
+    undefined,
+    { enabled: sessionStatus === 'authenticated' }
+  );
+
   const [amount, setAmount] = useState('');
-  const [method, setMethod] = useState<'usdc' | 'ach'>('usdc');
-  const [walletAddress, setWalletAddress] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
 
-  if (status !== 'authenticated') {
+  const requestMutation = trpc.payouts.request.useMutation({
+    onSuccess: () => {
+      toast('Payout requested — admin notified', 'success');
+      setAmount('');
+      setShowConfirm(false);
+      utils.payouts.summary.invalidate();
+      utils.payouts.history.invalidate();
+    },
+    onError: (err) => {
+      toast(err.message || 'Request failed', 'error');
+      setShowConfirm(false);
+    },
+  });
+
+  const cancelMutation = trpc.payouts.cancel.useMutation({
+    onSuccess: () => {
+      toast('Payout request cancelled', 'success');
+      utils.payouts.summary.invalidate();
+      utils.payouts.history.invalidate();
+    },
+    onError: (err) => toast(err.message || 'Cancel failed', 'error'),
+  });
+
+  if (sessionStatus !== 'authenticated') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+        <p className="text-5xl mb-2">💰</p>
         <p className="text-gray-400 text-lg">Sign in to access withdrawals</p>
         <Link href="/auth/login" className="rounded-full bg-red-600 px-6 py-3 font-semibold text-white hover:bg-red-500 transition">
           Sign In
@@ -31,254 +68,267 @@ export default function WithdrawPage() {
     );
   }
 
-  const available = 142.5;
-  const pending = 28.75;
-  const lifetime = 1247.3;
-  const fee = method === 'usdc' ? 0 : 2.5;
-  const minWithdrawal = 25.0;
+  const lifetimeEarned = summary?.lifetimeEarned ?? 0;
+  const totalPaid = summary?.totalPaid ?? 0;
+  const inFlight = summary?.inFlight ?? 0;
+  const available = summary?.available ?? 0;
+  const walletAddress = summary?.walletAddress ?? '';
+  const hasWallet = walletAddress.length > 0 && /^0x[a-fA-F0-9]{40}$/.test(walletAddress);
 
-  const parsedAmount = parseFloat(amount) || 0;
-  const isValid = parsedAmount >= minWithdrawal && parsedAmount <= available;
+  const requestedAmountCents = Math.round((parseFloat(amount) || 0) * 100);
+  const isValidAmount = requestedAmountCents >= MIN_PAYOUT_USD * 100 && requestedAmountCents <= available;
 
-  const handleWithdraw = () => {
-    if (!isValid) return;
+  const handleRequest = () => {
+    if (!isValidAmount) return;
     if (!showConfirm) {
       setShowConfirm(true);
       return;
     }
-    toast(`Withdrawal of $${parsedAmount.toFixed(2)} initiated via ${method === 'usdc' ? 'USDC' : 'ACH'}`, 'success');
-    setShowConfirm(false);
-    setAmount('');
+    requestMutation.mutate({ amountCents: requestedAmountCents });
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-16 px-6">
-      <div className="max-w-4xl mx-auto">
-        {/* Back link */}
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition mb-8"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          Back to Dashboard
-        </Link>
-
-        <h1 className="text-3xl font-black mb-8">Withdraw Earnings</h1>
-
-        {/* Balance cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
-          <BalanceCard label="Available Balance" value={`$${available.toFixed(2)}`} accent />
-          <BalanceCard label="Pending" value={`$${pending.toFixed(2)}`} />
-          <BalanceCard label="Lifetime Earned" value={`$${lifetime.toFixed(2)}`} />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-          {/* Withdrawal form */}
-          <div className="bg-[#15151f] rounded-2xl border border-brand-800/30 p-6">
-            <h2 className="text-lg font-bold mb-6">New Withdrawal</h2>
-
-            {/* Amount */}
-            <label className="block text-sm text-gray-400 mb-2">Amount (USD)</label>
-            <div className="relative mb-1">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">$</span>
-              <input
-                type="number"
-                value={amount}
-                onChange={(e) => { setAmount(e.target.value); setShowConfirm(false); }}
-                placeholder="0.00"
-                min={minWithdrawal}
-                max={available}
-                step="0.01"
-                className="w-full pl-8 pr-4 py-3 bg-brand-950 border border-brand-800/40 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-red-600 transition"
-              />
-            </div>
-            <p className="text-xs text-gray-500 mb-6">Minimum withdrawal: ${minWithdrawal.toFixed(2)}</p>
-
-            {/* Method selection */}
-            <label className="block text-sm text-gray-400 mb-2">Withdrawal Method</label>
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              <button
-                onClick={() => { setMethod('usdc'); setShowConfirm(false); }}
-                className={`p-4 rounded-xl border text-left transition ${
-                  method === 'usdc'
-                    ? 'border-red-600 bg-red-600/10'
-                    : 'border-brand-800/30 bg-brand-950 hover:border-brand-700'
-                }`}
-              >
-                <p className="font-semibold text-sm text-white">USDC</p>
-                <p className="text-xs text-gray-500 mt-1">Polygon wallet</p>
-                <p className="text-xs text-green-400 mt-1">Fee: $0.00</p>
-              </button>
-              <button
-                onClick={() => { setMethod('ach'); setShowConfirm(false); }}
-                className={`p-4 rounded-xl border text-left transition ${
-                  method === 'ach'
-                    ? 'border-red-600 bg-red-600/10'
-                    : 'border-brand-800/30 bg-brand-950 hover:border-brand-700'
-                }`}
-              >
-                <p className="font-semibold text-sm text-white">Bank Transfer</p>
-                <p className="text-xs text-gray-500 mt-1">ACH (US only)</p>
-                <p className="text-xs text-yellow-400 mt-1">Fee: $2.50</p>
-              </button>
-            </div>
-
-            {/* Conditional fields */}
-            {method === 'usdc' ? (
-              <div className="mb-6">
-                <label className="block text-sm text-gray-400 mb-2">Polygon Wallet Address</label>
-                <input
-                  type="text"
-                  value={walletAddress}
-                  onChange={(e) => setWalletAddress(e.target.value)}
-                  placeholder="0x..."
-                  className="w-full px-4 py-3 bg-brand-950 border border-brand-800/40 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-red-600 transition font-mono text-sm"
-                />
-              </div>
-            ) : (
-              <div className="mb-6 space-y-3">
-                <label className="block text-sm text-gray-400 mb-2">Bank Details</label>
-                <input
-                  type="text"
-                  placeholder="Account holder name"
-                  className="w-full px-4 py-3 bg-brand-950 border border-brand-800/40 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-red-600 transition text-sm"
-                />
-                <input
-                  type="text"
-                  placeholder="Routing number"
-                  className="w-full px-4 py-3 bg-brand-950 border border-brand-800/40 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-red-600 transition text-sm"
-                />
-                <input
-                  type="text"
-                  placeholder="Account number"
-                  className="w-full px-4 py-3 bg-brand-950 border border-brand-800/40 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-red-600 transition text-sm"
-                />
-              </div>
-            )}
-
-            {/* Fee summary */}
-            {parsedAmount > 0 && (
-              <div className="bg-brand-950 rounded-xl p-4 mb-6 space-y-2 text-sm">
-                <div className="flex justify-between text-gray-400">
-                  <span>Amount</span>
-                  <span>${parsedAmount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-gray-400">
-                  <span>Fee</span>
-                  <span>${fee.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-white font-semibold border-t border-brand-800/30 pt-2">
-                  <span>You receive</span>
-                  <span>${(parsedAmount - fee).toFixed(2)}</span>
-                </div>
-              </div>
-            )}
-
-            {/* Confirm / Withdraw */}
-            {showConfirm && (
-              <div className="bg-red-600/10 border border-red-600/30 rounded-xl p-4 mb-4 text-sm text-red-300">
-                Confirm withdrawal of <strong>${parsedAmount.toFixed(2)}</strong> via{' '}
-                {method === 'usdc' ? 'USDC to Polygon' : 'ACH bank transfer'}? Click again to confirm.
-              </div>
-            )}
-
-            <button
-              onClick={handleWithdraw}
-              disabled={!isValid}
-              className={`w-full py-3 rounded-full font-semibold transition ${
-                isValid
-                  ? 'bg-red-600 hover:bg-red-500 text-white'
-                  : 'bg-brand-800/40 text-gray-600 cursor-not-allowed'
-              }`}
-            >
-              {showConfirm ? 'Confirm Withdrawal' : 'Withdraw'}
-            </button>
-          </div>
-
-          {/* Info panel */}
-          <div className="space-y-6">
-            <div className="bg-[#15151f] rounded-2xl border border-brand-800/30 p-6">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-green-400 text-lg">&#x2713;</span>
-                <span className="text-sm font-semibold text-green-400">All payouts verified on Polygon</span>
-              </div>
-              <p className="text-xs text-gray-500">
-                Every USDC withdrawal is settled on the Polygon network. You can verify
-                transactions using the tx hash provided below.
-              </p>
-            </div>
-
-            <div className="bg-[#15151f] rounded-2xl border border-brand-800/30 p-6">
-              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
-                Withdrawal Info
-              </h3>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li>USDC withdrawals are processed within 24 hours</li>
-                <li>ACH transfers take 3-5 business days</li>
-                <li>Minimum withdrawal amount is $25.00</li>
-                <li>USDC withdrawals have zero fees</li>
-                <li>ACH transfers carry a $2.50 processing fee</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        {/* Recent withdrawals table */}
-        <div className="bg-[#15151f] rounded-2xl border border-brand-800/30 p-6">
-          <h2 className="text-lg font-bold mb-6">Recent Withdrawals</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-gray-500 text-left border-b border-brand-800/30">
-                  <th className="pb-3 font-medium">Date</th>
-                  <th className="pb-3 font-medium">Amount</th>
-                  <th className="pb-3 font-medium">Method</th>
-                  <th className="pb-3 font-medium">Status</th>
-                  <th className="pb-3 font-medium">Tx Hash</th>
-                </tr>
-              </thead>
-              <tbody>
-                {MOCK_WITHDRAWALS.map((w) => (
-                  <tr key={w.id} className="border-b border-brand-800/20 last:border-0">
-                    <td className="py-3 text-gray-300">{w.date}</td>
-                    <td className="py-3 text-white font-medium">${w.amount.toFixed(2)}</td>
-                    <td className="py-3 text-gray-300">{w.method}</td>
-                    <td className="py-3">
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          w.status === 'completed'
-                            ? 'bg-green-500/10 text-green-400'
-                            : 'bg-yellow-500/10 text-yellow-400'
-                        }`}
-                      >
-                        {w.status}
-                      </span>
-                    </td>
-                    <td className="py-3 text-gray-500 font-mono text-xs">
-                      {w.txHash ?? '--'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+    <div className="min-h-screen p-8 max-w-4xl mx-auto">
+      <div className="mb-6">
+        <Link href="/dashboard" className="text-sm text-gray-400 hover:text-white transition">← Dashboard</Link>
+        <h1 className="text-3xl font-bold mt-2">
+          Withdraw <span className="text-red-500">Earnings</span>
+        </h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Request payout in USDC on Polygon. Admin processes manually within 3 business days.
+        </p>
       </div>
+
+      {summaryLoading ? (
+        <div className="rounded-2xl bg-[#15151f] p-12 text-center">
+          <div className="animate-pulse text-gray-400">Loading…</div>
+        </div>
+      ) : (
+        <>
+          {/* Balance cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+            <BalanceCard
+              label="Available"
+              value={`$${(available / 100).toFixed(2)}`}
+              accent
+            />
+            <BalanceCard label="In flight" value={`$${(inFlight / 100).toFixed(2)}`} sub={inFlight > 0 ? 'Awaiting admin' : '—'} />
+            <BalanceCard label="Lifetime paid" value={`$${(totalPaid / 100).toFixed(2)}`} />
+            <BalanceCard label="Lifetime earned" value={`$${(lifetimeEarned / 100).toFixed(2)}`} />
+          </div>
+
+          {/* Wallet warning */}
+          {!hasWallet && (
+            <div className="rounded-2xl bg-red-950/20 border border-red-800/30 p-5 mb-8">
+              <p className="text-sm font-bold text-red-400 mb-1">⚠ No payout wallet set</p>
+              <p className="text-xs text-red-200/60 mb-3">
+                You need to set a Polygon wallet address before requesting a payout.
+                That&apos;s where USDC will be sent.
+              </p>
+              <Link
+                href="/settings"
+                className="inline-block rounded-full bg-red-600 hover:bg-red-500 px-5 py-2 text-sm font-semibold text-white transition"
+              >
+                Set wallet in settings →
+              </Link>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+            {/* Request form */}
+            <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6">
+              <h2 className="font-bold text-lg mb-4">Request payout</h2>
+
+              {hasWallet && (
+                <div className="rounded-xl bg-brand-950/50 border border-brand-800/20 px-4 py-3 mb-4">
+                  <p className="text-xs text-gray-500 mb-1">Sending to</p>
+                  <p className="text-xs font-mono text-gray-300 break-all">{walletAddress}</p>
+                  <Link href="/settings" className="text-xs text-brand-400 hover:text-brand-300 mt-1 inline-block">
+                    Change in settings →
+                  </Link>
+                </div>
+              )}
+
+              <div className="mb-4">
+                <label className="block text-sm text-gray-400 mb-1">Amount (USD)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                  <input
+                    type="number"
+                    min={MIN_PAYOUT_USD}
+                    max={available / 100}
+                    step="0.01"
+                    value={amount}
+                    onChange={(e) => { setAmount(e.target.value); setShowConfirm(false); }}
+                    placeholder={`Min $${MIN_PAYOUT_USD.toFixed(2)}`}
+                    disabled={!hasWallet || available < MIN_PAYOUT_USD * 100}
+                    className="w-full bg-brand-950 border border-brand-800/30 rounded-xl pl-7 pr-4 py-3 text-white placeholder:text-gray-600 focus:border-red-600 outline-none transition disabled:opacity-50"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Min ${MIN_PAYOUT_USD.toFixed(2)} · Max ${(available / 100).toFixed(2)} (your available balance)
+                </p>
+              </div>
+
+              {showConfirm ? (
+                <div className="rounded-xl bg-amber-950/20 border border-amber-800/30 p-3 mb-3">
+                  <p className="text-xs text-amber-300 font-semibold mb-2">Confirm payout request</p>
+                  <p className="text-xs text-amber-200/70 mb-3">
+                    Send <span className="font-bold">${(requestedAmountCents / 100).toFixed(2)}</span>{' '}
+                    USDC to your wallet. Admin processes manually — typically 1-3 business days.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleRequest}
+                      disabled={requestMutation.isPending}
+                      className="flex-1 rounded-full bg-green-600 hover:bg-green-500 py-2 text-xs font-semibold text-white transition disabled:opacity-50"
+                    >
+                      {requestMutation.isPending ? 'Submitting…' : 'Confirm'}
+                    </button>
+                    <button
+                      onClick={() => setShowConfirm(false)}
+                      className="flex-1 rounded-full border border-brand-800/30 py-2 text-xs font-semibold text-gray-300 hover:text-white transition"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={handleRequest}
+                  disabled={!isValidAmount || !hasWallet || available < MIN_PAYOUT_USD * 100}
+                  className="w-full rounded-full bg-gradient-to-r from-red-600 to-red-500 py-3 font-semibold text-white transition hover:shadow-lg hover:shadow-red-600/30 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {!hasWallet
+                    ? 'Set wallet first'
+                    : available < MIN_PAYOUT_USD * 100
+                      ? `Need ≥ $${MIN_PAYOUT_USD.toFixed(2)} to request`
+                      : 'Request Payout'}
+                </button>
+              )}
+            </div>
+
+            {/* How it works */}
+            <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6">
+              <h2 className="font-bold text-lg mb-4">How payouts work</h2>
+              <ol className="space-y-3 text-sm text-gray-400">
+                <li className="flex gap-3">
+                  <span className="text-brand-400 font-bold">1.</span>
+                  <span>You set your Polygon wallet address in <Link href="/settings" className="text-brand-400 hover:text-brand-300 underline">settings</Link>.</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="text-brand-400 font-bold">2.</span>
+                  <span>Request a payout for any amount up to your available balance (min $10).</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="text-brand-400 font-bold">3.</span>
+                  <span>Admin reviews + sends USDC manually from the OPYNX wallet on Polygon.</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="text-brand-400 font-bold">4.</span>
+                  <span>Once paid, the on-chain transaction hash appears below — verifiable on Polygonscan.</span>
+                </li>
+              </ol>
+              <div className="mt-5 pt-4 border-t border-brand-800/20">
+                <p className="text-xs text-gray-500">
+                  <strong className="text-gray-400">Why manual?</strong> We&apos;re intentionally not auto-disbursing
+                  while we&apos;re a small operation — every payout gets a human eyeball. Automated
+                  payouts via Stripe Connect or on-chain multisig are on the roadmap.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* History */}
+          <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6">
+            <h2 className="font-bold text-lg mb-4">Payout history</h2>
+            {historyLoading ? (
+              <p className="text-sm text-gray-500 py-6 text-center">Loading…</p>
+            ) : (history?.length ?? 0) === 0 ? (
+              <p className="text-sm text-gray-500 py-6 text-center">No payout requests yet.</p>
+            ) : (
+              <div className="divide-y divide-brand-800/20">
+                {history!.map((req) => {
+                  const status = STATUS_LABELS[req.status] ?? STATUS_LABELS.pending;
+                  return (
+                    <div key={req.id} className="py-4">
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                        <div>
+                          <p className="font-bold text-lg">${(req.amountCents / 100).toFixed(2)}</p>
+                          <p className="text-xs text-gray-500">
+                            Requested {new Date(req.requestedAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                          </p>
+                        </div>
+                        <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${status.className}`}>
+                          {status.label}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500 space-y-1">
+                        <p className="font-mono break-all">→ {req.walletAddress}</p>
+                        {req.txHash && (
+                          <p>
+                            <a
+                              href={`https://polygonscan.com/tx/${req.txHash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-brand-400 hover:text-brand-300 font-mono break-all"
+                            >
+                              tx: {req.txHash.slice(0, 10)}…{req.txHash.slice(-8)} ↗
+                            </a>
+                          </p>
+                        )}
+                        {req.notes && (
+                          <p className="text-gray-400 italic">Note: {req.notes}</p>
+                        )}
+                      </div>
+                      {req.status === 'pending' && (
+                        <button
+                          onClick={() => {
+                            if (confirm('Cancel this payout request?')) {
+                              cancelMutation.mutate({ id: req.id });
+                            }
+                          }}
+                          className="text-xs text-red-400 hover:text-red-300 mt-2"
+                        >
+                          Cancel request
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-function BalanceCard({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function BalanceCard({
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  accent?: boolean;
+}) {
   return (
-    <div className={`rounded-2xl border p-6 ${
-      accent
-        ? 'bg-red-600/10 border-red-600/30'
-        : 'bg-[#15151f] border-brand-800/30'
-    }`}>
-      <p className="text-sm text-gray-400 mb-1">{label}</p>
-      <p className={`text-2xl font-black ${accent ? 'text-red-400' : 'text-white'}`}>{value}</p>
+    <div
+      className={`rounded-2xl p-4 ${
+        accent
+          ? 'bg-gradient-to-br from-red-600/20 to-red-900/10 border border-red-800/30'
+          : 'bg-[#15151f] border border-brand-800/20'
+      }`}
+    >
+      <p className={`text-xs uppercase tracking-wider mb-1 ${accent ? 'text-red-400' : 'text-gray-400'}`}>
+        {label}
+      </p>
+      <p className="text-2xl font-black">{value}</p>
+      {sub && <p className="text-xs text-gray-500 mt-1">{sub}</p>}
     </div>
   );
 }

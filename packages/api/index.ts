@@ -22,6 +22,7 @@ import {
   tracks,
   trackPurchases,
   tips,
+  payoutRequests,
   albums,
   albumTracks,
   playlists,
@@ -2532,22 +2533,34 @@ const earningsRouter = createRouter({
         sql`${orders.status} IN ('paid', 'shipped', 'delivered')`
       ));
 
+    // Subscription commissions (creator/facilitator/outlier role, any active status)
+    const subTotal = await db
+      .select({
+        lifetime: sql<number>`COALESCE(SUM(${commissions.amount}), 0)::int`,
+        recent: sql<number>`COALESCE(SUM(CASE WHEN ${commissions.createdAt} >= ${thirtyDaysAgo} THEN ${commissions.amount} ELSE 0 END), 0)::int`,
+        count: sql<number>`COUNT(*)::int`,
+      })
+      .from(commissions)
+      .where(and(
+        eq(commissions.recipientId, userId),
+        sql`${commissions.status} IN ('pending', 'approved', 'processing', 'paid')`
+      ));
+
     const t = tipsTotal[0] ?? { lifetime: 0, recent: 0, count: 0 };
     const tr = trackTotal[0] ?? { lifetime: 0, recent: 0, count: 0 };
     const tk = ticketTotal[0] ?? { lifetime: 0, recent: 0, count: 0 };
     const m = merchTotal[0] ?? { lifetime: 0, recent: 0, count: 0 };
+    const s = subTotal[0] ?? { lifetime: 0, recent: 0, count: 0 };
 
     return {
-      lifetime: t.lifetime + tr.lifetime + tk.lifetime + m.lifetime,
-      thirtyDay: t.recent + tr.recent + tk.recent + m.recent,
+      lifetime: t.lifetime + tr.lifetime + tk.lifetime + m.lifetime + s.lifetime,
+      thirtyDay: t.recent + tr.recent + tk.recent + m.recent + s.recent,
       bySource: {
         tips: { lifetime: t.lifetime, recent: t.recent, count: t.count },
         tracks: { lifetime: tr.lifetime, recent: tr.recent, count: tr.count },
         tickets: { lifetime: tk.lifetime, recent: tk.recent, count: tk.count },
         marketplace: { lifetime: m.lifetime, recent: m.recent, count: m.count },
-        // Subscriptions not persisted yet — waterfall calculates but doesn't
-        // insert into commissions table. See TODO in nowpayments webhook.
-        subscriptions: { lifetime: 0, recent: 0, count: 0, todo: 'Commission persistence not wired yet' as const },
+        subscriptions: { lifetime: s.lifetime, recent: s.recent, count: s.count },
       },
     };
   }),
@@ -2560,8 +2573,8 @@ const earningsRouter = createRouter({
     const userId = ctx.session.user.id;
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-    // Four queries in parallel, then merge + sort in app layer (simpler than SQL UNION)
-    const [tipRows, trackRows, ticketRows, merchRows] = await Promise.all([
+    // Five queries in parallel, then merge + sort in app layer (simpler than SQL UNION)
+    const [tipRows, trackRows, ticketRows, merchRows, subRows] = await Promise.all([
       db
         .select({
           id: tips.id,
@@ -2625,6 +2638,21 @@ const earningsRouter = createRouter({
         ))
         .orderBy(desc(orders.createdAt))
         .limit(20),
+      db
+        .select({
+          id: commissions.id,
+          amount: commissions.amount,
+          createdAt: commissions.createdAt,
+          tier: commissions.tier,
+        })
+        .from(commissions)
+        .where(and(
+          eq(commissions.recipientId, userId),
+          sql`${commissions.status} IN ('pending', 'approved', 'processing', 'paid')`,
+          sql`${commissions.createdAt} >= ${thirtyDaysAgo}`
+        ))
+        .orderBy(desc(commissions.createdAt))
+        .limit(20),
     ]);
 
     const txns = [
@@ -2656,11 +2684,341 @@ const earningsRouter = createRouter({
         createdAt: r.createdAt,
         label: 'Marketplace sale',
       })),
+      ...subRows.map((r) => ({
+        id: r.id,
+        source: 'subscription' as const,
+        amount: r.amount,
+        createdAt: r.createdAt,
+        label: `Subscription commission (${r.tier})`,
+      })),
     ];
 
     txns.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     return txns.slice(0, 50);
   }),
+});
+
+// ─── Payouts Router ───
+/**
+ * Visibility-only payout flow (Option C). Creators see what they're owed,
+ * request payouts, and admins manually disburse via MetaMask. The
+ * payoutRequests table snapshots amount + wallet at request time so a
+ * mid-flight wallet change doesn't redirect a pending payout.
+ *
+ * NOT IMPLEMENTED YET — when needed:
+ * - Automated on-chain disbursement
+ * - Stripe Connect / Helio fiat payouts
+ * - 1099-NEC tax form generation
+ * - Multi-sig admin approval for large payouts
+ */
+const payoutsRouter = createRouter({
+  /**
+   * Returns a financial summary for the current user:
+   *   - lifetimeEarned: total revenue across all sources (matches earnings.summary)
+   *   - totalPaid: sum of all 'paid' payout requests
+   *   - inFlight: sum of 'pending' + 'processing' payout requests
+   *   - available: lifetimeEarned - totalPaid - inFlight (what creator can request now)
+   *   - walletAddress: current setting on user record (for the request form default)
+   */
+  summary: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    // Reuse the same aggregation as earningsRouter.summary inline (kept
+    // independent so payouts can evolve without touching earnings UI)
+    const [tipsAgg, trackAgg, ticketAgg, merchAgg, subAgg, payoutAgg, user] = await Promise.all([
+      db
+        .select({
+          lifetime: sql<number>`COALESCE(SUM(${tips.amount}), 0)::int`,
+        })
+        .from(tips)
+        .where(and(eq(tips.recipientUserId, userId), eq(tips.status, 'completed'))),
+      db
+        .select({
+          lifetime: sql<number>`COALESCE(SUM(${trackPurchases.pricePaid}), 0)::int`,
+        })
+        .from(trackPurchases)
+        .innerJoin(tracks, eq(trackPurchases.trackId, tracks.id))
+        .where(and(eq(tracks.userId, userId), eq(trackPurchases.status, 'completed'))),
+      db
+        .select({
+          lifetime: sql<number>`COALESCE(SUM(${ticketTypes.price}), 0)::int`,
+        })
+        .from(tickets)
+        .innerJoin(events, eq(tickets.eventId, events.id))
+        .innerJoin(ticketTypes, eq(tickets.ticketTypeId, ticketTypes.id))
+        .where(and(eq(events.hostId, userId), eq(tickets.status, 'valid'))),
+      db
+        .select({
+          lifetime: sql<number>`COALESCE(SUM(${orders.totalAmount}), 0)::int`,
+        })
+        .from(orders)
+        .where(and(
+          eq(orders.sellerId, userId),
+          sql`${orders.status} IN ('paid', 'shipped', 'delivered')`
+        )),
+      db
+        .select({
+          lifetime: sql<number>`COALESCE(SUM(${commissions.amount}), 0)::int`,
+        })
+        .from(commissions)
+        .where(and(
+          eq(commissions.recipientId, userId),
+          sql`${commissions.status} IN ('pending', 'approved', 'processing', 'paid')`
+        )),
+      db
+        .select({
+          paid: sql<number>`COALESCE(SUM(CASE WHEN ${payoutRequests.status} = 'paid' THEN ${payoutRequests.amountCents} ELSE 0 END), 0)::int`,
+          inFlight: sql<number>`COALESCE(SUM(CASE WHEN ${payoutRequests.status} IN ('pending', 'processing') THEN ${payoutRequests.amountCents} ELSE 0 END), 0)::int`,
+          paidLast30: sql<number>`COALESCE(SUM(CASE WHEN ${payoutRequests.status} = 'paid' AND ${payoutRequests.processedAt} >= ${thirtyDaysAgo} THEN ${payoutRequests.amountCents} ELSE 0 END), 0)::int`,
+        })
+        .from(payoutRequests)
+        .where(eq(payoutRequests.userId, userId)),
+      db.query.users.findFirst({ where: eq(users.id, userId) }),
+    ]);
+
+    const lifetimeEarned =
+      (tipsAgg[0]?.lifetime ?? 0) +
+      (trackAgg[0]?.lifetime ?? 0) +
+      (ticketAgg[0]?.lifetime ?? 0) +
+      (merchAgg[0]?.lifetime ?? 0) +
+      (subAgg[0]?.lifetime ?? 0);
+
+    const totalPaid = payoutAgg[0]?.paid ?? 0;
+    const inFlight = payoutAgg[0]?.inFlight ?? 0;
+    const paidLast30 = payoutAgg[0]?.paidLast30 ?? 0;
+    const available = Math.max(0, lifetimeEarned - totalPaid - inFlight);
+
+    return {
+      lifetimeEarned,
+      totalPaid,
+      inFlight,
+      available,
+      paidLast30,
+      walletAddress: user?.walletAddress ?? null,
+    };
+  }),
+
+  /** Recent payout request history (last 50) */
+  history: protectedProcedure.query(async ({ ctx }) => {
+    return db
+      .select()
+      .from(payoutRequests)
+      .where(eq(payoutRequests.userId, ctx.session.user.id))
+      .orderBy(desc(payoutRequests.requestedAt))
+      .limit(50);
+  }),
+
+  /**
+   * Creator requests a payout. Validates:
+   *   - User has a wallet address set (errors with friendly message)
+   *   - Amount > minimum ($10) and ≤ available balance
+   *   - No other pending request currently in flight (one at a time)
+   *
+   * Snapshots wallet + amount at request time. Admin processes manually.
+   */
+  request: protectedProcedure
+    .input(
+      z.object({
+        amountCents: z.number().int().min(1000), // $10 minimum
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+
+      const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
+      if (!user?.walletAddress) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Set your Polygon wallet address in settings before requesting a payout',
+        });
+      }
+      // Basic Polygon (EVM) address format check — 0x + 40 hex chars
+      if (!/^0x[a-fA-F0-9]{40}$/.test(user.walletAddress)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Wallet address looks invalid (must be 0x + 40 hex chars)',
+        });
+      }
+
+      // Block double-request: only one pending/processing at a time
+      const existing = await db.query.payoutRequests.findFirst({
+        where: and(
+          eq(payoutRequests.userId, userId),
+          sql`${payoutRequests.status} IN ('pending', 'processing')`
+        ),
+      });
+      if (existing) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'You already have a pending payout request — wait for it to be processed',
+        });
+      }
+
+      // Compute available balance inline (don't trust client-provided amount)
+      // Reuses the same logic as summary; kept here for atomicity at request time.
+      const [tipsAgg, trackAgg, ticketAgg, merchAgg, subAgg, payoutAgg] = await Promise.all([
+        db
+          .select({ lifetime: sql<number>`COALESCE(SUM(${tips.amount}), 0)::int` })
+          .from(tips)
+          .where(and(eq(tips.recipientUserId, userId), eq(tips.status, 'completed'))),
+        db
+          .select({ lifetime: sql<number>`COALESCE(SUM(${trackPurchases.pricePaid}), 0)::int` })
+          .from(trackPurchases)
+          .innerJoin(tracks, eq(trackPurchases.trackId, tracks.id))
+          .where(and(eq(tracks.userId, userId), eq(trackPurchases.status, 'completed'))),
+        db
+          .select({ lifetime: sql<number>`COALESCE(SUM(${ticketTypes.price}), 0)::int` })
+          .from(tickets)
+          .innerJoin(events, eq(tickets.eventId, events.id))
+          .innerJoin(ticketTypes, eq(tickets.ticketTypeId, ticketTypes.id))
+          .where(and(eq(events.hostId, userId), eq(tickets.status, 'valid'))),
+        db
+          .select({ lifetime: sql<number>`COALESCE(SUM(${orders.totalAmount}), 0)::int` })
+          .from(orders)
+          .where(and(
+            eq(orders.sellerId, userId),
+            sql`${orders.status} IN ('paid', 'shipped', 'delivered')`
+          )),
+        db
+          .select({ lifetime: sql<number>`COALESCE(SUM(${commissions.amount}), 0)::int` })
+          .from(commissions)
+          .where(and(
+            eq(commissions.recipientId, userId),
+            sql`${commissions.status} IN ('pending', 'approved', 'processing', 'paid')`
+          )),
+        db
+          .select({
+            paid: sql<number>`COALESCE(SUM(CASE WHEN ${payoutRequests.status} = 'paid' THEN ${payoutRequests.amountCents} ELSE 0 END), 0)::int`,
+            inFlight: sql<number>`COALESCE(SUM(CASE WHEN ${payoutRequests.status} IN ('pending', 'processing') THEN ${payoutRequests.amountCents} ELSE 0 END), 0)::int`,
+          })
+          .from(payoutRequests)
+          .where(eq(payoutRequests.userId, userId)),
+      ]);
+
+      const lifetimeEarned =
+        (tipsAgg[0]?.lifetime ?? 0) +
+        (trackAgg[0]?.lifetime ?? 0) +
+        (ticketAgg[0]?.lifetime ?? 0) +
+        (merchAgg[0]?.lifetime ?? 0) +
+        (subAgg[0]?.lifetime ?? 0);
+      const totalPaid = payoutAgg[0]?.paid ?? 0;
+      const inFlight = payoutAgg[0]?.inFlight ?? 0;
+      const available = Math.max(0, lifetimeEarned - totalPaid - inFlight);
+
+      if (input.amountCents > available) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Requested $${(input.amountCents / 100).toFixed(2)} but only $${(available / 100).toFixed(2)} is available`,
+        });
+      }
+
+      const [request] = await db
+        .insert(payoutRequests)
+        .values({
+          userId,
+          amountCents: input.amountCents,
+          walletAddress: user.walletAddress,
+          status: 'pending',
+        })
+        .returning();
+
+      // TODO: notify admin of new payout request (email or Discord webhook)
+      console.log(
+        `[Payouts] New request: user=${userId} amount=$${(input.amountCents / 100).toFixed(2)} wallet=${user.walletAddress}`
+      );
+
+      return request;
+    }),
+
+  /**
+   * Cancel a pending payout request (creator changes mind before it's processed).
+   * Only works on 'pending' status (admin already grabbed it = can't cancel).
+   */
+  cancel: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const req = await db.query.payoutRequests.findFirst({
+        where: eq(payoutRequests.id, input.id),
+      });
+      if (!req) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (req.userId !== ctx.session.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
+      if (req.status !== 'pending') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Cannot cancel — status is ${req.status}`,
+        });
+      }
+      await db
+        .update(payoutRequests)
+        .set({ status: 'cancelled', updatedAt: new Date() })
+        .where(eq(payoutRequests.id, input.id));
+      return { ok: true };
+    }),
+
+  // ─── Admin endpoints ───
+  // Until a real admin role check exists, these are unprotected against
+  // ctx.session.user.role — they currently rely on adminProcedure being
+  // gated upstream. If adminProcedure isn't ready, swap to a manual check.
+
+  /** Admin queue — all pending + processing requests across all users */
+  adminQueue: adminProcedure.query(async () => {
+    return db
+      .select({
+        request: payoutRequests,
+        userName: users.name,
+        userEmail: users.email,
+      })
+      .from(payoutRequests)
+      .leftJoin(users, eq(payoutRequests.userId, users.id))
+      .where(sql`${payoutRequests.status} IN ('pending', 'processing')`)
+      .orderBy(desc(payoutRequests.requestedAt));
+  }),
+
+  /** Admin marks a payout as paid (after sending USDC manually) */
+  adminMarkPaid: adminProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        txHash: z.string().min(10), // Polygon tx hash
+        notes: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const [updated] = await db
+        .update(payoutRequests)
+        .set({
+          status: 'paid',
+          txHash: input.txHash,
+          notes: input.notes ?? null,
+          processedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(payoutRequests.id, input.id))
+        .returning();
+      if (!updated) throw new TRPCError({ code: 'NOT_FOUND' });
+      return updated;
+    }),
+
+  /** Admin rejects a payout (with reason) */
+  adminReject: adminProcedure
+    .input(z.object({ id: z.string().uuid(), reason: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      const [updated] = await db
+        .update(payoutRequests)
+        .set({
+          status: 'rejected',
+          notes: input.reason,
+          processedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(payoutRequests.id, input.id))
+        .returning();
+      if (!updated) throw new TRPCError({ code: 'NOT_FOUND' });
+      return updated;
+    }),
 });
 
 // ─── App Router ───
@@ -2687,6 +3045,7 @@ export const appRouter = createRouter({
   trackPurchases: trackPurchasesRouter,
   tips: tipsRouter,
   earnings: earningsRouter,
+  payouts: payoutsRouter,
 });
 
 export type AppRouter = typeof appRouter;

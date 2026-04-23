@@ -43,6 +43,20 @@
       "when": 1776968808483,
       "tag": "0005_light_sabretooth",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1776981069734,
+      "tag": "0006_broken_vindicator",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1776981393404,
+      "tag": "0007_cold_alice",
+      "breakpoints": true
     }
   ]
 }
