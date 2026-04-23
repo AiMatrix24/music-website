@@ -81,7 +81,6 @@ async function handleRequest(
     'accept-ranges',
     'last-modified',
     'etag',
-    'cache-control',
   ];
   for (const h of passthrough) {
     const v = upstream.headers.get(h);
@@ -90,11 +89,17 @@ async function handleRequest(
   // Force the Content-Type to a known-good MP3 type if the CDN didn't include
   // one (UploadThing always does, but be defensive).
   if (!headers.has('content-type')) headers.set('content-type', 'audio/mpeg');
-  // Match the URL extension so iOS doesn't second-guess the format
   headers.set('content-disposition', 'inline');
-  // Same-origin, no need for CORS on the audio fetch — but include for safety
   headers.set('access-control-allow-origin', '*');
   headers.set('access-control-allow-methods', 'GET,HEAD,OPTIONS');
+  // CRITICAL: do NOT let Vercel's edge cache this response. The cache key
+  // doesn't vary on Range, so caching turns 206 Partial Content into 200
+  // Full, breaking HTML5 audio seeking and — on iOS — playback entirely.
+  // The browser still caches per-resource as normal; this only tells the
+  // CDN layer to stay out of the way.
+  headers.set('cache-control', 'no-store, private');
+  headers.set('cdn-cache-control', 'no-store');
+  headers.set('vercel-cdn-cache-control', 'no-store');
 
   // For HEAD or non-200/206, return without a body
   if (isHead || (status !== 200 && status !== 206)) {
