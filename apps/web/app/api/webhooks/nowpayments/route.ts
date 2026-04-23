@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { db, subscriptions, subEvents } from '@opynx/db';
-import { tickets, ticketTypes } from '@opynx/db/schema';
+import { tickets, ticketTypes, trackPurchases } from '@opynx/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { processCommissionWaterfall } from '@/lib/services/commissions';
 import { captureError, startTransaction } from '@/lib/services/monitoring';
@@ -278,6 +278,58 @@ async function handleTicketPurchase(
   }
 }
 
+async function handleTrackPurchase(
+  orderId: string,
+  payload: NowPaymentsIPNPayload,
+  status: PaymentStatus
+): Promise<void> {
+  // orderId format: trackbuy_{purchaseId}
+  const purchaseId = orderId.replace('trackbuy_', '');
+  if (!/^[0-9a-f-]{36}$/i.test(purchaseId)) {
+    console.error(`[NOWPayments Webhook] Malformed track purchase order_id: ${orderId}`);
+    return;
+  }
+
+  const purchase = await db.query.trackPurchases.findFirst({
+    where: eq(trackPurchases.id, purchaseId),
+  });
+  if (!purchase) {
+    console.warn(`[NOWPayments Webhook] Track purchase ${purchaseId} not found`);
+    return;
+  }
+
+  if (status === 'finished') {
+    if (purchase.status === 'completed') {
+      console.log(`[NOWPayments Webhook] Track purchase ${purchaseId} already completed (idempotent)`);
+      return;
+    }
+    await db
+      .update(trackPurchases)
+      .set({ status: 'completed', updatedAt: new Date() })
+      .where(eq(trackPurchases.id, purchaseId));
+    console.log(
+      `[NOWPayments Webhook] Track purchase ${purchaseId} completed (trackId=${purchase.trackId})`
+    );
+    // TODO: notify creator of sale, apply commission waterfall for per-track sales
+  } else if (status === 'failed' || status === 'expired') {
+    if (purchase.status === 'pending') {
+      await db
+        .update(trackPurchases)
+        .set({ status: 'cancelled', updatedAt: new Date() })
+        .where(eq(trackPurchases.id, purchaseId));
+      console.log(
+        `[NOWPayments Webhook] Track purchase ${purchaseId} cancelled (status=${status})`
+      );
+    }
+  } else if (status === 'refunded') {
+    await db
+      .update(trackPurchases)
+      .set({ status: 'refunded', updatedAt: new Date() })
+      .where(eq(trackPurchases.id, purchaseId));
+    console.log(`[NOWPayments Webhook] Track purchase ${purchaseId} refunded`);
+  }
+}
+
 async function handleMarketplaceOrder(
   orderId: string,
   payload: NowPaymentsIPNPayload
@@ -435,6 +487,8 @@ export async function POST(request: NextRequest) {
           await handleSubscriptionPayment(orderId, payload, 'finished');
         } else if (orderId.startsWith('ticket_')) {
           await handleTicketPurchase(orderId, payload, 'finished');
+        } else if (orderId.startsWith('trackbuy_')) {
+          await handleTrackPurchase(orderId, payload, 'finished');
         } else if (orderId.startsWith('merch_')) {
           await handleMarketplaceOrder(orderId, payload);
         } else {
@@ -459,6 +513,8 @@ export async function POST(request: NextRequest) {
           );
         } else if (payload.order_id.startsWith('ticket_')) {
           await handleTicketPurchase(payload.order_id, payload, payload.payment_status);
+        } else if (payload.order_id.startsWith('trackbuy_')) {
+          await handleTrackPurchase(payload.order_id, payload, payload.payment_status);
         }
         break;
       }

@@ -64,6 +64,45 @@ export const tracks = pgTable(
   ]
 );
 
+export const trackPurchaseStatusEnum = pgEnum('track_purchase_status', [
+  'pending',
+  'completed',
+  'cancelled',
+  'refunded',
+]);
+
+/**
+ * Track purchases — records a user's one-time purchase of a track.
+ *
+ * Flow: row inserted with status='pending' when NOWPayments charge is
+ * created. Webhook flips 'pending' → 'completed' on payment.finished,
+ * or → 'cancelled' on failed/expired. A 'completed' row means the user
+ * owns the track (shown as "Owned" on the track detail page).
+ */
+export const trackPurchases = pgTable(
+  'track_purchases',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    trackId: uuid('track_id')
+      .references(() => tracks.id, { onDelete: 'cascade' })
+      .notNull(),
+    pricePaid: integer('price_paid').notNull(), // INTEGER CENTS at purchase time
+    status: trackPurchaseStatusEnum('status').default('pending').notNull(),
+    paymentId: text('payment_id'), // NOWPayments payment_id for audit/reconciliation
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index('track_purchases_user_idx').on(t.userId),
+    index('track_purchases_track_idx').on(t.trackId),
+    index('track_purchases_status_idx').on(t.status),
+    index('track_purchases_user_track_idx').on(t.userId, t.trackId),
+  ]
+);
+
 export const albums = pgTable(
   'albums',
   {

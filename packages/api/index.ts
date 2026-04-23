@@ -20,6 +20,7 @@ import {
   commissions,
   payoutBatches,
   tracks,
+  trackPurchases,
   albums,
   albumTracks,
   playlists,
@@ -1932,6 +1933,183 @@ const podcastEpisodesRouter = createRouter({
     }),
 });
 
+// ─── Track Purchases Router ───
+/**
+ * Handles one-time paid purchases of individual tracks. Flow mirrors the
+ * ticket and subscription fixes: pending row in DB → NOWPayments charge →
+ * webhook flips to 'completed' on payment.finished.
+ */
+const trackPurchasesRouter = createRouter({
+  /**
+   * Initiate a track purchase. Returns a paymentUrl the client should redirect
+   * to. If the user already owns the track (a 'completed' row exists) or has
+   * an in-flight 'pending' purchase, returns an error — call myPurchases to
+   * see owned tracks.
+   */
+  buy: protectedProcedure
+    .input(z.object({ trackId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+
+      // Fetch the track — must exist, be published, and have a price
+      const track = await db.query.tracks.findFirst({
+        where: eq(tracks.id, input.trackId),
+      });
+      if (!track) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Track not found' });
+      }
+      if (track.status !== 'published') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Track is not available for purchase' });
+      }
+      if (!track.price || track.price <= 0) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'This track is free — no purchase needed' });
+      }
+      if (track.userId === userId) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'You already own this track (you created it)' });
+      }
+
+      // Block double-buy: if a completed purchase already exists, reject.
+      const existingCompleted = await db.query.trackPurchases.findFirst({
+        where: and(
+          eq(trackPurchases.userId, userId),
+          eq(trackPurchases.trackId, input.trackId),
+          eq(trackPurchases.status, 'completed')
+        ),
+      });
+      if (existingCompleted) {
+        throw new TRPCError({ code: 'CONFLICT', message: 'You already own this track' });
+      }
+
+      // Block concurrent buy: if a pending purchase exists (younger than 30min),
+      // reject to prevent double-charges if the user clicks Buy twice.
+      const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000);
+      const existingPending = await db.query.trackPurchases.findFirst({
+        where: and(
+          eq(trackPurchases.userId, userId),
+          eq(trackPurchases.trackId, input.trackId),
+          eq(trackPurchases.status, 'pending')
+        ),
+      });
+      if (existingPending && existingPending.createdAt > thirtyMinAgo) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'A purchase is already in progress — finish checkout or try again in 30 minutes',
+        });
+      }
+
+      const apiKey = process.env.NOWPAYMENTS_API_KEY;
+      if (!apiKey) {
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Payment not configured' });
+      }
+
+      // Create pending purchase row — webhook will flip to 'completed'
+      const [purchase] = await db
+        .insert(trackPurchases)
+        .values({
+          userId,
+          trackId: input.trackId,
+          pricePaid: track.price,
+          status: 'pending',
+        })
+        .returning();
+
+      try {
+        const priceUsd = track.price / 100;
+        const response = await fetch('https://api.nowpayments.io/v1/payment', {
+          method: 'POST',
+          headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            price_amount: priceUsd,
+            price_currency: 'usd',
+            pay_currency: 'usdcmatic',
+            // order_id format parsed by the webhook at /api/webhooks/nowpayments
+            order_id: `trackbuy_${purchase.id}`,
+            order_description: `OPYNX track: ${track.title} — $${priceUsd.toFixed(2)}`,
+            ipn_callback_url: 'https://opynx.com/api/webhooks/nowpayments',
+            success_url: `https://opynx.com/track/${input.trackId}?purchased=true`,
+            cancel_url: `https://opynx.com/track/${input.trackId}?cancelled=true`,
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.payment_id) {
+          // Roll back the pending row
+          await db.delete(trackPurchases).where(eq(trackPurchases.id, purchase.id));
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Payment creation failed',
+          });
+        }
+
+        // Store paymentId for reconciliation
+        await db
+          .update(trackPurchases)
+          .set({ paymentId: String(data.payment_id) })
+          .where(eq(trackPurchases.id, purchase.id));
+
+        return {
+          purchase,
+          paymentUrl: `https://nowpayments.io/payment/?iid=${data.payment_id}`,
+        };
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        await db.delete(trackPurchases).where(eq(trackPurchases.id, purchase.id));
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Payment service unavailable',
+        });
+      }
+    }),
+
+  /**
+   * Check whether the current user has purchased a given track. Returns
+   * null if signed-out or not purchased; returns purchase row if completed.
+   */
+  hasPurchased: publicProcedure
+    .input(z.object({ trackId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session?.user?.id;
+      if (!userId) return null;
+      const purchase = await db.query.trackPurchases.findFirst({
+        where: and(
+          eq(trackPurchases.userId, userId),
+          eq(trackPurchases.trackId, input.trackId),
+          eq(trackPurchases.status, 'completed')
+        ),
+      });
+      return purchase ?? null;
+    }),
+
+  /**
+   * List all completed purchases for the current user, joined with track
+   * details for display in a "My Library" or "Owned Tracks" view.
+   */
+  myPurchases: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+    return db
+      .select({
+        purchaseId: trackPurchases.id,
+        pricePaid: trackPurchases.pricePaid,
+        purchasedAt: trackPurchases.createdAt,
+        track: {
+          id: tracks.id,
+          title: tracks.title,
+          slug: tracks.slug,
+          genre: tracks.genre,
+          duration: tracks.duration,
+          coverUrl: tracks.coverUrl,
+        },
+      })
+      .from(trackPurchases)
+      .innerJoin(tracks, eq(trackPurchases.trackId, tracks.id))
+      .where(and(
+        eq(trackPurchases.userId, userId),
+        eq(trackPurchases.status, 'completed')
+      ))
+      .orderBy(desc(trackPurchases.createdAt));
+  }),
+});
+
 // ─── App Router ───
 export const appRouter = createRouter({
   auth: authRouter,
@@ -1953,6 +2131,7 @@ export const appRouter = createRouter({
   admin: adminRouter,
   podcasts: podcastsRouter,
   podcastEpisodes: podcastEpisodesRouter,
+  trackPurchases: trackPurchasesRouter,
 });
 
 export type AppRouter = typeof appRouter;

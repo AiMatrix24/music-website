@@ -18,6 +18,8 @@ export default function TrackDetailPage() {
     { limit: 4 },
     { enabled: !!track }
   );
+  // Purchase status — hasPurchased returns the purchase row if user owns it, else null
+  const { data: ownership } = trpc.trackPurchases.hasPurchased.useQuery({ trackId: id });
   const [linkCopied, setLinkCopied] = useState(false);
 
   const handleCopyLink = useCallback(() => {
@@ -93,6 +95,21 @@ export default function TrackDetailPage() {
               />
               <LikeButton initialCount={Math.floor((track.playCount ?? 0) * 0.12)} />
               <ShareButton title={`${track.title} on OPYNX`} text={`Listen to ${track.title} by ${track.artistName ?? 'Unknown'} on OPYNX`} />
+              {/* Buy button (only for paid tracks not yet owned) */}
+              {track.price && track.price > 0 && !ownership && (
+                <Link
+                  href={`/track/${id}/buy`}
+                  className="rounded-full bg-green-600 hover:bg-green-500 px-5 py-2 text-sm font-semibold text-white transition"
+                >
+                  Buy — ${(track.price / 100).toFixed(2)}
+                </Link>
+              )}
+              {/* Owned badge */}
+              {ownership && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-green-600/20 border border-green-600/40 px-4 py-2 text-sm font-semibold text-green-400">
+                  ✓ Owned
+                </span>
+              )}
               <TipJar artistName={track.artistName ?? 'Unknown'} artistId={track.userId} />
             </div>
           </div>
