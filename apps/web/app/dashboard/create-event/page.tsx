@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useToast } from '@/app/components/Toast';
 import Link from 'next/link';
+import { CoverImageField } from '@/app/components/podcast/CoverImageField';
+import { RichTextEditor } from '@/app/components/podcast/RichTextEditor';
 
 interface TicketTier {
   name: string;
@@ -27,12 +29,16 @@ export default function CreateEventPage() {
 
   // Event details
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [coverUrl, setCoverUrl] = useState('');
   const [startDate, setStartDate] = useState('');
   const [startTime, setStartTime] = useState('20:00');
   const [endTime, setEndTime] = useState('23:00');
   const [timezone, setTimezone] = useState('America/New_York');
   const [capacity, setCapacity] = useState('');
-  const [location, setLocation] = useState('');
+  const [venueName, setVenueName] = useState('');
+  const [venueCity, setVenueCity] = useState('');
+  const [venueAddress, setVenueAddress] = useState('');
 
   // Ticket tiers
   const [tiers, setTiers] = useState<TicketTier[]>([
@@ -75,10 +81,15 @@ export default function CreateEventPage() {
 
       const event = await createEvent.mutateAsync({
         title,
+        description: description.trim() || undefined,
+        coverUrl: coverUrl || undefined,
         startDate: startDateTime,
         endDate: endDateTime,
         timezone,
         capacity: capacity ? parseInt(capacity) : undefined,
+        venueName: venueName.trim() || undefined,
+        venueCity: venueCity.trim() || undefined,
+        venueAddress: venueAddress.trim() || undefined,
       });
 
       setCreatedEventId(event.id);
@@ -194,24 +205,68 @@ export default function CreateEventPage() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold mb-2">Venue / Location</label>
-              <input
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="e.g. The Warehouse, Los Angeles"
-                className="w-full bg-[#15151f] border border-brand-800/30 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 focus:border-red-600 focus:outline-none transition"
+            {/* Venue */}
+            <div className="rounded-xl bg-[#15151f] border border-brand-800/20 p-5 space-y-3">
+              <h3 className="font-semibold text-sm">Venue</h3>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Venue name</label>
+                <input
+                  value={venueName}
+                  onChange={(e) => setVenueName(e.target.value)}
+                  placeholder="e.g. The Warehouse"
+                  className="w-full bg-brand-950 border border-brand-800/30 rounded-xl px-4 py-2.5 text-white placeholder:text-gray-600 focus:border-red-600 focus:outline-none transition"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">City</label>
+                  <input
+                    value={venueCity}
+                    onChange={(e) => setVenueCity(e.target.value)}
+                    placeholder="Los Angeles"
+                    className="w-full bg-brand-950 border border-brand-800/30 rounded-xl px-4 py-2.5 text-white placeholder:text-gray-600 focus:border-red-600 focus:outline-none transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Total capacity</label>
+                  <input
+                    type="number"
+                    value={capacity}
+                    onChange={(e) => setCapacity(e.target.value)}
+                    placeholder="500"
+                    className="w-full bg-brand-950 border border-brand-800/30 rounded-xl px-4 py-2.5 text-white placeholder:text-gray-600 focus:border-red-600 focus:outline-none transition"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Street address (optional)</label>
+                <input
+                  value={venueAddress}
+                  onChange={(e) => setVenueAddress(e.target.value)}
+                  placeholder="1234 Sunset Blvd"
+                  className="w-full bg-brand-950 border border-brand-800/30 rounded-xl px-4 py-2.5 text-white placeholder:text-gray-600 focus:border-red-600 focus:outline-none transition"
+                />
+              </div>
+            </div>
+
+            {/* Cover art */}
+            <div className="rounded-xl bg-[#15151f] border border-brand-800/20 p-5">
+              <CoverImageField
+                label="Cover art"
+                hint="Wide 16:9 (or square) JPG/PNG, ≤8MB — shown on event page + explore grid"
+                value={coverUrl}
+                onChange={setCoverUrl}
               />
             </div>
 
+            {/* Description */}
             <div>
-              <label className="block text-sm font-semibold mb-2">Total Capacity</label>
-              <input
-                type="number"
-                value={capacity}
-                onChange={(e) => setCapacity(e.target.value)}
-                placeholder="e.g. 500"
-                className="w-full bg-[#15151f] border border-brand-800/30 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 focus:border-red-600 focus:outline-none transition"
+              <label className="block text-sm font-semibold mb-2">Event description</label>
+              <RichTextEditor
+                value={description}
+                onChange={setDescription}
+                placeholder="Tell fans what to expect — lineup, vibe, why they should come…"
+                minHeight={140}
               />
             </div>
 
@@ -328,6 +383,10 @@ export default function CreateEventPage() {
         {step === 'review' && (
           <div className="space-y-6">
             <div className="rounded-xl bg-[#15151f] border border-brand-800/20 p-6">
+              {coverUrl && (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={coverUrl} alt="" className="w-full aspect-video rounded-lg object-cover mb-4" />
+              )}
               <h3 className="font-bold text-lg mb-4">{title || 'Untitled Event'}</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
@@ -342,10 +401,20 @@ export default function CreateEventPage() {
                   <span className="text-gray-400">Timezone</span>
                   <span>{timezone.split('/')[1]?.replace('_', ' ')}</span>
                 </div>
-                {location && (
+                {(venueName || venueCity) && (
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Location</span>
-                    <span>{location}</span>
+                    <span className="text-gray-400">Venue</span>
+                    <span className="text-right">
+                      {venueName}
+                      {venueName && venueCity && <span className="text-gray-500"> · </span>}
+                      {venueCity}
+                    </span>
+                  </div>
+                )}
+                {venueAddress && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Address</span>
+                    <span className="text-right">{venueAddress}</span>
                   </div>
                 )}
                 {capacity && (

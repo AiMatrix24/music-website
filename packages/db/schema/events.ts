@@ -83,10 +83,18 @@ export const events = pgTable(
       .references(() => users.id)
       .notNull(),
     title: text('title').notNull(),
-    description: jsonb('description'), // Tiptap JSON
+    // Sanitized HTML from the rich text editor (same model as podcasts).
+    // Was jsonb (Tiptap JSON); text is simpler and matches the rest of the
+    // creator-facing content.
+    description: text('description'),
     startDate: timestamp('start_date', { withTimezone: true }).notNull(),
     endDate: timestamp('end_date', { withTimezone: true }).notNull(),
     venueId: uuid('venue_id').references(() => venues.id),
+    // Free-text venue fields captured at event creation. When a proper venues
+    // system exists (Wave 3), these can be auto-populated from venueId.
+    venueName: text('venue_name'),
+    venueCity: text('venue_city'),
+    venueAddress: text('venue_address'),
     seriesId: uuid('series_id').references(() => eventSeries.id),
     seriesOrder: integer('series_order'),
     countryCode: text('country_code'), // ISO 3166-1 alpha-2

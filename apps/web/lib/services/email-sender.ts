@@ -15,7 +15,17 @@ import {
   creatorEarningsEmail,
 } from '@/lib/emails/templates';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy-init so build-time imports don't crash when RESEND_API_KEY is unset.
+// The key is only needed at runtime when emails actually send.
+let _resend: Resend | null = null;
+function getResend(): Resend | null {
+  if (_resend) return _resend;
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return null;
+  _resend = new Resend(key);
+  return _resend;
+}
+
 const FROM_EMAIL = process.env.EMAIL_FROM ?? 'OPYNX <noreply@opynx.com>';
 
 // ─── Core Send Function ───
@@ -25,6 +35,11 @@ export async function sendEmail(params: {
   subject: string;
   html: string;
 }): Promise<{ success: boolean; id?: string; error?: string }> {
+  const resend = getResend();
+  if (!resend) {
+    console.warn('[email-sender] RESEND_API_KEY not set — skipping send');
+    return { success: false, error: 'Email not configured' };
+  }
   try {
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,

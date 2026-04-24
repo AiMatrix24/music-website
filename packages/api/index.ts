@@ -813,9 +813,14 @@ const eventsRouter = createRouter({
           id: events.id,
           hostId: events.hostId,
           title: events.title,
+          description: events.description,
+          coverUrl: events.coverUrl,
           startDate: events.startDate,
           endDate: events.endDate,
           venueId: events.venueId,
+          venueName: events.venueName,
+          venueCity: events.venueCity,
+          venueAddress: events.venueAddress,
           countryCode: events.countryCode,
           timezone: events.timezone,
           status: events.status,
@@ -839,9 +844,14 @@ const eventsRouter = createRouter({
           id: events.id,
           hostId: events.hostId,
           title: events.title,
+          description: events.description,
+          coverUrl: events.coverUrl,
           startDate: events.startDate,
           endDate: events.endDate,
           venueId: events.venueId,
+          venueName: events.venueName,
+          venueCity: events.venueCity,
+          venueAddress: events.venueAddress,
           countryCode: events.countryCode,
           timezone: events.timezone,
           status: events.status,
@@ -860,13 +870,17 @@ const eventsRouter = createRouter({
     .input(
       z.object({
         title: z.string().min(1).max(200),
+        description: z.string().max(50000).optional(),
+        coverUrl: z.string().url().optional(),
         startDate: z.string().datetime(),
         endDate: z.string().datetime().optional(),
         venueId: z.string().uuid().optional(),
+        venueName: z.string().max(200).optional(),
+        venueCity: z.string().max(100).optional(),
+        venueAddress: z.string().max(300).optional(),
         countryCode: z.string().max(2).optional(),
         timezone: z.string().optional(),
         capacity: z.number().int().min(1).optional(),
-        coverUrl: z.string().url().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -875,13 +889,17 @@ const eventsRouter = createRouter({
         .values({
           hostId: ctx.session.user.id,
           title: input.title,
+          description: input.description ?? null,
+          coverUrl: input.coverUrl ?? null,
           startDate: new Date(input.startDate),
           endDate: input.endDate ? new Date(input.endDate) : new Date(new Date(input.startDate).getTime() + 3 * 60 * 60 * 1000),
           venueId: input.venueId ?? null,
+          venueName: input.venueName ?? null,
+          venueCity: input.venueCity ?? null,
+          venueAddress: input.venueAddress ?? null,
           countryCode: input.countryCode ?? null,
           timezone: input.timezone ?? null,
           capacity: input.capacity ?? null,
-          coverUrl: input.coverUrl ?? null,
           // Default to 'published' — the create-event UI is a one-shot "set up
           // everything and publish" flow, and users expect the "Publish Event"
           // button to actually make the event visible. If a drafts-first flow

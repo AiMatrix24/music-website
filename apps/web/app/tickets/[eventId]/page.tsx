@@ -170,7 +170,9 @@ export default function TicketPurchasePage() {
               <div className="flex flex-wrap gap-3 text-sm text-gray-500">
                 <span>📅 {date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
                 <span>🕐 {date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
-                {event.timezone && <span>📍 {event.timezone.split('/')[1]?.replace('_', ' ')}</span>}
+                {(event.venueName || event.venueCity) && (
+                  <span>📍 {event.venueName}{event.venueName && event.venueCity && ' · '}{event.venueCity}</span>
+                )}
               </div>
             </div>
           </div>

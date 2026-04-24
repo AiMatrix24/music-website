@@ -57,6 +57,13 @@
       "when": 1776981393404,
       "tag": "0007_cold_alice",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777052520431,
+      "tag": "0008_noisy_hannibal_king",
+      "breakpoints": true
     }
   ]
 }

@@ -8,6 +8,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useToast } from '@/app/components/Toast';
+import { useSafeHtml } from '@/app/components/podcast/useSafeHtml';
 
 export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -357,6 +358,16 @@ export default function EventDetailPage() {
           ← Back to Explore
         </Link>
 
+        {/* Cover image (if set by creator) */}
+        {event.coverUrl && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={event.coverUrl}
+            alt=""
+            className="w-full aspect-video rounded-2xl object-cover mb-6 shadow-2xl"
+          />
+        )}
+
         {/* Hero banner */}
         <div className="rounded-2xl bg-gradient-to-br from-brand-700 via-brand-800 to-brand-950 p-8 mb-8 relative overflow-hidden">
           <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSA2MCAwIEwgMCAwIDAgNjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-50" />
@@ -425,13 +436,28 @@ export default function EventDetailPage() {
                 label="Sold"
                 value={`${percentSold}%`}
               />
-              {event.timezone && (
+              {(event.venueCity || event.timezone) && (
                 <StatCard
                   label="Location"
-                  value={event.timezone.split('/')[1]?.replace('_', ' ') ?? event.timezone}
+                  value={event.venueCity ?? event.timezone?.split('/')[1]?.replace('_', ' ') ?? '—'}
                 />
               )}
             </div>
+
+            {/* Venue */}
+            {(event.venueName || event.venueAddress) && (
+              <div className="rounded-2xl bg-[#15151f] p-5">
+                <h2 className="font-bold text-lg mb-2">📍 Venue</h2>
+                {event.venueName && <p className="font-semibold text-base">{event.venueName}</p>}
+                {event.venueAddress && <p className="text-sm text-gray-400">{event.venueAddress}</p>}
+                {event.venueCity && <p className="text-sm text-gray-400">{event.venueCity}</p>}
+              </div>
+            )}
+
+            {/* Description */}
+            {event.description && (
+              <EventDescription html={event.description} />
+            )}
 
             {/* Sales progress */}
             {totalCapacity > 0 && (
@@ -573,6 +599,20 @@ export default function EventDetailPage() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function EventDescription({ html }: { html: string }) {
+  const safe = useSafeHtml(html);
+  if (!safe) return null;
+  return (
+    <div className="rounded-2xl bg-[#15151f] p-6">
+      <h2 className="font-bold text-lg mb-3">About this event</h2>
+      <div
+        className="prose prose-sm prose-invert max-w-none prose-a:text-brand-400 prose-strong:text-white prose-headings:text-white"
+        dangerouslySetInnerHTML={{ __html: safe }}
+      />
     </div>
   );
 }
