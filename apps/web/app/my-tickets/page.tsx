@@ -4,6 +4,7 @@ import { trpc } from '@/lib/trpc/client';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useState } from 'react';
+import { QRCode } from '@/app/components/QRCode';
 
 export default function MyTicketsPage() {
   const { status } = useSession();
@@ -151,13 +152,11 @@ function TicketCard({ ticket, event }: { ticket: any; event: any }) {
 
               {showQR && (
                 <div className="mt-3 p-6 bg-white rounded-xl inline-block">
-                  <div className="w-48 h-48 bg-gray-100 border-2 border-gray-200 rounded-lg flex flex-col items-center justify-center">
-                    <span className="text-5xl mb-2">📱</span>
-                    <p className="text-xs text-gray-500 text-center px-4">
-                      Show this at the venue
-                    </p>
-                  </div>
-                  <p className="text-xs text-gray-400 text-center mt-2 font-mono break-all">
+                  <QRCode value={ticket.qrToken} size={240} errorCorrectionLevel="Q" />
+                  <p className="text-xs text-gray-600 text-center mt-3 font-semibold">
+                    Show this at the venue
+                  </p>
+                  <p className="text-[10px] text-gray-400 text-center mt-1 font-mono break-all max-w-[240px]">
                     {ticket.qrToken}
                   </p>
                 </div>

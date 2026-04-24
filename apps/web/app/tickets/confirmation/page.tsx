@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
+import { QRCode } from '@/app/components/QRCode';
 
 function ConfirmationContent() {
   const params = useSearchParams();
@@ -72,9 +73,8 @@ function ConfirmationContent() {
 
           {/* QR token */}
           <div className="mt-6 p-4 bg-white rounded-xl text-center">
-            <div className="w-32 h-32 bg-gray-100 border-2 border-gray-200 rounded-lg mx-auto flex flex-col items-center justify-center mb-2">
-              <span className="text-4xl">📱</span>
-              <p className="text-xs text-gray-400 mt-1">QR Code</p>
+            <div className="mx-auto flex flex-col items-center justify-center mb-2">
+              <QRCode value={token} size={160} errorCorrectionLevel="M" className="rounded-lg" />
             </div>
             <p className="text-xs text-gray-500 font-mono break-all">{token}</p>
           </div>

@@ -1176,6 +1176,77 @@ const ticketsRouter = createRouter({
       if (!ticket) return { valid: false, ticket: null };
       return { valid: ticket.status === 'valid', ticket };
     }),
+
+  /**
+   * Check in a ticket at the venue. Validates the QR token, confirms the
+   * scanner is authorized (event host or sub-scanner with permission — for
+   * now only the event host can check in), flips ticket status valid → used
+   * with a checkedIn timestamp. Idempotent on already-used tickets: returns
+   * the original check-in time instead of erroring.
+   *
+   * Returns the ticket + event for display on the scanner page (who's
+   * checking in, which event, what tier).
+   */
+  checkIn: protectedProcedure
+    .input(z.object({ qrToken: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const ticket = await db.query.tickets.findFirst({
+        where: eq(tickets.qrToken, input.qrToken),
+      });
+      if (!ticket) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Ticket not found — invalid QR' });
+      }
+
+      // Authorize: only the event host can check tickets in
+      const event = await db.query.events.findFirst({ where: eq(events.id, ticket.eventId) });
+      if (!event) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Event not found' });
+      }
+      if (event.hostId !== ctx.session.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the event host can check tickets in',
+        });
+      }
+
+      // Status checks
+      if (ticket.status === 'cancelled' || ticket.status === 'refunded') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Ticket is ${ticket.status}, not valid for entry`,
+        });
+      }
+      if (ticket.status === 'pending') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Ticket payment not confirmed yet',
+        });
+      }
+
+      // Idempotent on re-scan of already-used ticket
+      if (ticket.status === 'used') {
+        return {
+          alreadyCheckedIn: true,
+          ticket,
+          event,
+          checkedIn: ticket.checkedIn,
+        };
+      }
+
+      // Flip to used
+      const [updated] = await db
+        .update(tickets)
+        .set({ status: 'used', checkedIn: new Date() })
+        .where(eq(tickets.id, ticket.id))
+        .returning();
+
+      return {
+        alreadyCheckedIn: false,
+        ticket: updated,
+        event,
+        checkedIn: updated.checkedIn,
+      };
+    }),
 });
 
 // ─── Marketplace Router ───
