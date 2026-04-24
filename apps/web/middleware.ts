@@ -44,8 +44,15 @@ export function middleware(request: NextRequest) {
     return new NextResponse('Authentication required', {
       status: 401,
       headers: {
-        'WWW-Authenticate': 'Basic realm="OPYNX — Pre-launch", charset="UTF-8"',
+        // Plain ASCII realm — some browsers refuse to show the dialog if the
+        // realm contains non-ASCII or advanced params (charset, etc.)
+        'WWW-Authenticate': 'Basic realm="OPYNX"',
         'Content-Type': 'text/plain',
+        // Never let intermediaries or service workers cache the 401 challenge —
+        // they might serve a stale cached 200 page instead of passing the
+        // challenge to the browser UI.
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
       },
     });
   }
