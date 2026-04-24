@@ -9,7 +9,7 @@ export function Footer() {
           {/* Brand */}
           <div>
             <Link href="/" className="flex items-center gap-2 mb-3">
-              <Image src="/logo.jpeg" alt="OPYNX" width={32} height={32} className="rounded-lg" />
+              <Image src="/logo.png" alt="OPYNX" width={32} height={32} className="rounded-lg" />
               <span className="text-xl font-black tracking-tight">
                 <span className="text-red-500">O</span>pyn<span className="text-red-500">X</span>
               </span>

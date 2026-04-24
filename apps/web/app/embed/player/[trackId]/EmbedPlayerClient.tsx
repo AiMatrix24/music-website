@@ -153,7 +153,7 @@ export function EmbedPlayerClient({
       <div className="flex items-center justify-between mt-1">
         <div className="flex items-center gap-1.5">
           <Image
-            src={`${appUrl}/logo.jpeg`}
+            src={`${appUrl}/logo.png`}
             alt="OPYNX"
             width={16}
             height={16}

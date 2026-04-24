@@ -61,7 +61,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2 mb-4">
-            <Image src="/logo.jpeg" alt="OPYNX" width={48} height={48} className="rounded-xl" />
+            <Image src="/logo.png" alt="OPYNX" width={48} height={48} className="rounded-xl" />
           </Link>
           <h1 className="text-3xl font-bold mb-2">Welcome to OPYNX</h1>
           <p className="text-gray-400">

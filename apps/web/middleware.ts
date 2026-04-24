@@ -77,6 +77,6 @@ export const config = {
     // without basic auth. Static assets + service worker + PWA manifest
     // are excluded so browsers can load them before presenting the auth
     // dialog.
-    '/((?!_next/static|_next/image|favicon.ico|icon.svg|logo.jpeg|manifest.json|sw.js|api/).*)',
+    '/((?!_next/static|_next/image|favicon.ico|icon.svg|logo.png|manifest.json|sw.js|api/).*)',
   ],
 };

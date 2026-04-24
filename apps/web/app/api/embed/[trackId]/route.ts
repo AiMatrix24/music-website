@@ -39,6 +39,6 @@ export async function GET(
     width: 400,
     height: 160,
     html: `<iframe src="${appUrl}/embed/player/${trackId}" width="400" height="160" frameborder="0" allow="autoplay; encrypted-media" style="border-radius: 12px;"></iframe>`,
-    thumbnail_url: track.coverUrl ?? `${appUrl}/logo.jpeg`,
+    thumbnail_url: track.coverUrl ?? `${appUrl}/logo.png`,
   });
 }

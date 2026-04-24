@@ -90,7 +90,7 @@ function generateRSS(show: ShowRow, episodes: EpisodeRow[]): string {
   const lang = show.language || 'en';
   const explicit = show.explicit ? 'true' : 'false';
   const category = show.category ?? 'Music';
-  const coverUrl = show.coverUrl ?? `${SITE_URL}/logo.jpeg`;
+  const coverUrl = show.coverUrl ?? `${SITE_URL}/logo.png`;
 
   const items = episodes
     .filter((ep) => !!ep.audioUrl)
