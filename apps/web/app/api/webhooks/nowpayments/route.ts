@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { db, subscriptions, subEvents } from '@opynx/db';
 import { tickets, ticketTypes, trackPurchases, tips, orders, orderItems, listings, commissions } from '@opynx/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { processCommissionWaterfall } from '@/lib/services/commissions';
 import { captureError, startTransaction } from '@/lib/services/monitoring';
+import { sendPaymentReceipt, sendCreatorEarningsNotification } from '@/lib/services/email-sender';
+import { users, tracks, events } from '@opynx/db/schema';
 
 /**
  * NOWPayments IPN (Instant Payment Notification) Webhook Handler
@@ -160,8 +162,22 @@ async function handleSubscriptionPayment(
       event: 'refunded',
       metadata: JSON.stringify({ source: 'nowpayments', paymentId: payload.payment_id }),
     });
-    console.log(`[NOWPayments Webhook] Subscription ${subscriptionId} refunded`);
-    // TODO: reverse commission waterfall on refund
+    // Claw back commission rows for this subscription so they stop counting
+    // in creator earnings dashboards. Status 'clawed_back' is excluded from
+    // the earnings + payouts summary queries.
+    const clawback = await db
+      .update(commissions)
+      .set({ status: 'clawed_back', updatedAt: new Date() })
+      .where(and(
+        eq(commissions.sourceType, 'subscription'),
+        eq(commissions.sourceId, subscriptionId),
+        sql`${commissions.status} IN ('pending', 'approved', 'processing', 'paid')`
+      ))
+      .returning({ id: commissions.id, amount: commissions.amount, recipientId: commissions.recipientId });
+    console.log(
+      `[NOWPayments Webhook] Subscription ${subscriptionId} refunded; clawed back ${clawback.length} commissions ` +
+        `totalling $${(clawback.reduce((s, c) => s + c.amount, 0) / 100).toFixed(2)}`
+    );
     return;
   }
 
@@ -246,6 +262,43 @@ async function handleSubscriptionPayment(
   console.log(
     `[NOWPayments Webhook] Subscription ${subscriptionId} ${wasPending ? 'activated' : 'renewed'} (tier=${tierRaw})`
   );
+
+  // Fire-and-forget emails: receipt to subscriber + earnings notif to each
+  // commission recipient. Errors are logged but don't fail the webhook.
+  void (async () => {
+    try {
+      const subscriber = await db.query.users.findFirst({ where: eq(users.id, existingSub.userId) });
+      if (subscriber?.email) {
+        await sendPaymentReceipt(subscriber.email, {
+          type: 'subscription',
+          buyerName: subscriber.name ?? 'OPYNX subscriber',
+          amountCents: tierRaw === 'bundle' ? 1273 : tierRaw === 'studio' ? 1600 : 873,
+          itemDescription: `${tierRaw.charAt(0).toUpperCase() + tierRaw.slice(1)} subscription`,
+          ctaUrl: 'https://opynx.com/explore',
+        });
+      }
+      // Notify each non-platform commission recipient
+      if (waterfallResult) {
+        const recipients = waterfallResult.splits.filter(
+          (s) => s.role !== 'platform' && s.recipientId !== 'platform' && s.amount > 0
+        );
+        for (const split of recipients) {
+          const recipient = await db.query.users.findFirst({ where: eq(users.id, split.recipientId) });
+          if (recipient?.email) {
+            await sendCreatorEarningsNotification(recipient.email, {
+              type: 'subscription',
+              creatorName: recipient.name ?? 'Creator',
+              amountCents: split.amount,
+              itemDescription: `${tierRaw.charAt(0).toUpperCase() + tierRaw.slice(1)} subscription commission`,
+              fromName: subscriber?.name ?? undefined,
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[NOWPayments Webhook] Subscription email error:', err);
+    }
+  })();
 }
 
 async function handleTicketPurchase(
@@ -279,7 +332,42 @@ async function handleTicketPurchase(
     console.log(
       `[NOWPayments Webhook] Ticket ${ticketId} activated, paid=${payload.actually_paid} ${payload.pay_currency}`
     );
-    // TODO: send confirmation email with QR code
+    // Fire-and-forget receipt to attendee + sale notif to event host
+    void (async () => {
+      try {
+        const [attendee, ticketType, event] = await Promise.all([
+          db.query.users.findFirst({ where: eq(users.id, ticket.attendeeId) }),
+          db.query.ticketTypes.findFirst({ where: eq(ticketTypes.id, ticket.ticketTypeId) }),
+          db.query.events.findFirst({ where: eq(events.id, ticket.eventId) }),
+        ]);
+        const itemDesc = `${event?.title ?? 'event'} — ${ticketType?.name ?? 'ticket'}`;
+        const price = ticketType?.price ?? 0;
+        if (attendee?.email) {
+          await sendPaymentReceipt(attendee.email, {
+            type: 'ticket',
+            buyerName: attendee.name ?? 'Attendee',
+            amountCents: price,
+            itemDescription: itemDesc,
+            ctaUrl: `https://opynx.com/my-tickets`,
+            ctaLabel: 'View Ticket',
+          });
+        }
+        if (event?.hostId) {
+          const host = await db.query.users.findFirst({ where: eq(users.id, event.hostId) });
+          if (host?.email && host.id !== attendee?.id) {
+            await sendCreatorEarningsNotification(host.email, {
+              type: 'ticket',
+              creatorName: host.name ?? 'Creator',
+              amountCents: price,
+              itemDescription: itemDesc,
+              fromName: attendee?.name ?? undefined,
+            });
+          }
+        }
+      } catch (err) {
+        console.error('[NOWPayments Webhook] Ticket email error:', err);
+      }
+    })();
   } else if (status === 'failed' || status === 'expired' || status === 'refunded') {
     // Release inventory + cancel the pending ticket (only if still pending)
     if (ticket.status === 'pending') {
@@ -333,7 +421,39 @@ async function handleTrackPurchase(
     console.log(
       `[NOWPayments Webhook] Track purchase ${purchaseId} completed (trackId=${purchase.trackId})`
     );
-    // TODO: notify creator of sale, apply commission waterfall for per-track sales
+    void (async () => {
+      try {
+        const [buyer, track] = await Promise.all([
+          db.query.users.findFirst({ where: eq(users.id, purchase.userId) }),
+          db.query.tracks.findFirst({ where: eq(tracks.id, purchase.trackId) }),
+        ]);
+        if (buyer?.email && track) {
+          await sendPaymentReceipt(buyer.email, {
+            type: 'track',
+            buyerName: buyer.name ?? 'Listener',
+            amountCents: purchase.pricePaid,
+            itemDescription: `Track: ${track.title}`,
+            ctaUrl: `https://opynx.com/track/${track.id}`,
+            ctaLabel: 'Listen Now',
+          });
+        }
+        if (track?.userId) {
+          const creator = await db.query.users.findFirst({ where: eq(users.id, track.userId) });
+          if (creator?.email && creator.id !== buyer?.id) {
+            await sendCreatorEarningsNotification(creator.email, {
+              type: 'track',
+              creatorName: creator.name ?? 'Creator',
+              amountCents: purchase.pricePaid,
+              itemDescription: `Track: ${track.title}`,
+              fromName: buyer?.name ?? undefined,
+              ctaUrl: `https://opynx.com/dashboard/earnings`,
+            });
+          }
+        }
+      } catch (err) {
+        console.error('[NOWPayments Webhook] Track email error:', err);
+      }
+    })();
   } else if (status === 'failed' || status === 'expired') {
     if (purchase.status === 'pending') {
       await db
@@ -383,7 +503,35 @@ async function handleTipPayment(
     console.log(
       `[NOWPayments Webhook] Tip ${tipId} completed: ${tip.amount} cents to ${tip.recipientUserId}`
     );
-    // TODO: notify creator of tip received
+    void (async () => {
+      try {
+        const [tipper, recipient] = await Promise.all([
+          db.query.users.findFirst({ where: eq(users.id, tip.tipperUserId) }),
+          db.query.users.findFirst({ where: eq(users.id, tip.recipientUserId) }),
+        ]);
+        if (tipper?.email && recipient) {
+          await sendPaymentReceipt(tipper.email, {
+            type: 'tip',
+            buyerName: tipper.name ?? 'Fan',
+            amountCents: tip.amount,
+            itemDescription: `Tip to ${recipient.name ?? 'creator'}`,
+            ctaUrl: `https://opynx.com/artist/${recipient.id}`,
+            ctaLabel: `Visit ${recipient.name ?? 'creator'}`,
+          });
+        }
+        if (recipient?.email && recipient.id !== tipper?.id) {
+          await sendCreatorEarningsNotification(recipient.email, {
+            type: 'tip',
+            creatorName: recipient.name ?? 'Creator',
+            amountCents: tip.amount,
+            itemDescription: tip.message ? `Tip with note: "${tip.message.slice(0, 80)}"` : 'Tip received',
+            fromName: tipper?.name ?? undefined,
+          });
+        }
+      } catch (err) {
+        console.error('[NOWPayments Webhook] Tip email error:', err);
+      }
+    })();
   } else if (status === 'failed' || status === 'expired') {
     if (tip.status === 'pending') {
       await db
@@ -433,7 +581,42 @@ async function handleMarketplaceOrder(
     console.log(
       `[NOWPayments Webhook] Marketplace order ${merchOrderId} paid: $${(order.totalAmount / 100).toFixed(2)} to seller ${order.sellerId}`
     );
-    // TODO: notify seller of sale, send buyer confirmation email
+    void (async () => {
+      try {
+        const [buyer, seller, items] = await Promise.all([
+          db.query.users.findFirst({ where: eq(users.id, order.buyerId) }),
+          db.query.users.findFirst({ where: eq(users.id, order.sellerId) }),
+          db
+            .select({ title: listings.title })
+            .from(orderItems)
+            .leftJoin(listings, eq(listings.id, orderItems.listingId))
+            .where(eq(orderItems.orderId, merchOrderId))
+            .limit(1),
+        ]);
+        const itemDesc = items[0]?.title ?? 'Marketplace order';
+        if (buyer?.email) {
+          await sendPaymentReceipt(buyer.email, {
+            type: 'merch',
+            buyerName: buyer.name ?? 'Buyer',
+            amountCents: order.totalAmount,
+            itemDescription: itemDesc,
+            ctaUrl: `https://opynx.com/explore`,
+            ctaLabel: 'Browse More',
+          });
+        }
+        if (seller?.email && seller.id !== buyer?.id) {
+          await sendCreatorEarningsNotification(seller.email, {
+            type: 'merch',
+            creatorName: seller.name ?? 'Seller',
+            amountCents: order.totalAmount,
+            itemDescription: itemDesc,
+            fromName: buyer?.name ?? undefined,
+          });
+        }
+      } catch (err) {
+        console.error('[NOWPayments Webhook] Merch email error:', err);
+      }
+    })();
   } else if (status === 'failed' || status === 'expired') {
     if (order.status === 'pending') {
       // Release stock: look up order items and add back

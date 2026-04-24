@@ -11,6 +11,8 @@ import {
   ticketPurchaseEmail,
   commissionPaidEmail,
   newReleaseEmail,
+  paymentReceiptEmail,
+  creatorEarningsEmail,
 } from '@/lib/emails/templates';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -86,5 +88,21 @@ export async function sendNewReleaseEmail(
   }
 ) {
   const { subject, html } = newReleaseEmail(params);
+  return sendEmail({ to, subject, html });
+}
+
+export async function sendPaymentReceipt(
+  to: string,
+  params: Parameters<typeof paymentReceiptEmail>[0]
+) {
+  const { subject, html } = paymentReceiptEmail(params);
+  return sendEmail({ to, subject, html });
+}
+
+export async function sendCreatorEarningsNotification(
+  to: string,
+  params: Parameters<typeof creatorEarningsEmail>[0]
+) {
+  const { subject, html } = creatorEarningsEmail(params);
   return sendEmail({ to, subject, html });
 }

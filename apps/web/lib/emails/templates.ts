@@ -254,3 +254,86 @@ export function newReleaseEmail(params: {
     `),
   };
 }
+
+// ─── Generic payment receipt (buyer-facing) ───
+/**
+ * Generic "your payment landed" receipt for any revenue path.
+ * Use type to control framing: 'subscription' | 'ticket' | 'track' | 'tip' | 'merch'
+ */
+export function paymentReceiptEmail(params: {
+  type: 'subscription' | 'ticket' | 'track' | 'tip' | 'merch';
+  buyerName: string;
+  amountCents: number;
+  itemDescription: string;
+  ctaUrl: string;
+  ctaLabel?: string;
+}): { subject: string; html: string } {
+  const { type, buyerName, amountCents, itemDescription, ctaUrl, ctaLabel } = params;
+  const amount = `$${(amountCents / 100).toFixed(2)}`;
+  const subjectByType: Record<typeof type, string> = {
+    subscription: `Your OPYNX subscription is active — ${amount}`,
+    ticket: `Ticket confirmed: ${itemDescription}`,
+    track: `Track purchased: ${itemDescription}`,
+    tip: `Tip sent — ${amount}`,
+    merch: `Order confirmed: ${itemDescription}`,
+  };
+  const headlineByType: Record<typeof type, string> = {
+    subscription: 'Subscription Active',
+    ticket: 'You\'re going to the show',
+    track: 'Track unlocked',
+    tip: 'Tip sent — thank you',
+    merch: 'Order confirmed',
+  };
+  const defaultCtaLabel: Record<typeof type, string> = {
+    subscription: 'Open OPYNX',
+    ticket: 'View Ticket',
+    track: 'Listen Now',
+    tip: 'Back to OPYNX',
+    merch: 'View Order',
+  };
+  return {
+    subject: subjectByType[type],
+    html: emailWrapper(`
+      ${heading(headlineByType[type])}
+      ${paragraph(`Hey ${buyerName}, your payment of <strong>${amount}</strong> for <strong>${itemDescription}</strong> has been confirmed on Polygon.`)}
+      ${ctaButton(ctaLabel ?? defaultCtaLabel[type], ctaUrl)}
+      ${smallText('Settled on-chain via NOWPayments. This receipt is the proof of payment for your records.')}
+    `),
+  };
+}
+
+// ─── Generic creator-earnings notification ───
+/**
+ * "You earned money" notification to a creator/seller. Sent on every revenue
+ * event so creators see income in real-time and trust the platform.
+ */
+export function creatorEarningsEmail(params: {
+  type: 'subscription' | 'ticket' | 'track' | 'tip' | 'merch';
+  creatorName: string;
+  amountCents: number;
+  itemDescription: string;
+  fromName?: string;
+  ctaUrl?: string;
+}): { subject: string; html: string } {
+  const { type, creatorName, amountCents, itemDescription, fromName, ctaUrl } = params;
+  const amount = `$${(amountCents / 100).toFixed(2)}`;
+  const sourceLabel: Record<typeof type, string> = {
+    subscription: 'a subscription commission',
+    ticket: 'a ticket sale',
+    track: 'a track sale',
+    tip: 'a tip',
+    merch: 'a marketplace order',
+  };
+  const fromText = fromName ? ` from <strong>${fromName}</strong>` : '';
+  return {
+    subject: `You earned ${amount} on OPYNX`,
+    html: emailWrapper(`
+      ${heading(`+${amount} earned`)}
+      ${paragraph(`Hey ${creatorName}, you just received <strong>${amount}</strong> from ${sourceLabel[type]}${fromText}.`)}
+      ${paragraph(`<strong>${itemDescription}</strong>`)}
+      ${paragraph('It\'s been added to your available balance. Request a payout from your dashboard whenever you\'re ready.')}
+      ${ctaButton('Open Earnings', ctaUrl ?? 'https://opynx.com/dashboard/earnings')}
+      ${smallText('You\'re receiving this because someone paid for your content on OPYNX.')}
+    `),
+  };
+}
