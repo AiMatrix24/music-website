@@ -821,6 +821,10 @@ const eventsRouter = createRouter({
           venueName: events.venueName,
           venueCity: events.venueCity,
           venueAddress: events.venueAddress,
+          venueLat: events.venueLat,
+          venueLng: events.venueLng,
+          geofenceRadiusMeters: events.geofenceRadiusMeters,
+          geofenceEnforced: events.geofenceEnforced,
           countryCode: events.countryCode,
           timezone: events.timezone,
           status: events.status,
@@ -852,6 +856,10 @@ const eventsRouter = createRouter({
           venueName: events.venueName,
           venueCity: events.venueCity,
           venueAddress: events.venueAddress,
+          venueLat: events.venueLat,
+          venueLng: events.venueLng,
+          geofenceRadiusMeters: events.geofenceRadiusMeters,
+          geofenceEnforced: events.geofenceEnforced,
           countryCode: events.countryCode,
           timezone: events.timezone,
           status: events.status,
@@ -878,6 +886,11 @@ const eventsRouter = createRouter({
         venueName: z.string().max(200).optional(),
         venueCity: z.string().max(100).optional(),
         venueAddress: z.string().max(300).optional(),
+        // Geofencing — captured via browser geolocation at create time
+        venueLat: z.number().min(-90).max(90).optional(),
+        venueLng: z.number().min(-180).max(180).optional(),
+        geofenceRadiusMeters: z.number().int().min(20).max(5000).optional(),
+        geofenceEnforced: z.boolean().optional(),
         countryCode: z.string().max(2).optional(),
         timezone: z.string().optional(),
         capacity: z.number().int().min(1).optional(),
@@ -897,6 +910,10 @@ const eventsRouter = createRouter({
           venueName: input.venueName ?? null,
           venueCity: input.venueCity ?? null,
           venueAddress: input.venueAddress ?? null,
+          venueLat: input.venueLat ?? null,
+          venueLng: input.venueLng ?? null,
+          geofenceRadiusMeters: input.geofenceRadiusMeters ?? 100,
+          geofenceEnforced: input.geofenceEnforced ?? false,
           countryCode: input.countryCode ?? null,
           timezone: input.timezone ?? null,
           capacity: input.capacity ?? null,
@@ -1179,16 +1196,23 @@ const ticketsRouter = createRouter({
 
   /**
    * Check in a ticket at the venue. Validates the QR token, confirms the
-   * scanner is authorized (event host or sub-scanner with permission — for
-   * now only the event host can check in), flips ticket status valid → used
-   * with a checkedIn timestamp. Idempotent on already-used tickets: returns
-   * the original check-in time instead of erroring.
-   *
-   * Returns the ticket + event for display on the scanner page (who's
-   * checking in, which event, what tier).
+   * scanner is the event host, optionally enforces geofence (scanner must be
+   * within `geofenceRadiusMeters` of the venue) AND time window (event start
+   * − 2h through end + 1h) when `event.geofenceEnforced=true`. Flips ticket
+   * status valid → used with a checkedIn timestamp. Idempotent on already-
+   * used tickets: returns the original check-in time instead of erroring.
    */
   checkIn: protectedProcedure
-    .input(z.object({ qrToken: z.string().min(1) }))
+    .input(
+      z.object({
+        qrToken: z.string().min(1),
+        // Optional GPS — required when event.geofenceEnforced=true.
+        // Captured via browser navigator.geolocation on the scanner device.
+        scannerLat: z.number().min(-90).max(90).optional(),
+        scannerLng: z.number().min(-180).max(180).optional(),
+        scannerAccuracyMeters: z.number().min(0).optional(),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       const ticket = await db.query.tickets.findFirst({
         where: eq(tickets.qrToken, input.qrToken),
@@ -1223,6 +1247,66 @@ const ticketsRouter = createRouter({
         });
       }
 
+      // Geofence + time window enforcement (when host opted in)
+      let geoDistanceMeters: number | null = null;
+      let geoConfidence: 'high' | 'medium' | 'low' | null = null;
+      if (event.geofenceEnforced) {
+        // Time window: start − 2h through end + 1h
+        const now = Date.now();
+        const startMs = event.startDate.getTime();
+        const endMs = event.endDate.getTime();
+        const windowStart = startMs - 2 * 60 * 60 * 1000;
+        const windowEnd = endMs + 60 * 60 * 1000;
+        if (now < windowStart) {
+          const minsUntil = Math.round((windowStart - now) / 60000);
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Check-in opens ${minsUntil} min from now (event starts ${event.startDate.toLocaleString()})`,
+          });
+        }
+        if (now > windowEnd) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Check-in window closed (event ended ${event.endDate.toLocaleString()})`,
+          });
+        }
+
+        // GPS check — only if venue location was captured at create time
+        if (event.venueLat != null && event.venueLng != null) {
+          if (input.scannerLat == null || input.scannerLng == null) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'GPS location required — enable location access in your browser and retry',
+            });
+          }
+          // Inline Haversine — keeps the mutation self-contained
+          const R = 6371000; // meters
+          const lat1 = (event.venueLat * Math.PI) / 180;
+          const lat2 = (input.scannerLat * Math.PI) / 180;
+          const dLat = ((input.scannerLat - event.venueLat) * Math.PI) / 180;
+          const dLng = ((input.scannerLng - event.venueLng) * Math.PI) / 180;
+          const a =
+            Math.sin(dLat / 2) ** 2 +
+            Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          geoDistanceMeters = Math.round(R * c);
+          const radius = event.geofenceRadiusMeters ?? 100;
+          // Allow scanner GPS accuracy slack — if reported accuracy is e.g.
+          // 50m, treat the user as in-range if they're within radius+50m.
+          const slack = Math.min(input.scannerAccuracyMeters ?? 0, 200);
+          if (geoDistanceMeters > radius + slack) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: `You're ${geoDistanceMeters}m from the venue (max ${radius}m). Scan from the venue.`,
+            });
+          }
+          geoConfidence =
+            geoDistanceMeters <= radius * 0.5 ? 'high'
+            : geoDistanceMeters <= radius ? 'medium'
+            : 'low';
+        }
+      }
+
       // Idempotent on re-scan of already-used ticket
       if (ticket.status === 'used') {
         return {
@@ -1230,6 +1314,8 @@ const ticketsRouter = createRouter({
           ticket,
           event,
           checkedIn: ticket.checkedIn,
+          geoDistanceMeters,
+          geoConfidence,
         };
       }
 
@@ -1245,6 +1331,8 @@ const ticketsRouter = createRouter({
         ticket: updated,
         event,
         checkedIn: updated.checkedIn,
+        geoDistanceMeters,
+        geoConfidence,
       };
     }),
 });

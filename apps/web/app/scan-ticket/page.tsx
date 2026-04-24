@@ -12,6 +12,13 @@ type ScanResult =
   | { kind: 'success'; alreadyCheckedIn: boolean; eventTitle: string; checkedInAt: Date | null }
   | { kind: 'error'; message: string };
 
+type GpsState =
+  | { status: 'idle' }
+  | { status: 'requesting' }
+  | { status: 'ok'; lat: number; lng: number; accuracy: number; capturedAt: number }
+  | { status: 'denied' }
+  | { status: 'error'; message: string };
+
 export default function ScanTicketPage() {
   const { status: sessionStatus } = useSession();
   const { toast } = useToast();
@@ -19,17 +26,65 @@ export default function ScanTicketPage() {
   const [manualToken, setManualToken] = useState('');
   const [result, setResult] = useState<ScanResult | null>(null);
   const [cameraError, setCameraError] = useState<string>('');
+  const [gps, setGps] = useState<GpsState>({ status: 'idle' });
   const scannerRef = useRef<unknown>(null);
   const isMountedRef = useRef(true);
   const processingRef = useRef(false); // prevent double-scans from rapid camera callbacks
 
   const checkInMutation = trpc.tickets.checkIn.useMutation();
 
+  // Re-capture GPS if last reading is older than 60s — coordinates can stale
+  // out over the course of an event, especially indoors.
+  const captureGps = (): Promise<{ lat: number; lng: number; accuracy: number } | null> => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        setGps({ status: 'error', message: 'Geolocation not supported by browser' });
+        resolve(null);
+        return;
+      }
+      // If we have a fresh reading (<60s), reuse it
+      if (gps.status === 'ok' && Date.now() - gps.capturedAt < 60_000) {
+        resolve({ lat: gps.lat, lng: gps.lng, accuracy: gps.accuracy });
+        return;
+      }
+      setGps({ status: 'requesting' });
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const reading = {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+          };
+          setGps({ ...reading, status: 'ok', capturedAt: Date.now() });
+          resolve(reading);
+        },
+        (err) => {
+          if (err.code === err.PERMISSION_DENIED) {
+            setGps({ status: 'denied' });
+          } else {
+            setGps({ status: 'error', message: err.message });
+          }
+          resolve(null);
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 30_000 }
+      );
+    });
+  };
+
   const handleToken = async (token: string) => {
     if (processingRef.current) return;
     processingRef.current = true;
     try {
-      const res = await checkInMutation.mutateAsync({ qrToken: token });
+      // Best-effort GPS capture — if event isn't geofence-enforced the
+      // backend ignores these fields; if it IS enforced and GPS fails,
+      // the backend returns a "GPS required" error that lands in result.
+      const reading = await captureGps();
+      const res = await checkInMutation.mutateAsync({
+        qrToken: token,
+        scannerLat: reading?.lat,
+        scannerLng: reading?.lng,
+        scannerAccuracyMeters: reading?.accuracy,
+      });
       if (!isMountedRef.current) return;
       setResult({
         kind: 'success',
@@ -206,6 +261,29 @@ export default function ScanTicketPage() {
           <h1 className="text-3xl font-black mb-2">Ticket Scanner</h1>
           <p className="text-gray-400 text-sm">Scan a ticket QR code to check in attendees.</p>
         </div>
+
+        {/* GPS status (shown only if geo capture has been attempted) */}
+        {gps.status !== 'idle' && (
+          <div
+            className={`mb-4 rounded-lg px-3 py-2 text-xs flex items-center gap-2 ${
+              gps.status === 'ok'
+                ? 'bg-green-950/30 border border-green-800/30 text-green-300'
+                : gps.status === 'requesting'
+                  ? 'bg-blue-950/30 border border-blue-800/30 text-blue-300'
+                  : 'bg-amber-950/30 border border-amber-800/30 text-amber-300'
+            }`}
+          >
+            <span>📍</span>
+            {gps.status === 'requesting' && 'Getting location…'}
+            {gps.status === 'ok' && (
+              <span>
+                Location ready · ±{Math.round(gps.accuracy)}m accuracy
+              </span>
+            )}
+            {gps.status === 'denied' && 'Location permission denied — geofenced events will reject check-ins'}
+            {gps.status === 'error' && `Location error: ${gps.message}`}
+          </div>
+        )}
 
         {/* Mode toggle */}
         <div className="flex gap-2 mb-6">

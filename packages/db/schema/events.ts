@@ -95,6 +95,14 @@ export const events = pgTable(
     venueName: text('venue_name'),
     venueCity: text('venue_city'),
     venueAddress: text('venue_address'),
+    // Geofencing (Option A — GPS directly on event row, no venues table needed
+    // for MVP). When geofenceEnforced=true, ticket check-in requires the
+    // scanner's GPS coordinates within geofenceRadiusMeters of (lat, lng) AND
+    // the event's time window (start − 2h through end + 1h).
+    venueLat: real('venue_lat'), // -90 to 90, null if not captured
+    venueLng: real('venue_lng'), // -180 to 180, null if not captured
+    geofenceRadiusMeters: integer('geofence_radius_meters').default(100),
+    geofenceEnforced: boolean('geofence_enforced').default(false).notNull(),
     seriesId: uuid('series_id').references(() => eventSeries.id),
     seriesOrder: integer('series_order'),
     countryCode: text('country_code'), // ISO 3166-1 alpha-2

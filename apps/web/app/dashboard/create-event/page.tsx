@@ -40,6 +40,34 @@ export default function CreateEventPage() {
   const [venueCity, setVenueCity] = useState('');
   const [venueAddress, setVenueAddress] = useState('');
 
+  // Geofencing — captured via browser geolocation
+  const [venueLat, setVenueLat] = useState<number | null>(null);
+  const [venueLng, setVenueLng] = useState<number | null>(null);
+  const [geofenceRadiusMeters, setGeofenceRadiusMeters] = useState(100);
+  const [geofenceEnforced, setGeofenceEnforced] = useState(false);
+  const [capturingLocation, setCapturingLocation] = useState(false);
+
+  const captureLocation = () => {
+    if (!navigator.geolocation) {
+      toast('Browser does not support geolocation', 'error');
+      return;
+    }
+    setCapturingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setVenueLat(pos.coords.latitude);
+        setVenueLng(pos.coords.longitude);
+        setCapturingLocation(false);
+        toast(`Captured location (±${Math.round(pos.coords.accuracy)}m accuracy)`, 'success');
+      },
+      (err) => {
+        setCapturingLocation(false);
+        toast(`Location capture failed: ${err.message}`, 'error');
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  };
+
   // Ticket tiers
   const [tiers, setTiers] = useState<TicketTier[]>([
     { name: 'General Admission', tier: 'general', price: '25.00', quantity: '200' },
@@ -90,6 +118,10 @@ export default function CreateEventPage() {
         venueName: venueName.trim() || undefined,
         venueCity: venueCity.trim() || undefined,
         venueAddress: venueAddress.trim() || undefined,
+        venueLat: venueLat ?? undefined,
+        venueLng: venueLng ?? undefined,
+        geofenceRadiusMeters,
+        geofenceEnforced,
       });
 
       setCreatedEventId(event.id);
@@ -247,6 +279,68 @@ export default function CreateEventPage() {
                   className="w-full bg-brand-950 border border-brand-800/30 rounded-xl px-4 py-2.5 text-white placeholder:text-gray-600 focus:border-red-600 focus:outline-none transition"
                 />
               </div>
+            </div>
+
+            {/* Geofence — anti-fraud check-in */}
+            <div className="rounded-xl bg-[#15151f] border border-brand-800/20 p-5 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold text-sm">📍 Geofenced check-in (optional)</h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Only allow ticket scans from within range of the venue and during the event window.
+                    Capture the venue&apos;s GPS while standing on-site.
+                  </p>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={geofenceEnforced}
+                    onChange={(e) => setGeofenceEnforced(e.target.checked)}
+                    className="w-5 h-5 rounded accent-red-600 bg-brand-950"
+                  />
+                  <span className="text-xs text-gray-300">Enforce</span>
+                </label>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <button
+                  type="button"
+                  onClick={captureLocation}
+                  disabled={capturingLocation}
+                  className="rounded-full bg-brand-950 border border-brand-800/30 px-4 py-2 text-xs font-semibold text-gray-300 hover:text-white hover:border-red-600 transition disabled:opacity-50"
+                >
+                  {capturingLocation ? 'Capturing…' : venueLat ? '📍 Re-capture location' : '📍 Use my current location'}
+                </button>
+                {venueLat != null && venueLng != null && (
+                  <span className="text-xs text-green-400 font-mono">
+                    {venueLat.toFixed(5)}, {venueLng.toFixed(5)}
+                  </span>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">
+                  Geofence radius: <span className="text-white font-semibold">{geofenceRadiusMeters}m</span>
+                </label>
+                <input
+                  type="range"
+                  min={20}
+                  max={1000}
+                  step={10}
+                  value={geofenceRadiusMeters}
+                  onChange={(e) => setGeofenceRadiusMeters(parseInt(e.target.value))}
+                  className="w-full accent-red-600"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Small club: 50m · Theater: 100m · Festival ground: 300–500m
+                </p>
+              </div>
+
+              {geofenceEnforced && !venueLat && (
+                <p className="text-xs text-amber-400">
+                  ⚠ Enforcement is on but no GPS captured — check-in will require location but you haven&apos;t set one.
+                </p>
+              )}
             </div>
 
             {/* Cover art */}
