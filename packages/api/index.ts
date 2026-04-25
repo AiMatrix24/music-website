@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { eq, desc, and, sql, ilike } from 'drizzle-orm';
+import { eq, desc, and, sql, ilike, isNull } from 'drizzle-orm';
 import {
   createRouter,
   createCallerFactory,
@@ -8,6 +8,7 @@ import {
   protectedProcedure,
   adminProcedure,
 } from '../../apps/web/lib/trpc/server';
+import { notify, fmtCents } from '../../apps/web/lib/services/notifications';
 import { db } from '@opynx/db';
 import {
   users,
@@ -45,6 +46,7 @@ import {
   broadcasts,
   podcasts,
   podcastEpisodes,
+  notifications,
 } from '@opynx/db';
 
 // ─── Auth Router ───
@@ -205,6 +207,16 @@ const usersRouter = createRouter({
         await db.insert(follows).values({
           followerId: userId,
           followeeId: input.artistId,
+        });
+        // Notify the followee — fire-and-forget
+        const follower = await db.query.users.findFirst({ where: eq(users.id, userId) });
+        void notify({
+          userId: input.artistId,
+          type: 'follow',
+          title: 'New follower',
+          body: `${follower?.name ?? 'Someone'} started following you`,
+          link: `/artist/${userId}`,
+          metadata: { followerId: userId },
         });
         return { following: true };
       }
@@ -3176,6 +3188,14 @@ const payoutsRouter = createRouter({
         .where(eq(payoutRequests.id, input.id))
         .returning();
       if (!updated) throw new TRPCError({ code: 'NOT_FOUND' });
+      void notify({
+        userId: updated.userId,
+        type: 'payout_processed',
+        title: 'Payout sent',
+        body: `${fmtCents(updated.amountCents)} USDC sent to your wallet`,
+        link: '/dashboard/withdraw',
+        metadata: { amountCents: updated.amountCents, txHash: input.txHash, payoutId: updated.id },
+      });
       return updated;
     }),
 
@@ -3194,8 +3214,89 @@ const payoutsRouter = createRouter({
         .where(eq(payoutRequests.id, input.id))
         .returning();
       if (!updated) throw new TRPCError({ code: 'NOT_FOUND' });
+      void notify({
+        userId: updated.userId,
+        type: 'payout_rejected',
+        title: 'Payout request rejected',
+        body: `${fmtCents(updated.amountCents)} request was rejected: ${input.reason}`,
+        link: '/dashboard/withdraw',
+        metadata: { amountCents: updated.amountCents, reason: input.reason, payoutId: updated.id },
+      });
       return updated;
     }),
+});
+
+// ─── Notifications Router ───
+/**
+ * In-app bell + /notifications page. Rows are written by webhooks (revenue
+ * events) and background jobs (milestones, payouts). Reads are scoped to the
+ * authenticated user — there is no admin-wide list endpoint.
+ *
+ * Pagination: simple `limit` for now; add cursor when a creator hits 100+.
+ */
+const notificationsRouter = createRouter({
+  // Latest notifications for the bell dropdown + full /notifications page.
+  list: protectedProcedure
+    .input(
+      z
+        .object({
+          limit: z.number().int().min(1).max(100).default(50),
+          unreadOnly: z.boolean().default(false),
+        })
+        .optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const limit = input?.limit ?? 50;
+      const unreadOnly = input?.unreadOnly ?? false;
+      const where = unreadOnly
+        ? and(eq(notifications.userId, ctx.session.user.id), isNull(notifications.readAt))
+        : eq(notifications.userId, ctx.session.user.id);
+      return db
+        .select()
+        .from(notifications)
+        .where(where)
+        .orderBy(desc(notifications.createdAt))
+        .limit(limit);
+    }),
+
+  // Bell badge count. Cheap — uses notif_user_read_idx.
+  unreadCount: protectedProcedure.query(async ({ ctx }) => {
+    const [row] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(notifications)
+      .where(
+        and(eq(notifications.userId, ctx.session.user.id), isNull(notifications.readAt))
+      );
+    return row?.count ?? 0;
+  }),
+
+  // Mark a single notification read. Idempotent — second call is a no-op.
+  markRead: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await db
+        .update(notifications)
+        .set({ readAt: new Date() })
+        .where(
+          and(
+            eq(notifications.id, input.id),
+            eq(notifications.userId, ctx.session.user.id),
+            isNull(notifications.readAt)
+          )
+        );
+      return { ok: true };
+    }),
+
+  // Mark all unread for this user as read.
+  markAllRead: protectedProcedure.mutation(async ({ ctx }) => {
+    await db
+      .update(notifications)
+      .set({ readAt: new Date() })
+      .where(
+        and(eq(notifications.userId, ctx.session.user.id), isNull(notifications.readAt))
+      );
+    return { ok: true };
+  }),
 });
 
 // ─── App Router ───
@@ -3223,6 +3324,7 @@ export const appRouter = createRouter({
   tips: tipsRouter,
   earnings: earningsRouter,
   payouts: payoutsRouter,
+  notifications: notificationsRouter,
 });
 
 export type AppRouter = typeof appRouter;

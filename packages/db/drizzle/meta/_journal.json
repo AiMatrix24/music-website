@@ -71,6 +71,13 @@
       "when": 1777067615289,
       "tag": "0009_big_midnight",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1777070373231,
+      "tag": "0010_numerous_penance",
+      "breakpoints": true
     }
   ]
 }

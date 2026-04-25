@@ -11,3 +11,4 @@ export * from './beats';
 export * from './podcasts';
 export * from './tips';
 export * from './payouts';
+export * from './notifications';

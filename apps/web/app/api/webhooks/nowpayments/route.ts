@@ -6,6 +6,7 @@ import { eq, and, sql } from 'drizzle-orm';
 import { processCommissionWaterfall } from '@/lib/services/commissions';
 import { captureError, startTransaction } from '@/lib/services/monitoring';
 import { sendPaymentReceipt, sendCreatorEarningsNotification } from '@/lib/services/email-sender';
+import { notify, fmtCents } from '@/lib/services/notifications';
 import { users, tracks, events } from '@opynx/db/schema';
 
 /**
@@ -293,6 +294,16 @@ async function handleSubscriptionPayment(
               fromName: subscriber?.name ?? undefined,
             });
           }
+          if (recipient) {
+            await notify({
+              userId: recipient.id,
+              type: 'subscription',
+              title: 'New subscription commission',
+              body: `${fmtCents(split.amount)} earned from ${subscriber?.name ?? 'a fan'} (${tierRaw})`,
+              link: '/dashboard/earnings',
+              metadata: { amountCents: split.amount, tier: tierRaw, subscriptionId },
+            });
+          }
         }
       }
     } catch (err) {
@@ -361,6 +372,16 @@ async function handleTicketPurchase(
               amountCents: price,
               itemDescription: itemDesc,
               fromName: attendee?.name ?? undefined,
+            });
+          }
+          if (host && host.id !== attendee?.id) {
+            await notify({
+              userId: host.id,
+              type: 'ticket_sale',
+              title: 'Ticket sold',
+              body: `${fmtCents(price)} — ${attendee?.name ?? 'someone'} bought ${ticketType?.name ?? 'a ticket'} to ${event?.title ?? 'your event'}`,
+              link: `/event/${event?.id ?? ''}`,
+              metadata: { amountCents: price, ticketId, eventId: event?.id, attendeeId: attendee?.id },
             });
           }
         }
@@ -449,6 +470,16 @@ async function handleTrackPurchase(
               ctaUrl: `https://opynx.com/dashboard/earnings`,
             });
           }
+          if (creator && creator.id !== buyer?.id) {
+            await notify({
+              userId: creator.id,
+              type: 'track_sale',
+              title: 'Track sold',
+              body: `${fmtCents(purchase.pricePaid)} — ${buyer?.name ?? 'someone'} bought "${track?.title ?? 'your track'}"`,
+              link: '/dashboard/earnings',
+              metadata: { amountCents: purchase.pricePaid, trackId: track?.id, buyerId: buyer?.id },
+            });
+          }
         }
       } catch (err) {
         console.error('[NOWPayments Webhook] Track email error:', err);
@@ -526,6 +557,16 @@ async function handleTipPayment(
             amountCents: tip.amount,
             itemDescription: tip.message ? `Tip with note: "${tip.message.slice(0, 80)}"` : 'Tip received',
             fromName: tipper?.name ?? undefined,
+          });
+        }
+        if (recipient && recipient.id !== tipper?.id) {
+          await notify({
+            userId: recipient.id,
+            type: 'tip_received',
+            title: 'Tip received',
+            body: `${fmtCents(tip.amount)} from ${tipper?.name ?? 'a fan'}${tip.message ? ` — "${tip.message.slice(0, 60)}"` : ''}`,
+            link: '/dashboard/earnings',
+            metadata: { amountCents: tip.amount, tipId, tipperId: tipper?.id },
           });
         }
       } catch (err) {
@@ -611,6 +652,16 @@ async function handleMarketplaceOrder(
             amountCents: order.totalAmount,
             itemDescription: itemDesc,
             fromName: buyer?.name ?? undefined,
+          });
+        }
+        if (seller && seller.id !== buyer?.id) {
+          await notify({
+            userId: seller.id,
+            type: 'marketplace_sale',
+            title: 'Listing sold',
+            body: `${fmtCents(order.totalAmount)} — ${buyer?.name ?? 'a buyer'} bought ${itemDesc}`,
+            link: '/dashboard/earnings',
+            metadata: { amountCents: order.totalAmount, orderId: merchOrderId, buyerId: buyer?.id },
           });
         }
       } catch (err) {
