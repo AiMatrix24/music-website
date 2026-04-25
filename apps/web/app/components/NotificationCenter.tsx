@@ -155,7 +155,7 @@ export function NotificationBell() {
                         </p>
                         {!isRead && <span className="w-2 h-2 bg-red-500 rounded-full shrink-0" />}
                       </div>
-                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{n.body}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 whitespace-normal break-words">{n.body}</p>
                       <p className="text-xs text-gray-600 mt-1">{timeAgo(new Date(n.createdAt))}</p>
                     </div>
                   </Wrapper>
