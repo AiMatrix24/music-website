@@ -279,6 +279,34 @@ const usersRouter = createRouter({
         recentLast30Days: t.recent,
       };
     }),
+
+  /**
+   * Creators the current user is following. Used by /library "Following" tab.
+   * Joins users for display name + avatar + role.
+   */
+  myFollowing: protectedProcedure
+    .input(
+      z
+        .object({ limit: z.number().int().min(1).max(100).default(50) })
+        .optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const limit = input?.limit ?? 50;
+      const rows = await db
+        .select({
+          id: users.id,
+          name: users.name,
+          avatar: users.avatar,
+          role: users.role,
+          followedAt: follows.createdAt,
+        })
+        .from(follows)
+        .innerJoin(users, eq(follows.followeeId, users.id))
+        .where(eq(follows.followerId, ctx.session.user.id))
+        .orderBy(desc(follows.createdAt))
+        .limit(limit);
+      return rows;
+    }),
 });
 
 // ─── Subscriptions Router ───
@@ -704,6 +732,27 @@ const playlistsRouter = createRouter({
         .where(conditions.length ? and(...conditions) : undefined)
         .orderBy(desc(playlists.createdAt))
         .limit(input.limit);
+    }),
+
+  /**
+   * Playlists owned by the current authenticated user. Used by /library
+   * "Playlists" tab and the AddToPlaylistModal so the user only sees their
+   * own playlists (the public `list` procedure returns everyone's).
+   */
+  listMine: protectedProcedure
+    .input(
+      z
+        .object({ limit: z.number().int().min(1).max(100).default(50) })
+        .optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const limit = input?.limit ?? 50;
+      return db
+        .select()
+        .from(playlists)
+        .where(eq(playlists.userId, ctx.session.user.id))
+        .orderBy(desc(playlists.createdAt))
+        .limit(limit);
     }),
 
   getById: publicProcedure
@@ -2015,6 +2064,50 @@ const likesRouter = createRouter({
         .from(likes)
         .where(eq(likes.trackId, input.trackId));
       return result[0]?.count ?? 0;
+    }),
+
+  /**
+   * Tracks the current user has liked. Returns the same shape as
+   * tracks.list so the /library "Liked Tracks" tab can reuse the same
+   * row component. audioUrl is rewritten through the same-origin proxy.
+   */
+  listMine: protectedProcedure
+    .input(
+      z
+        .object({ limit: z.number().int().min(1).max(100).default(50) })
+        .optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const limit = input?.limit ?? 50;
+      const rows = await db
+        .select({
+          id: tracks.id,
+          userId: tracks.userId,
+          title: tracks.title,
+          slug: tracks.slug,
+          genre: tracks.genre,
+          bpm: tracks.bpm,
+          duration: tracks.duration,
+          visibility: tracks.visibility,
+          status: tracks.status,
+          playCount: tracks.playCount,
+          price: tracks.price,
+          createdAt: tracks.createdAt,
+          artistName: users.name,
+          coverUrl: tracks.coverUrl,
+          rawAudioUrl: sql<string | null>`COALESCE(${tracks.audioUrl320}, ${tracks.audioUrl128})`,
+          likedAt: likes.createdAt,
+        })
+        .from(likes)
+        .innerJoin(tracks, eq(likes.trackId, tracks.id))
+        .leftJoin(users, eq(tracks.userId, users.id))
+        .where(eq(likes.userId, ctx.session.user.id))
+        .orderBy(desc(likes.createdAt))
+        .limit(limit);
+      return rows.map(({ rawAudioUrl, ...r }) => ({
+        ...r,
+        audioUrl: rawAudioUrl ? `/api/media/track/${r.id}` : null,
+      }));
     }),
 });
 
