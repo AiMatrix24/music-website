@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { usePlayer } from '@/app/components/MusicPlayer';
 import { AddToPlaylistModal } from '@/app/components/AddToPlaylistModal';
 
-type LibraryTab = 'uploads' | 'liked' | 'playlists' | 'following';
+type LibraryTab = 'uploads' | 'liked' | 'playlists' | 'history' | 'following';
 
 export default function LibraryPage() {
   const { data: session, status } = useSession();
@@ -33,6 +33,7 @@ export default function LibraryPage() {
     { id: 'uploads', label: 'My Uploads', icon: '🎵' },
     { id: 'liked', label: 'Liked Tracks', icon: '❤️' },
     { id: 'playlists', label: 'Playlists', icon: '🎧' },
+    { id: 'history', label: 'History', icon: '🕐' },
     { id: 'following', label: 'Following', icon: '👤' },
   ];
 
@@ -55,6 +56,7 @@ export default function LibraryPage() {
         {tab === 'uploads' && <MyUploads userId={userId} onAddToPlaylist={setAddToPlaylistFor} />}
         {tab === 'liked' && <LikedTracks onAddToPlaylist={setAddToPlaylistFor} />}
         {tab === 'playlists' && <MyPlaylists />}
+        {tab === 'history' && <ListenHistory onAddToPlaylist={setAddToPlaylistFor} />}
         {tab === 'following' && <FollowingArtists />}
       </div>
 
@@ -207,6 +209,25 @@ function LikedTracks({
       emptyIcon="❤️"
       emptyTitle="No liked tracks yet"
       emptyDesc="Hit the heart icon on any track to save it here."
+      emptyAction={{ label: 'Explore Music', href: '/explore' }}
+      onAddToPlaylist={onAddToPlaylist}
+    />
+  );
+}
+
+function ListenHistory({
+  onAddToPlaylist,
+}: {
+  onAddToPlaylist: (t: { id: string; title: string }) => void;
+}) {
+  const { data, isLoading } = trpc.tracks.history.useQuery({ limit: 100 });
+  if (isLoading) return <LoadingSkeleton />;
+  return (
+    <TrackList
+      tracks={data ?? []}
+      emptyIcon="🕐"
+      emptyTitle="No listening history yet"
+      emptyDesc="Plays are logged after 30 seconds — start a track and it'll show up here."
       emptyAction={{ label: 'Explore Music', href: '/explore' }}
       onAddToPlaylist={onAddToPlaylist}
     />

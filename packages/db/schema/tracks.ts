@@ -64,6 +64,43 @@ export const tracks = pgTable(
   ]
 );
 
+/**
+ * track_plays — append-only listen log. One row per qualified play
+ * (currently fired by the MusicPlayer after 30s of continuous audio).
+ *
+ * Used by /library "History" to surface a deduplicated recent-listens feed
+ * (DISTINCT ON track_id, ordered by played_at DESC). The same data also
+ * powers the tracks.playCount aggregate (incremented in the same write).
+ *
+ * Storage cost: ~50 bytes/row × plays. At MVP scale this is negligible;
+ * if we ever roll up into a daily summary table we'll keep this as the
+ * source of truth and prune older rows.
+ *
+ * Privacy: only authenticated users are logged. Anonymous sessions are
+ * skipped entirely (no anon tracking).
+ */
+export const trackPlays = pgTable(
+  'track_plays',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    trackId: uuid('track_id')
+      .references(() => tracks.id, { onDelete: 'cascade' })
+      .notNull(),
+    playedAt: timestamp('played_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    // Per-user history feed: covers (user_id, played_at DESC) lookups.
+    index('plays_user_played_idx').on(t.userId, t.playedAt),
+    // Per-track analytics (e.g., "who played this track this week").
+    index('plays_track_idx').on(t.trackId),
+  ]
+);
+
 export const trackPurchaseStatusEnum = pgEnum('track_purchase_status', [
   'pending',
   'completed',

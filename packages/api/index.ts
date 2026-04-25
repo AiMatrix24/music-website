@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { eq, desc, and, sql, ilike, isNull } from 'drizzle-orm';
+import { eq, desc, and, sql, ilike, isNull, inArray } from 'drizzle-orm';
 import {
   createRouter,
   createCallerFactory,
@@ -21,6 +21,7 @@ import {
   commissions,
   payoutBatches,
   tracks,
+  trackPlays,
   trackPurchases,
   tips,
   payoutRequests,
@@ -610,6 +611,76 @@ const tracksRouter = createRouter({
         .where(and(eq(tracks.id, input.id), eq(tracks.userId, ctx.session.user.id)))
         .returning();
       return deleted ?? null;
+    }),
+
+  /**
+   * Recent listening history for the current user. Deduplicates by track
+   * (one row per track, latest play wins) so the History tab shows recent
+   * unique tracks rather than the same track repeated. Same shape as
+   * tracks.list so /library can reuse the row component.
+   *
+   * Two-step: GROUP BY trackId for latest play timestamp per track, then
+   * fetch track + artist metadata for those ids. Cheap given the
+   * (user_id, played_at) index covers step 1.
+   */
+  history: protectedProcedure
+    .input(
+      z
+        .object({ limit: z.number().int().min(1).max(100).default(50) })
+        .optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const limit = input?.limit ?? 50;
+      const userId = ctx.session.user.id;
+
+      const recent = await db
+        .select({
+          trackId: trackPlays.trackId,
+          playedAt: sql<Date>`MAX(${trackPlays.playedAt})`.as('played_at'),
+        })
+        .from(trackPlays)
+        .where(eq(trackPlays.userId, userId))
+        .groupBy(trackPlays.trackId)
+        .orderBy(sql`MAX(${trackPlays.playedAt}) DESC`)
+        .limit(limit);
+
+      if (recent.length === 0) return [];
+
+      const trackIds = recent.map((r) => r.trackId);
+      const trackRows = await db
+        .select({
+          id: tracks.id,
+          userId: tracks.userId,
+          title: tracks.title,
+          slug: tracks.slug,
+          genre: tracks.genre,
+          bpm: tracks.bpm,
+          duration: tracks.duration,
+          visibility: tracks.visibility,
+          status: tracks.status,
+          playCount: tracks.playCount,
+          price: tracks.price,
+          createdAt: tracks.createdAt,
+          artistName: users.name,
+          coverUrl: tracks.coverUrl,
+        })
+        .from(tracks)
+        .leftJoin(users, eq(tracks.userId, users.id))
+        .where(inArray(tracks.id, trackIds));
+
+      // Stitch played_at back in, preserve recent[] ordering (latest first).
+      const byId = new Map(trackRows.map((t) => [t.id, t]));
+      return recent
+        .map((r) => {
+          const t = byId.get(r.trackId);
+          if (!t) return null;
+          return {
+            ...t,
+            audioUrl: `/api/media/track/${t.id}`,
+            playedAt: r.playedAt,
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null);
     }),
 });
 
