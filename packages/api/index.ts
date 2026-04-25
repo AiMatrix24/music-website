@@ -48,6 +48,7 @@ import {
   podcasts,
   podcastEpisodes,
   notifications,
+  pushSubscriptions,
 } from '@opynx/db';
 
 // ─── Auth Router ───
@@ -3463,6 +3464,75 @@ const notificationsRouter = createRouter({
   }),
 });
 
+// ─── Push Subscriptions Router ───
+/**
+ * Per-device Web Push subscriptions. The browser hands us a PushSubscription
+ * object after the user grants permission; we save it server-side so the
+ * notify() helper can fan out to every device the user has opted in on.
+ *
+ * Subscriptions are unique by `endpoint` — re-subscribing on the same
+ * device replaces (UPSERT) instead of duplicating.
+ */
+const pushSubscriptionsRouter = createRouter({
+  /** Save (or replace) a Web Push subscription for the current user + device. */
+  subscribe: protectedProcedure
+    .input(
+      z.object({
+        endpoint: z.string().url(),
+        p256dh: z.string().min(1),
+        auth: z.string().min(1),
+        userAgent: z.string().max(500).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Endpoint is unique — UPSERT replaces the old keys if the user
+      // re-subscribes (keys can rotate, e.g., after browser data clear).
+      await db
+        .insert(pushSubscriptions)
+        .values({
+          userId: ctx.session.user.id,
+          endpoint: input.endpoint,
+          p256dh: input.p256dh,
+          auth: input.auth,
+          userAgent: input.userAgent ?? null,
+        })
+        .onConflictDoUpdate({
+          target: pushSubscriptions.endpoint,
+          set: {
+            userId: ctx.session.user.id,
+            p256dh: input.p256dh,
+            auth: input.auth,
+            userAgent: input.userAgent ?? null,
+          },
+        });
+      return { ok: true };
+    }),
+
+  /** Remove a subscription (on user "disable notifications" toggle). */
+  unsubscribe: protectedProcedure
+    .input(z.object({ endpoint: z.string().url() }))
+    .mutation(async ({ ctx, input }) => {
+      await db
+        .delete(pushSubscriptions)
+        .where(
+          and(
+            eq(pushSubscriptions.endpoint, input.endpoint),
+            eq(pushSubscriptions.userId, ctx.session.user.id)
+          )
+        );
+      return { ok: true };
+    }),
+
+  /** How many devices is the current user subscribed on? Powers the toggle UI. */
+  countMine: protectedProcedure.query(async ({ ctx }) => {
+    const [row] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(pushSubscriptions)
+      .where(eq(pushSubscriptions.userId, ctx.session.user.id));
+    return row?.count ?? 0;
+  }),
+});
+
 // ─── App Router ───
 export const appRouter = createRouter({
   auth: authRouter,
@@ -3489,6 +3559,7 @@ export const appRouter = createRouter({
   earnings: earningsRouter,
   payouts: payoutsRouter,
   notifications: notificationsRouter,
+  pushSubscriptions: pushSubscriptionsRouter,
 });
 
 export type AppRouter = typeof appRouter;

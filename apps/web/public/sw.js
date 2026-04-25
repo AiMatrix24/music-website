@@ -11,9 +11,9 @@
 // caching media (.mp3/.wav) without proper Range request support, which broke
 // HTML5 audio playback on iOS Safari. Old caches are deleted in the activate
 // handler when names don't match `allowedCaches`.
-const CACHE_NAME = 'opynx-v4';
-const STATIC_CACHE = 'opynx-static-v3';
-const API_CACHE = 'opynx-api-v3';
+const CACHE_NAME = 'opynx-v5';
+const STATIC_CACHE = 'opynx-static-v4';
+const API_CACHE = 'opynx-api-v4';
 
 // Static assets to pre-cache on install
 const PRECACHE_URLS = [
@@ -254,4 +254,58 @@ self.addEventListener('message', (event) => {
     const urls = event.data.urls || [];
     caches.open(STATIC_CACHE).then((cache) => cache.addAll(urls));
   }
+});
+
+// ─── Web Push ───
+// Server posts JSON { title, body, link, type } to our VAPID endpoint;
+// we render a notification and route the click back into the app.
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch {
+    payload = { title: 'OPYNX', body: event.data.text() };
+  }
+
+  const title = payload.title || 'OPYNX';
+  const options = {
+    body: payload.body || '',
+    // Reuse the PWA icon — same OPYNX logo on dark bg.
+    icon: '/icon-192.png',
+    // 96×96 monochrome on Android; we use the same icon — close enough.
+    badge: '/icon-192.png',
+    // Stash the link so notificationclick can route to it.
+    data: { link: payload.link || '/notifications', type: payload.type },
+    // Renotify=true so multiple notifications of the same type don't merge silently.
+    renotify: false,
+    // Tag groups duplicate notifications so a user mid-flood sees the latest, not 50.
+    tag: payload.type || 'opynx',
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const link = event.notification.data?.link || '/notifications';
+
+  // Focus an existing tab if one's already open on the same origin;
+  // otherwise open a fresh one. This is the standard "open or focus" pattern.
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        for (const client of clientList) {
+          // Prefer focusing an existing tab and navigating it to the link.
+          if ('focus' in client) {
+            client.navigate(link).catch(() => {});
+            return client.focus();
+          }
+        }
+        if (self.clients.openWindow) {
+          return self.clients.openWindow(link);
+        }
+      })
+  );
 });

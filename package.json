@@ -27,10 +27,12 @@
     "node": ">=20.0.0"
   },
   "devDependencies": {
+    "@types/web-push": "^3.6.4",
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.1"
   },
   "dependencies": {
-    "bullmq": "^5.73.5"
+    "bullmq": "^5.73.5",
+    "web-push": "^3.6.7"
   }
 }

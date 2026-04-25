@@ -66,3 +66,41 @@ export const notifications = pgTable(
 export const notificationsRelations = relations(notifications, ({ one }) => ({
   user: one(users, { fields: [notifications.userId], references: [users.id] }),
 }));
+
+/**
+ * push_subscriptions — Web Push subscriptions per device. One user can
+ * have many rows (phone + tablet + laptop, each gets its own subscription
+ * with a different endpoint URL).
+ *
+ * Endpoints are unique by browser + device. We dedupe on insert by
+ * (endpoint) so a user re-subscribing on the same device replaces the
+ * old keys instead of creating duplicate rows.
+ *
+ * Subscriptions can expire silently (browser clears storage, user
+ * revokes permission, push service rotates keys). The send helper
+ * deletes rows on 410 Gone responses so we don't keep mailing dead
+ * endpoints.
+ */
+export const pushSubscriptions = pgTable(
+  'push_subscriptions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    // Push service URL — uniquely identifies the (device, browser, install)
+    endpoint: text('endpoint').notNull().unique(),
+    // ECDH P-256 public key from the browser, base64url-encoded
+    p256dh: text('p256dh').notNull(),
+    // 16-byte auth secret from the browser, base64url-encoded
+    auth: text('auth').notNull(),
+    // For debugging — which device subscribed (e.g., "iPhone Safari")
+    userAgent: text('user_agent'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index('psub_user_idx').on(t.userId),
+  ]
+);

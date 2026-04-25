@@ -5,6 +5,7 @@ import { trpc } from '@/lib/trpc/client';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useToast } from '../components/Toast';
+import { PushNotificationToggle } from '../components/PushNotificationToggle';
 
 const GENRE_OPTIONS = [
   'Synthwave', 'Lo-fi Hip Hop', 'Electronic', 'Indie Rock', 'Post-Punk',
@@ -413,6 +414,7 @@ export default function SettingsPage() {
         {/* ─── Notifications Tab ─── */}
         {activeTab === 'notifications' && (
           <div className="space-y-6">
+            <PushNotificationToggle />
             <div className="rounded-2xl bg-[#15151f] p-6">
               <h2 className="text-lg font-bold mb-4">Email Notifications</h2>
               <div className="space-y-5">
