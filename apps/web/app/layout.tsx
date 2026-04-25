@@ -21,6 +21,10 @@ const TopLoadingBar = dynamic(() =>
   import('./components/TopLoadingBar').then((m) => m.TopLoadingBar),
   { ssr: false }
 );
+const InstallAppBanner = dynamic(() =>
+  import('./components/InstallAppBanner').then((m) => m.InstallAppBanner),
+  { ssr: false }
+);
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -101,6 +105,7 @@ export default function RootLayout({
               <Footer />
               <BackToTop />
               <MusicPlayerBar />
+              <InstallAppBanner />
               <CookieConsent />
               <KeyboardShortcuts />
             </PlayerProvider>
