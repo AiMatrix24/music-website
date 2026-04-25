@@ -11,9 +11,9 @@
 // caching media (.mp3/.wav) without proper Range request support, which broke
 // HTML5 audio playback on iOS Safari. Old caches are deleted in the activate
 // handler when names don't match `allowedCaches`.
-const CACHE_NAME = 'opynx-v3';
-const STATIC_CACHE = 'opynx-static-v2';
-const API_CACHE = 'opynx-api-v2';
+const CACHE_NAME = 'opynx-v4';
+const STATIC_CACHE = 'opynx-static-v3';
+const API_CACHE = 'opynx-api-v3';
 
 // Static assets to pre-cache on install
 const PRECACHE_URLS = [
