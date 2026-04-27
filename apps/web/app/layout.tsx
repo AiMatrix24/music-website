@@ -25,6 +25,10 @@ const InstallAppBanner = dynamic(() =>
   import('./components/InstallAppBanner').then((m) => m.InstallAppBanner),
   { ssr: false }
 );
+const ServiceWorkerRegister = dynamic(() =>
+  import('./components/ServiceWorkerRegister').then((m) => m.ServiceWorkerRegister),
+  { ssr: false }
+);
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -105,6 +109,7 @@ export default function RootLayout({
               <Footer />
               <BackToTop />
               <MusicPlayerBar />
+              <ServiceWorkerRegister />
               <InstallAppBanner />
               <CookieConsent />
               <KeyboardShortcuts />
