@@ -79,13 +79,15 @@ export function InstallAppBanner() {
 
     // iOS Safari: show immediately (no event to wait for).
     if (p === 'ios-safari') setShow(true);
-    // Android: defer to beforeinstallprompt handler below.
-    // Desktop / unsupported: stay hidden.
+    // Android + desktop: defer to beforeinstallprompt handler below.
+    // Unsupported (iOS non-Safari): stay hidden.
   }, []);
 
-  // ── Android: capture beforeinstallprompt ──
+  // ── Android + desktop Chrome/Edge: capture beforeinstallprompt ──
+  // Same event fires on Chromium desktop browsers when the site meets the
+  // PWA install criteria. We treat them the same way.
   useEffect(() => {
-    if (platform !== 'android') return;
+    if (platform !== 'android' && platform !== 'desktop') return;
     const handler = (e: Event) => {
       e.preventDefault(); // Suppress Chrome's native banner — we render our own.
       setInstallEvent(e as BeforeInstallPromptEvent);
@@ -138,7 +140,7 @@ export function InstallAppBanner() {
               Get app-style access. No app store, no waiting — installs in one tap.
             </p>
             <div className="flex gap-3 mt-3">
-              {platform === 'android' && (
+              {(platform === 'android' || platform === 'desktop') && (
                 <button
                   onClick={handleAndroidInstall}
                   className="rounded-full bg-red-600 hover:bg-red-500 px-4 py-1.5 text-xs font-bold text-white transition"
