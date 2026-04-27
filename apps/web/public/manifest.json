@@ -1,7 +1,7 @@
 {
-  "name": "OPYNX — Direct-to-Fan Music",
+  "name": "OPYNX",
   "short_name": "OPYNX",
-  "description": "Subscribe directly to artists. Transparent. On-chain.",
+  "description": "Direct-to-fan music — subscribe directly to artists. Transparent. On-chain.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
