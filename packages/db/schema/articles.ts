@@ -4,7 +4,6 @@ import {
   text,
   timestamp,
   pgEnum,
-  jsonb,
   index,
 } from 'drizzle-orm/pg-core';
 import { users } from './users';
@@ -25,7 +24,10 @@ export const articles = pgTable(
       .notNull(),
     title: text('title').notNull(),
     slug: text('slug').notNull().unique(),
-    body: jsonb('body'), // Tiptap/Dante3 JSON
+    // Sanitized HTML from the rich text editor (matches the editor's output
+    // and the same model used for podcasts + event descriptions). Was jsonb
+    // (Tiptap JSON); text is simpler.
+    body: text('body'),
     excerpt: text('excerpt'),
     coverUrl: text('cover_url'),
     status: articleStatusEnum('status').default('draft').notNull(),

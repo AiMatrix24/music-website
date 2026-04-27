@@ -1761,6 +1761,52 @@ const articlesRouter = createRouter({
       return article ?? null;
     }),
 
+  // Public-facing article URL is /articles/[slug] — needs slug lookup. Joins
+  // users for the author display name shown on the detail page byline.
+  getBySlug: publicProcedure
+    .input(z.object({ slug: z.string().min(1) }))
+    .query(async ({ input }) => {
+      const [row] = await db
+        .select({
+          id: articles.id,
+          authorId: articles.authorId,
+          title: articles.title,
+          slug: articles.slug,
+          body: articles.body,
+          excerpt: articles.excerpt,
+          coverUrl: articles.coverUrl,
+          status: articles.status,
+          publishedAt: articles.publishedAt,
+          createdAt: articles.createdAt,
+          updatedAt: articles.updatedAt,
+          authorName: users.name,
+          authorAvatar: users.avatar,
+        })
+        .from(articles)
+        .leftJoin(users, eq(articles.authorId, users.id))
+        .where(eq(articles.slug, input.slug))
+        .limit(1);
+      return row ?? null;
+    }),
+
+  // Author's own articles (drafts + published) for the dashboard editor.
+  // Public list endpoint above only returns 'public' rows.
+  listMine: protectedProcedure
+    .input(
+      z
+        .object({ limit: z.number().int().min(1).max(100).default(50) })
+        .optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const limit = input?.limit ?? 50;
+      return db
+        .select()
+        .from(articles)
+        .where(eq(articles.authorId, ctx.session.user.id))
+        .orderBy(desc(articles.updatedAt))
+        .limit(limit);
+    }),
+
   create: protectedProcedure
     .input(
       z.object({

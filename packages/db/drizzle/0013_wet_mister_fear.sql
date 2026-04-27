@@ -1,0 +1,1 @@
+ALTER TABLE "articles" ALTER COLUMN "body" SET DATA TYPE text;
