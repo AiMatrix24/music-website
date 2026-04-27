@@ -63,11 +63,30 @@ function wasRecentlyDismissed(): boolean {
   }
 }
 
+/**
+ * The cookie consent banner sits at z-[70] / bottom-0 and visually covers
+ * the install banner. More importantly, it blocks the click. Don't show
+ * the install banner until the user has accepted/declined cookies — one
+ * thing at a time. Returns true if cookie consent has been resolved.
+ */
+function cookieConsentResolved(): boolean {
+  try {
+    return localStorage.getItem('opynx-cookie-consent') !== null;
+  } catch {
+    return true; // localStorage unavailable (private mode) — proceed.
+  }
+}
+
 export function InstallAppBanner() {
   const [show, setShow] = useState(false);
   const [platform, setPlatform] = useState<Platform>('desktop');
   const [iosModalOpen, setIosModalOpen] = useState(false);
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
+
+  // Tracks whether the cookie consent banner has been dismissed. While
+  // this is false, the install banner stays hidden (the consent banner
+  // covers it physically and blocks clicks at z-[70]).
+  const [cookiesResolved, setCookiesResolved] = useState(false);
 
   // ── Initial gate: standalone? dismissed? unsupported platform? ──
   useEffect(() => {
@@ -76,12 +95,27 @@ export function InstallAppBanner() {
 
     const p = detectPlatform();
     setPlatform(p);
+    setCookiesResolved(cookieConsentResolved());
 
     // iOS Safari: show immediately (no event to wait for).
     if (p === 'ios-safari') setShow(true);
     // Android + desktop: defer to beforeinstallprompt handler below.
     // Unsupported (iOS non-Safari): stay hidden.
   }, []);
+
+  // Poll cookie-consent state — the consent banner writes to localStorage
+  // when dismissed but doesn't fire a custom event. Cheap (200ms × until
+  // resolved) and stops the moment cookies are resolved.
+  useEffect(() => {
+    if (cookiesResolved) return;
+    const id = setInterval(() => {
+      if (cookieConsentResolved()) {
+        setCookiesResolved(true);
+        clearInterval(id);
+      }
+    }, 200);
+    return () => clearInterval(id);
+  }, [cookiesResolved]);
 
   // ── Android + desktop Chrome/Edge: capture beforeinstallprompt ──
   // Same event fires on Chromium desktop browsers when the site meets the
@@ -126,7 +160,9 @@ export function InstallAppBanner() {
     }
   };
 
-  if (!show) return null;
+  // Hide while the cookie consent is still up — its z-[70] layer sits on
+  // top of our z-40 banner and swallows the click on Install.
+  if (!show || !cookiesResolved) return null;
 
   return (
     <>
