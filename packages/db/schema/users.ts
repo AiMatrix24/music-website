@@ -39,6 +39,10 @@ export const users = pgTable(
     socialSoundcloud: text('social_soundcloud'),
     socialWebsite: text('social_website'),
     locale: text('locale').default('en-US').notNull(),
+    // Set when an admin approves the user's verification application.
+    // Drives the blue ✓ badge on /artist, /track, /event detail pages.
+    // Null = not verified.
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),

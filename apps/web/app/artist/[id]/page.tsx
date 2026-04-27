@@ -4,6 +4,7 @@ import { trpc } from '@/lib/trpc/client';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { FollowButton } from '../../components/FollowButton';
+import { VerifiedBadge } from '../../components/VerifiedBadge';
 
 export default function ArtistProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -63,7 +64,10 @@ export default function ArtistProfilePage() {
             <span className="inline-block bg-brand-600/20 text-brand-400 text-xs px-3 py-1 rounded-full mb-2 font-semibold uppercase">
               {artist.role}
             </span>
-            <h1 className="text-4xl font-black mb-2">{artist.name}</h1>
+            <h1 className="text-4xl font-black mb-2 flex items-center gap-2 flex-wrap">
+              {artist.name}
+              {artist.verifiedAt && <VerifiedBadge size="lg" />}
+            </h1>
             <p className="text-gray-400 mb-3">
               Joined {new Date(artist.createdAt).toLocaleDateString('en-US', {
                 month: 'long',

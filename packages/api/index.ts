@@ -49,6 +49,7 @@ import {
   podcastEpisodes,
   notifications,
   pushSubscriptions,
+  verificationApplications,
 } from '@opynx/db';
 
 // ─── Auth Router ───
@@ -477,6 +478,8 @@ const tracksRouter = createRouter({
           createdAt: tracks.createdAt,
           updatedAt: tracks.updatedAt,
           artistName: users.name,
+          // For the verified ✓ badge next to the byline on /track/[id]
+          artistVerifiedAt: users.verifiedAt,
           coverUrl: tracks.coverUrl,
           rawAudioUrl: sql<string | null>`COALESCE(${tracks.audioUrl320}, ${tracks.audioUrl128})`,
         })
@@ -3579,6 +3582,194 @@ const pushSubscriptionsRouter = createRouter({
   }),
 });
 
+// ─── Verification Router ───
+/**
+ * Creator verification (Tier B — identity + activity, cosmetic blue ✓ badge).
+ *
+ * Flow:
+ *   1. User submits application via verification.apply (one pending app per
+ *      user — second submission while pending is rejected at the procedure
+ *      level so the queue stays clean).
+ *   2. Admin reviews queue at /admin/verified, calls verification.adminDecide
+ *      with status='approved'|'rejected' + a note.
+ *   3. On approve: users.verifiedAt = NOW(), notify the user.
+ *   4. On reject: just record reason, notify the user (they can reapply).
+ *   5. ID photo (idImageKey) gets nulled by a cron 30 days post-decision.
+ *
+ * Activity gate (≥1 upload OR ≥1 hosted event OR ≥100 plays) is enforced
+ * at submit time so applicants without a track record bounce immediately
+ * instead of cluttering the admin queue.
+ */
+const verificationRouter = createRouter({
+  /** Submit a new verification application. */
+  submit: protectedProcedure
+    .input(
+      z.object({
+        legalName: z.string().min(2).max(200),
+        stageName: z.string().max(200).optional(),
+        country: z.string().length(2), // ISO 3166-1 alpha-2
+        portfolioUrl: z.string().url(),
+        pitch: z.string().min(20).max(2000),
+        idImageKey: z.string().min(1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+
+      // Reject if already verified
+      const me = await db.query.users.findFirst({ where: eq(users.id, userId) });
+      if (me?.verifiedAt) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'You are already verified.' });
+      }
+
+      // Reject duplicate pending applications
+      const existingPending = await db
+        .select({ id: verificationApplications.id })
+        .from(verificationApplications)
+        .where(
+          and(
+            eq(verificationApplications.userId, userId),
+            eq(verificationApplications.status, 'pending')
+          )
+        )
+        .limit(1);
+      if (existingPending.length > 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'You already have a pending application. Wait for admin review.',
+        });
+      }
+
+      // Activity gate (Tier B). Anyone failing this is a tire-kicker.
+      const [tracksCount] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(tracks)
+        .where(eq(tracks.userId, userId));
+      const [eventsCount] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(events)
+        .where(eq(events.hostId, userId));
+      const [playSum] = await db
+        .select({ total: sql<number>`COALESCE(SUM(${tracks.playCount}), 0)::int` })
+        .from(tracks)
+        .where(eq(tracks.userId, userId));
+
+      const meetsActivity =
+        (tracksCount?.count ?? 0) >= 1 ||
+        (eventsCount?.count ?? 0) >= 1 ||
+        (playSum?.total ?? 0) >= 100;
+      if (!meetsActivity) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message:
+            'Verification requires platform activity: upload at least 1 track, host at least 1 event, or earn 100+ plays first.',
+        });
+      }
+
+      const [created] = await db
+        .insert(verificationApplications)
+        .values({
+          userId,
+          legalName: input.legalName,
+          stageName: input.stageName ?? null,
+          country: input.country.toUpperCase(),
+          portfolioUrl: input.portfolioUrl,
+          pitch: input.pitch,
+          idImageKey: input.idImageKey,
+        })
+        .returning();
+      return created;
+    }),
+
+  /** The current user's most recent application (for the dashboard status panel). */
+  getMine: protectedProcedure.query(async ({ ctx }) => {
+    const [row] = await db
+      .select()
+      .from(verificationApplications)
+      .where(eq(verificationApplications.userId, ctx.session.user.id))
+      .orderBy(desc(verificationApplications.submittedAt))
+      .limit(1);
+      return row ?? null;
+  }),
+
+  /** Cancel my own pending application (so I can resubmit corrected). */
+  cancelMine: protectedProcedure.mutation(async ({ ctx }) => {
+    await db
+      .delete(verificationApplications)
+      .where(
+        and(
+          eq(verificationApplications.userId, ctx.session.user.id),
+          eq(verificationApplications.status, 'pending')
+        )
+      );
+    return { ok: true };
+  }),
+
+  // ── Admin endpoints ──
+
+  /** All pending applications, oldest first (FIFO review queue). */
+  adminQueue: adminProcedure.query(async () => {
+    return db
+      .select({
+        application: verificationApplications,
+        userName: users.name,
+        userEmail: users.email,
+        userAvatar: users.avatar,
+      })
+      .from(verificationApplications)
+      .leftJoin(users, eq(verificationApplications.userId, users.id))
+      .where(eq(verificationApplications.status, 'pending'))
+      .orderBy(verificationApplications.submittedAt);
+  }),
+
+  /** Approve or reject an application. Sets users.verifiedAt on approve. */
+  adminDecide: adminProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        decision: z.enum(['approved', 'rejected']),
+        reason: z.string().min(1).max(1000),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // adminProcedure middleware guarantees session.user exists
+      const adminId = ctx.session.user!.id;
+      const [updated] = await db
+        .update(verificationApplications)
+        .set({
+          status: input.decision,
+          decisionReason: input.reason,
+          decidedBy: adminId,
+          decidedAt: new Date(),
+        })
+        .where(eq(verificationApplications.id, input.id))
+        .returning();
+      if (!updated) throw new TRPCError({ code: 'NOT_FOUND' });
+
+      if (input.decision === 'approved') {
+        await db
+          .update(users)
+          .set({ verifiedAt: new Date(), updatedAt: new Date() })
+          .where(eq(users.id, updated.userId));
+      }
+
+      // Fire-and-forget notification (in-app bell + push if subscribed)
+      void notify({
+        userId: updated.userId,
+        type: 'verification_status',
+        title: input.decision === 'approved' ? 'You are verified' : 'Verification not approved',
+        body:
+          input.decision === 'approved'
+            ? `Your verified badge is now showing across OPYNX.`
+            : `Reason: ${input.reason}`,
+        link: '/dashboard/verified',
+        metadata: { decision: input.decision, applicationId: updated.id },
+      });
+
+      return updated;
+    }),
+});
+
 // ─── App Router ───
 export const appRouter = createRouter({
   auth: authRouter,
@@ -3606,6 +3797,7 @@ export const appRouter = createRouter({
   payouts: payoutsRouter,
   notifications: notificationsRouter,
   pushSubscriptions: pushSubscriptionsRouter,
+  verification: verificationRouter,
 });
 
 export type AppRouter = typeof appRouter;

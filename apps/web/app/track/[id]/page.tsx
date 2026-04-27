@@ -10,6 +10,7 @@ import { LikeButton } from '../../components/LikeButton';
 import { Breadcrumbs } from '../../components/Breadcrumbs';
 import { TrackComments } from '../../components/TrackComments';
 import { TipJar } from '../../components/TipJar';
+import { VerifiedBadge } from '../../components/VerifiedBadge';
 
 export default function TrackDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -70,9 +71,10 @@ export default function TrackDetailPage() {
             {track.artistName && (
               <Link
                 href={`/artist/${track.userId}`}
-                className="text-gray-400 hover:text-brand-400 transition text-sm mb-2 inline-block"
+                className="text-gray-400 hover:text-brand-400 transition text-sm mb-2 inline-flex items-center gap-1"
               >
                 by {track.artistName}
+                {track.artistVerifiedAt && <VerifiedBadge size="sm" />}
               </Link>
             )}
             {track.genre && (

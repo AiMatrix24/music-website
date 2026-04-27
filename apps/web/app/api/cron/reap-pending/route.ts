@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { eq, and, sql, lt } from 'drizzle-orm';
+import { eq, and, sql, lt, isNotNull } from 'drizzle-orm';
 import { db } from '@opynx/db';
 import {
   subscriptions,
@@ -8,6 +8,7 @@ import {
   tips,
   orders,
   orderItems,
+  verificationApplications,
 } from '@opynx/db/schema';
 
 /**
@@ -44,6 +45,8 @@ export async function GET(request: Request) {
   }
 
   const cutoff = new Date(Date.now() - REAP_AGE_MINUTES * 60 * 1000);
+  // Verification ID photo retention — 30 days post-decision (privacy minimum)
+  const idPhotoCutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const summary = {
     subscriptionsCancelled: 0,
     ticketsCancelled: 0,
@@ -52,6 +55,7 @@ export async function GET(request: Request) {
     tipsCancelled: 0,
     ordersCancelled: 0,
     orderStockReleased: 0,
+    verificationIdPhotosScrubbed: 0,
   };
 
   // ── Subscriptions: pending = status 'inactive' ──
@@ -112,13 +116,32 @@ export async function GET(request: Request) {
     summary.ordersCancelled++;
   }
 
+  // ── Verification ID photos: scrub idImageKey 30+ days after decision ──
+  // Keep the application row (audit trail), drop the photo URL (privacy).
+  // Note: this NULLs the column but doesn't delete the file from UploadThing —
+  // when UploadThing's bulk-delete API is wired up, replace this with a
+  // server-side delete + then NULL.
+  const photoScrubResult = await db
+    .update(verificationApplications)
+    .set({ idImageKey: null })
+    .where(
+      and(
+        isNotNull(verificationApplications.decidedAt),
+        lt(verificationApplications.decidedAt, idPhotoCutoff),
+        isNotNull(verificationApplications.idImageKey)
+      )
+    )
+    .returning({ id: verificationApplications.id });
+  summary.verificationIdPhotosScrubbed = photoScrubResult.length;
+
   console.log(
     `[Cron reap-pending] cutoff=${cutoff.toISOString()} ` +
       `subs=${summary.subscriptionsCancelled} ` +
       `tickets=${summary.ticketsCancelled} (stock+${summary.ticketStockReleased}) ` +
       `trackBuys=${summary.trackPurchasesCancelled} ` +
       `tips=${summary.tipsCancelled} ` +
-      `orders=${summary.ordersCancelled} (stock+${summary.orderStockReleased})`
+      `orders=${summary.ordersCancelled} (stock+${summary.orderStockReleased}) ` +
+      `idPhotos=${summary.verificationIdPhotosScrubbed}`
   );
 
   return NextResponse.json({
