@@ -935,14 +935,18 @@ const eventsRouter = createRouter({
   list: publicProcedure
     .input(
       z.object({
-        limit: z.number().min(1).max(50).default(20),
+        limit: z.number().min(1).max(100).default(20),
         offset: z.number().min(0).default(0),
         status: z.enum(['draft', 'published', 'active', 'completed', 'cancelled']).optional(),
+        // Optional filter: only return events hosted by this user. Powers
+        // the /dashboard/promo-qr "tag with an event" picker.
+        hostId: z.string().uuid().optional(),
       })
     )
     .query(async ({ input }) => {
       const conditions = [];
       if (input.status) conditions.push(eq(events.status, input.status));
+      if (input.hostId) conditions.push(eq(events.hostId, input.hostId));
 
       return db
         .select({
