@@ -60,9 +60,18 @@ export default function TrackDetailPage() {
 
         {/* Track header */}
         <div className="flex flex-col sm:flex-row gap-6 items-start mb-10">
-          <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-5xl font-bold shrink-0">
-            {track.genre?.charAt(0) ?? '♪'}
-          </div>
+          {track.coverUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={track.coverUrl}
+              alt=""
+              className="w-32 h-32 rounded-2xl object-cover shrink-0"
+            />
+          ) : (
+            <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-5xl font-bold shrink-0">
+              {track.genre?.charAt(0) ?? '♪'}
+            </div>
+          )}
           <div className="flex-1">
             <p className="text-sm text-brand-400 font-semibold uppercase tracking-wider mb-1">
               Track
@@ -225,9 +234,18 @@ export default function TrackDetailPage() {
                     href={`/track/${t.id}`}
                     className="flex items-center gap-4 p-3 rounded-xl transition hover:bg-brand-950/50"
                   >
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-sm font-bold shrink-0">
-                      {t.genre?.charAt(0) ?? '♪'}
-                    </div>
+                    {(t as { coverUrl?: string | null }).coverUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={(t as { coverUrl?: string | null }).coverUrl ?? ''}
+                        alt=""
+                        className="w-10 h-10 rounded-lg object-cover shrink-0"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-sm font-bold shrink-0">
+                        {t.genre?.charAt(0) ?? '♪'}
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold truncate text-sm">{t.title}</p>
                       <p className="text-xs text-gray-400">{t.artistName ?? 'Unknown'} · {t.genre}</p>

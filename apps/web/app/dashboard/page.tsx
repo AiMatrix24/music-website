@@ -60,9 +60,18 @@ export default function DashboardPage() {
         )}
 
         <div className="flex items-center gap-4 mb-8">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-2xl font-black">
-            {session.user?.name?.charAt(0)?.toUpperCase() ?? '?'}
-          </div>
+          {session.user?.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={session.user.image}
+              alt=""
+              className="w-16 h-16 rounded-full object-cover ring-2 ring-brand-800/40"
+            />
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-2xl font-black">
+              {session.user?.name?.charAt(0)?.toUpperCase() ?? '?'}
+            </div>
+          )}
           <div>
             <h1 className="text-3xl font-bold">{session.user?.name ?? 'Creator'}</h1>
             <p className="text-gray-400">{session.user?.email}</p>

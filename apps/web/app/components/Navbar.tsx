@@ -99,9 +99,18 @@ export function Navbar() {
                   Sign Out
                 </button>
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center text-sm font-bold">
-                    {session.user?.name?.charAt(0)?.toUpperCase() ?? '?'}
-                  </div>
+                  {session.user?.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={session.user.image}
+                      alt=""
+                      className="w-8 h-8 rounded-full object-cover ring-2 ring-brand-800/40"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center text-sm font-bold">
+                      {session.user?.name?.charAt(0)?.toUpperCase() ?? '?'}
+                    </div>
+                  )}
                   <SubscriptionBadge role={(session.user as { role?: string })?.role} />
                 </div>
               </>

@@ -57,9 +57,18 @@ export default function ArtistProfilePage() {
 
         {/* Artist header */}
         <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start mb-10">
-          <div className="w-28 h-28 rounded-full bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-4xl font-black shrink-0">
-            {artist.name?.charAt(0)?.toUpperCase() ?? '?'}
-          </div>
+          {artist.avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={artist.avatar}
+              alt=""
+              className="w-28 h-28 rounded-full object-cover ring-2 ring-brand-800/40 shrink-0"
+            />
+          ) : (
+            <div className="w-28 h-28 rounded-full bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-4xl font-black shrink-0">
+              {artist.name?.charAt(0)?.toUpperCase() ?? '?'}
+            </div>
+          )}
           <div className="text-center sm:text-left">
             <span className="inline-block bg-brand-600/20 text-brand-400 text-xs px-3 py-1 rounded-full mb-2 font-semibold uppercase">
               {artist.role}

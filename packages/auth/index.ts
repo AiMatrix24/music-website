@@ -160,10 +160,11 @@ export const authConfig: NextAuthConfig = {
         try {
           const fresh = await db.query.users.findFirst({
             where: eq(users.id, token.id as string),
-            columns: { role: true },
+            columns: { role: true, avatar: true },
           });
           if (fresh) {
             token.role = fresh.role;
+            token.picture = fresh.avatar ?? null;
           }
           // If the user was deleted we leave the cached role alone — the
           // next protected procedure will fail naturally and the user can
