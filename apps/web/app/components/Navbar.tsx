@@ -112,18 +112,24 @@ export function Navbar() {
           {/* Avatar + badge — pinned right-edge, always visible when signed in (any viewport) */}
           {status === 'authenticated' && (
             <div className="flex items-center gap-2 shrink-0 ml-3">
-              {session.user?.image ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={session.user.image}
-                  alt=""
-                  className="w-8 h-8 rounded-full object-cover ring-2 ring-brand-800/40"
-                />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center text-sm font-bold">
-                  {session.user?.name?.charAt(0)?.toUpperCase() ?? '?'}
-                </div>
-              )}
+              <Link
+                href="/settings"
+                aria-label="Settings"
+                className="block transition hover:opacity-80"
+              >
+                {session.user?.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={session.user.image}
+                    alt=""
+                    className="w-8 h-8 rounded-full object-cover ring-2 ring-brand-800/40"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center text-sm font-bold">
+                    {session.user?.name?.charAt(0)?.toUpperCase() ?? '?'}
+                  </div>
+                )}
+              </Link>
               <SubscriptionBadge role={(session.user as { role?: string })?.role} />
             </div>
           )}
