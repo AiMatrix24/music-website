@@ -126,11 +126,15 @@ export default function AnalyticsPage() {
             <p className="text-gray-500 text-sm text-center py-12">No plays in this period yet.</p>
           ) : (
             <>
+              {/* Wrapper has h-full + flex-col + justify-end so the bar
+                  inside has a definite-height parent for its `%` height to
+                  resolve against. Without this the bar collapses to 0px
+                  (auto-height parent → undefined % child). */}
               <div className="h-48 flex items-end gap-px">
                 {playHistory.map((d, i) => (
-                  <div key={i} className="flex-1 group relative">
+                  <div key={i} className="flex-1 h-full flex flex-col justify-end group relative">
                     <div
-                      className="bg-gradient-to-t from-red-600 to-red-400 rounded-t-sm transition-all hover:from-red-500 hover:to-red-300 min-h-[2px]"
+                      className="bg-gradient-to-t from-red-600 to-red-400 rounded-t-sm transition-all hover:from-red-500 hover:to-red-300 min-h-[2px] w-full"
                       style={{ height: `${(d.value / maxPlay) * 100}%` }}
                     />
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10 pointer-events-none">
