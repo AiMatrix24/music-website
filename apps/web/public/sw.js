@@ -11,9 +11,9 @@
 // caching media (.mp3/.wav) without proper Range request support, which broke
 // HTML5 audio playback on iOS Safari. Old caches are deleted in the activate
 // handler when names don't match `allowedCaches`.
-const CACHE_NAME = 'opynx-v10';
-const STATIC_CACHE = 'opynx-static-v9';
-const API_CACHE = 'opynx-api-v9';
+const CACHE_NAME = 'opynx-v11';
+const STATIC_CACHE = 'opynx-static-v10';
+const API_CACHE = 'opynx-api-v10';
 
 // Static assets to pre-cache on install
 const PRECACHE_URLS = [
@@ -68,7 +68,12 @@ self.addEventListener('fetch', (event) => {
   // Cached responses break this on iOS.
   if (isMediaRequest(request, url.pathname)) return;
 
-  // API calls: stale-while-revalidate
+  // tRPC: NEVER cache. tRPC is the live data layer; caching responses means
+  // every refresh shows data one update behind. Was a real bug (chart showed
+  // stale empty results even after fresh plays were logged).
+  if (url.pathname.startsWith('/api/trpc')) return;
+
+  // Other API calls: stale-while-revalidate. Safe for static-ish routes.
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(staleWhileRevalidate(request, API_CACHE));
     return;
