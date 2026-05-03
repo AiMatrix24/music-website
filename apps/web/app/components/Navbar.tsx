@@ -36,37 +36,37 @@ export function Navbar() {
 
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-6">
-            <Link href="/explore" className="text-sm text-gray-400 hover:text-white transition">
+            <Link href="/explore" className="text-sm text-gray-400 hover:text-white transition whitespace-nowrap">
               Explore
             </Link>
             {status === 'authenticated' && (
-              <Link href="/for-you" className="text-sm text-gray-400 hover:text-white transition">
+              <Link href="/for-you" className="text-sm text-gray-400 hover:text-white transition whitespace-nowrap">
                 For You
               </Link>
             )}
-            <Link href="/library" className="text-sm text-gray-400 hover:text-white transition">
+            <Link href="/library" className="text-sm text-gray-400 hover:text-white transition whitespace-nowrap">
               Library
             </Link>
-            <Link href="/tickets" className="text-sm text-gray-400 hover:text-white transition">
+            <Link href="/tickets" className="text-sm text-gray-400 hover:text-white transition whitespace-nowrap">
               Tickets
             </Link>
-            <Link href="/venues/discover" className="text-sm text-gray-400 hover:text-white transition">
+            <Link href="/venues/discover" className="text-sm text-gray-400 hover:text-white transition whitespace-nowrap">
               Venues
             </Link>
-            <Link href="/radio" className="text-sm text-gray-400 hover:text-white transition flex items-center gap-1.5">
+            <Link href="/radio" className="text-sm text-gray-400 hover:text-white transition flex items-center gap-1.5 whitespace-nowrap">
               <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
               Radio
             </Link>
-            <Link href="/showcase" className="text-sm text-gray-400 hover:text-white transition">
+            <Link href="/showcase" className="text-sm text-gray-400 hover:text-white transition whitespace-nowrap">
               Showcase
             </Link>
-            <Link href="/ewyk" className="text-sm text-red-400 hover:text-red-300 font-semibold transition">
+            <Link href="/ewyk" className="text-sm text-red-400 hover:text-red-300 font-semibold transition whitespace-nowrap">
               Why OPYNX
             </Link>
-            <Link href="/subscribe" className="text-sm text-gray-400 hover:text-white transition">
+            <Link href="/subscribe" className="text-sm text-gray-400 hover:text-white transition whitespace-nowrap">
               Subscribe
             </Link>
-            <Link href="/scan" className="text-sm text-gray-400 hover:text-white transition">
+            <Link href="/scan" className="text-sm text-gray-400 hover:text-white transition whitespace-nowrap">
               Scan
             </Link>
 
@@ -89,40 +89,44 @@ export function Navbar() {
                   </svg>
                 </Link>
                 <NotificationBell />
-                <Link href="/dashboard" className="text-sm text-gray-400 hover:text-white transition">
+                <Link href="/dashboard" className="text-sm text-gray-400 hover:text-white transition whitespace-nowrap">
                   Dashboard
                 </Link>
                 <button
                   onClick={() => signOut({ callbackUrl: '/' })}
-                  className="text-sm text-gray-400 hover:text-white transition"
+                  className="text-sm text-gray-400 hover:text-white transition whitespace-nowrap"
                 >
                   Sign Out
                 </button>
-                <div className="flex items-center gap-2">
-                  {session.user?.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={session.user.image}
-                      alt=""
-                      className="w-8 h-8 rounded-full object-cover ring-2 ring-brand-800/40"
-                    />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center text-sm font-bold">
-                      {session.user?.name?.charAt(0)?.toUpperCase() ?? '?'}
-                    </div>
-                  )}
-                  <SubscriptionBadge role={(session.user as { role?: string })?.role} />
-                </div>
               </>
             ) : (
               <Link
                 href="/auth/login"
-                className="rounded-full bg-brand-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-brand-500"
+                className="rounded-full bg-brand-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-brand-500 whitespace-nowrap"
               >
                 Sign In
               </Link>
             )}
           </div>
+
+          {/* Avatar + badge — pinned right-edge, always visible when signed in (any viewport) */}
+          {status === 'authenticated' && (
+            <div className="flex items-center gap-2 shrink-0 ml-3">
+              {session.user?.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={session.user.image}
+                  alt=""
+                  className="w-8 h-8 rounded-full object-cover ring-2 ring-brand-800/40"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center text-sm font-bold">
+                  {session.user?.name?.charAt(0)?.toUpperCase() ?? '?'}
+                </div>
+              )}
+              <SubscriptionBadge role={(session.user as { role?: string })?.role} />
+            </div>
+          )}
 
           {/* Mobile buttons */}
           <div className="flex items-center gap-3 md:hidden">
