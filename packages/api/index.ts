@@ -1932,28 +1932,96 @@ const uploadRouter = createRouter({
 });
 
 // ─── Admin Router ───
+// Tier monthly prices used to compute MRR. Source of truth is CLAUDE.md
+// "Payment & infra constants" + apps/web/app/api/subscribe/route.ts.
+const TIER_MRR_CENTS = { premium: 873, bundle: 1273, studio: 1600 } as const;
+
 const adminRouter = createRouter({
   getDashboard: adminProcedure.query(async () => {
-    const [userCount] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(users);
-    const [subCount] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(subscriptions)
-      .where(eq(subscriptions.status, 'active'));
-    const [trackCount] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(tracks);
-    const [eventCount] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(events);
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    const [
+      userCount,
+      newUsersWeek,
+      subCount,
+      tierCounts,
+      trackCount,
+      eventCount,
+      pendingPayoutSum,
+    ] = await Promise.all([
+      db.select({ count: sql<number>`count(*)::int` }).from(users),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(users)
+        .where(sql`${users.createdAt} >= ${sevenDaysAgo}`),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(subscriptions)
+        .where(eq(subscriptions.status, 'active')),
+      // Per-tier counts so we can compute MRR by multiplying through prices
+      db
+        .select({
+          tier: subscriptions.tier,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(subscriptions)
+        .where(eq(subscriptions.status, 'active'))
+        .groupBy(subscriptions.tier),
+      db.select({ count: sql<number>`count(*)::int` }).from(tracks),
+      db.select({ count: sql<number>`count(*)::int` }).from(events),
+      db
+        .select({ total: sql<number>`COALESCE(SUM(${payoutRequests.amountCents}), 0)::int` })
+        .from(payoutRequests)
+        .where(sql`${payoutRequests.status} IN ('pending', 'processing')`),
+    ]);
+
+    // MRR in cents = sum across active subs of (count_per_tier × tier_price)
+    let mrrCents = 0;
+    for (const row of tierCounts) {
+      const tier = row.tier as keyof typeof TIER_MRR_CENTS;
+      if (tier in TIER_MRR_CENTS) {
+        mrrCents += row.count * TIER_MRR_CENTS[tier];
+      }
+    }
 
     return {
-      totalUsers: Number(userCount.count),
-      activeSubscriptions: Number(subCount.count),
-      totalTracks: Number(trackCount.count),
-      totalEvents: Number(eventCount.count),
+      totalUsers: userCount[0]?.count ?? 0,
+      newUsersLast7Days: newUsersWeek[0]?.count ?? 0,
+      activeSubscriptions: subCount[0]?.count ?? 0,
+      totalTracks: trackCount[0]?.count ?? 0,
+      totalEvents: eventCount[0]?.count ?? 0,
+      mrrCents,
+      pendingPayoutCents: pendingPayoutSum[0]?.total ?? 0,
     };
+  }),
+
+  /**
+   * Active subscribers grouped by tier with MRR contribution. Drives the
+   * Revenue tab's per-tier breakdown.
+   */
+  revenueByTier: adminProcedure.query(async () => {
+    const rows = await db
+      .select({
+        tier: subscriptions.tier,
+        subscribers: sql<number>`count(*)::int`,
+      })
+      .from(subscriptions)
+      .where(eq(subscriptions.status, 'active'))
+      .groupBy(subscriptions.tier);
+
+    return rows
+      .filter((r) => r.tier in TIER_MRR_CENTS)
+      .map((r) => {
+        const tier = r.tier as keyof typeof TIER_MRR_CENTS;
+        const priceCents = TIER_MRR_CENTS[tier];
+        return {
+          tier,
+          subscribers: r.subscribers,
+          priceCents,
+          mrrCents: r.subscribers * priceCents,
+        };
+      })
+      .sort((a, b) => b.mrrCents - a.mrrCents);
   }),
 
   getUsers: adminProcedure
