@@ -20,6 +20,15 @@ export default function AnalyticsPage() {
     { enabled: status === 'authenticated' && !!session?.user?.id }
   );
 
+  // Real timeseries from track_plays (logged by the audio player after 30s
+  // of continuous play). Backend returns same-length window for the prior
+  // period too so we can compute a real "+X% vs prev period" delta.
+  const chartDays = range === '7d' ? 7 : range === '30d' ? 30 : range === '90d' ? 90 : 180;
+  const { data: timeseries } = trpc.tracks.playsTimeseries.useQuery(
+    { days: chartDays },
+    { enabled: status === 'authenticated' }
+  );
+
   if (status !== 'authenticated') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
@@ -33,14 +42,19 @@ export default function AnalyticsPage() {
   const trackCount = myTracks?.length ?? 0;
   const topTracks = [...(myTracks ?? [])].sort((a, b) => (b.playCount ?? 0) - (a.playCount ?? 0)).slice(0, 10);
   const genreBreakdown = getGenreBreakdown(myTracks ?? []);
-  const estimatedRevenue = totalPlays * 0.004; // ~$0.004 per play
 
-  // Generate mock chart data based on range
-  const chartDays = range === '7d' ? 7 : range === '30d' ? 30 : range === '90d' ? 90 : 180;
-  const playHistory = generateMockHistory(chartDays, totalPlays);
-  const revenueHistory = playHistory.map((d) => ({ ...d, value: d.value * 0.004 }));
+  // Real chart data with per-day labels
+  const playHistory = (timeseries?.current ?? []).map((d) => ({
+    value: d.count,
+    label: new Date(d.date + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+  }));
+  const periodPlays = timeseries?.currentTotal ?? 0;
+  const previousPeriodPlays = timeseries?.previousTotal ?? 0;
+  const playsDelta =
+    previousPeriodPlays > 0
+      ? ((periodPlays - previousPeriodPlays) / previousPeriodPlays) * 100
+      : null;
   const maxPlay = Math.max(...playHistory.map((d) => d.value), 1);
-  const maxRevenue = Math.max(...revenueHistory.map((d) => d.value), 0.01);
 
   return (
     <div className="min-h-screen py-16 px-6">
@@ -62,68 +76,65 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        {/* Key Metrics */}
+        {/* Key Metrics. Total Plays delta is computed from the real
+            timeseries (current period vs prior period of equal length).
+            Other metrics (Followers, Revenue) don't have historical
+            snapshots yet, so we don't fake a +X% indicator. */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <MetricCard label="Total Plays" value={formatNumber(totalPlays)} change="+12.4%" positive />
-          <MetricCard label="Followers" value={formatNumber(followerCount ?? 0)} change="+8.2%" positive />
+          <MetricCard
+            label="Total Plays"
+            value={formatNumber(totalPlays)}
+            change={playsDelta == null ? '' : `${playsDelta >= 0 ? '+' : ''}${playsDelta.toFixed(1)}% vs prev ${range}`}
+            positive={playsDelta == null || playsDelta >= 0}
+          />
+          <MetricCard label="Followers" value={formatNumber(followerCount ?? 0)} change="" positive />
           <MetricCard label="Tracks" value={String(trackCount)} change="" positive />
-          <MetricCard label="Est. Revenue" value={`$${estimatedRevenue.toFixed(2)}`} change="+15.7%" positive />
+          <MetricCard label={`Plays this ${range}`} value={formatNumber(periodPlays)} change="" positive />
         </div>
 
-        {/* Play Count Chart */}
+        {/* Play Count Chart — real per-day data from track_plays */}
         <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6 mb-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-bold">Plays Over Time</h2>
-            <span className="text-sm text-gray-500">{formatNumber(totalPlays)} total</span>
+            <span className="text-sm text-gray-500">
+              {formatNumber(periodPlays)} in last {range === 'all' ? '180 days' : range}
+            </span>
           </div>
-          <div className="h-48 flex items-end gap-px">
-            {playHistory.map((d, i) => (
-              <div key={i} className="flex-1 group relative">
-                <div
-                  className="bg-gradient-to-t from-red-600 to-red-400 rounded-t-sm transition-all hover:from-red-500 hover:to-red-300 min-h-[2px]"
-                  style={{ height: `${(d.value / maxPlay) * 100}%` }}
-                />
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
-                  <div className="bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-xs whitespace-nowrap shadow-xl">
-                    <p className="font-bold">{formatNumber(d.value)} plays</p>
-                    <p className="text-gray-500">{d.label}</p>
+          {playHistory.length === 0 ? (
+            <p className="text-gray-500 text-sm text-center py-12">No plays in this period yet.</p>
+          ) : (
+            <>
+              <div className="h-48 flex items-end gap-px">
+                {playHistory.map((d, i) => (
+                  <div key={i} className="flex-1 group relative">
+                    <div
+                      className="bg-gradient-to-t from-red-600 to-red-400 rounded-t-sm transition-all hover:from-red-500 hover:to-red-300 min-h-[2px]"
+                      style={{ height: `${(d.value / maxPlay) * 100}%` }}
+                    />
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10 pointer-events-none">
+                      <div className="bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-xs whitespace-nowrap shadow-xl">
+                        <p className="font-bold">{formatNumber(d.value)} play{d.value === 1 ? '' : 's'}</p>
+                        <p className="text-gray-500">{d.label}</p>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div className="flex justify-between mt-2 text-xs text-gray-600">
-            <span>{playHistory[0]?.label}</span>
-            <span>{playHistory[playHistory.length - 1]?.label}</span>
-          </div>
+              <div className="flex justify-between mt-2 text-xs text-gray-600">
+                <span>{playHistory[0]?.label}</span>
+                <span>{playHistory[playHistory.length - 1]?.label}</span>
+              </div>
+              <p className="text-xs text-gray-600 mt-3">
+                Plays logged after 30 seconds of continuous listening (filters out skips).
+              </p>
+            </>
+          )}
         </div>
 
-        {/* Revenue Chart */}
-        <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6 mb-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold">Revenue</h2>
-            <span className="text-sm text-green-400 font-semibold">${estimatedRevenue.toFixed(2)} estimated</span>
-          </div>
-          <div className="h-32 flex items-end gap-px">
-            {revenueHistory.map((d, i) => (
-              <div key={i} className="flex-1 group relative">
-                <div
-                  className="bg-gradient-to-t from-green-600 to-green-400 rounded-t-sm transition-all hover:from-green-500 hover:to-green-300 min-h-[2px]"
-                  style={{ height: `${(d.value / maxRevenue) * 100}%` }}
-                />
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
-                  <div className="bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-xs whitespace-nowrap shadow-xl">
-                    <p className="font-bold text-green-400">${d.value.toFixed(2)}</p>
-                    <p className="text-gray-500">{d.label}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 p-3 bg-brand-950/50 rounded-lg text-xs text-gray-400">
-            <p>Revenue breakdown: <span className="text-red-400 font-semibold">85%</span> to you · <span className="text-pink-400">5%</span> facilitator · <span className="text-cyan-400">10%</span> platform — verified on Polygon</p>
-          </div>
-        </div>
+        {/* Revenue chart removed — was charting an estimate ($0.004 × plays)
+            with no relation to actual subscription revenue or commissions.
+            Real revenue lives at /dashboard/earnings, which already pulls
+            from the commissions + tips + sales tables. */}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* Top Tracks */}
@@ -179,90 +190,29 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        {/* Listener Demographics (mock) */}
-        <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6 mb-6">
-          <h2 className="text-lg font-bold mb-4">Listener Demographics</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <h3 className="text-sm text-gray-400 mb-3">Top Locations</h3>
-              <div className="space-y-2">
-                {[
-                  { city: 'Los Angeles, CA', pct: 24 },
-                  { city: 'New York, NY', pct: 18 },
-                  { city: 'Austin, TX', pct: 12 },
-                  { city: 'Nashville, TN', pct: 9 },
-                  { city: 'London, UK', pct: 7 },
-                ].map((loc) => (
-                  <div key={loc.city} className="flex justify-between text-sm">
-                    <span>{loc.city}</span>
-                    <span className="text-gray-500">{loc.pct}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <h3 className="text-sm text-gray-400 mb-3">Age Groups</h3>
-              <div className="space-y-2">
-                {[
-                  { group: '18-24', pct: 35 }, { group: '25-34', pct: 42 },
-                  { group: '35-44', pct: 15 }, { group: '45+', pct: 8 },
-                ].map((a) => (
-                  <div key={a.group} className="flex items-center gap-3">
-                    <span className="text-sm w-12">{a.group}</span>
-                    <div className="flex-1 h-2 bg-brand-950 rounded-full overflow-hidden">
-                      <div className="h-full bg-red-500 rounded-full" style={{ width: `${a.pct}%` }} />
-                    </div>
-                    <span className="text-xs text-gray-500 w-8 text-right">{a.pct}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <h3 className="text-sm text-gray-400 mb-3">Listening Platform</h3>
-              <div className="space-y-2">
-                {[
-                  { platform: 'OPYNX Web', pct: 52, icon: '🌐' },
-                  { platform: 'OPYNX PWA', pct: 28, icon: '📱' },
-                  { platform: 'Embedded', pct: 12, icon: '🔗' },
-                  { platform: 'API', pct: 8, icon: '⚡' },
-                ].map((p) => (
-                  <div key={p.platform} className="flex justify-between text-sm">
-                    <span>{p.icon} {p.platform}</span>
-                    <span className="text-gray-500">{p.pct}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Listener Demographics removed — was 100% mock (hardcoded
+            "Los Angeles 24%, NY 18%…"). Real demographic data needs:
+              - Locations: from sub attribution.scanLat/scanLng (which we
+                started capturing in the QR flow) + IP geolocation on plays.
+              - Age groups: requires a self-reported birth year on signup
+                (not currently collected).
+              - Platform: needs the play-log endpoint to capture user-agent.
+            All separate data-collection projects; will return when wired. */}
 
-        {/* Payout Summary */}
-        <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold">Payout Summary</h2>
-            <Link href="/settings" className="text-sm text-red-400 hover:text-red-300 font-semibold">Payout Settings →</Link>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-brand-950/50 rounded-xl p-4 text-center">
-              <p className="text-xs text-gray-500 mb-1">Pending</p>
-              <p className="text-xl font-black text-yellow-400">${(estimatedRevenue * 0.3).toFixed(2)}</p>
-            </div>
-            <div className="bg-brand-950/50 rounded-xl p-4 text-center">
-              <p className="text-xs text-gray-500 mb-1">This Month</p>
-              <p className="text-xl font-black text-green-400">${(estimatedRevenue * 0.25).toFixed(2)}</p>
-            </div>
-            <div className="bg-brand-950/50 rounded-xl p-4 text-center">
-              <p className="text-xs text-gray-500 mb-1">All Time</p>
-              <p className="text-xl font-black text-red-400">${estimatedRevenue.toFixed(2)}</p>
-            </div>
-            <div className="bg-brand-950/50 rounded-xl p-4 text-center">
-              <p className="text-xs text-gray-500 mb-1">Next Payout</p>
-              <p className="text-xl font-black">Apr 1</p>
-            </div>
-          </div>
-          <p className="text-xs text-gray-600 mt-3 text-center">
-            All payouts verified on Polygon. <a href="#" className="text-red-400 hover:text-red-300">View on-chain →</a>
+        {/* Payout summary lives at /dashboard/earnings — that page already
+            queries real commissions, tips, and ticket / track / merch sales.
+            Was previously faked here as estimatedRevenue × {0.3, 0.25, 1}. */}
+        <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6 text-center">
+          <h2 className="text-lg font-bold mb-2">Real revenue + payouts</h2>
+          <p className="text-sm text-gray-400 mb-4">
+            Live earnings, commission breakdown, and payout status are on a dedicated page.
           </p>
+          <Link
+            href="/dashboard/earnings"
+            className="inline-block rounded-full bg-red-600 hover:bg-red-500 px-6 py-2.5 text-sm font-bold text-white transition"
+          >
+            Go to Earnings →
+          </Link>
         </div>
       </div>
     </div>
@@ -289,22 +239,6 @@ function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return String(n);
-}
-
-function generateMockHistory(days: number, totalPlays: number) {
-  const data: { label: string; value: number }[] = [];
-  const avgDaily = Math.max(totalPlays / (days * 2), 10);
-  for (let i = days; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const variance = 0.5 + Math.random();
-    const trend = 1 + (days - i) / days * 0.5;
-    data.push({
-      label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      value: Math.round(avgDaily * variance * trend),
-    });
-  }
-  return data;
 }
 
 function getGenreBreakdown(tracks: any[]) {

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { eq, desc, and, sql, ilike, isNull, inArray } from 'drizzle-orm';
+import { eq, desc, and, sql, ilike, isNull, inArray, gte } from 'drizzle-orm';
 import {
   createRouter,
   createCallerFactory,
@@ -685,6 +685,74 @@ const tracksRouter = createRouter({
           };
         })
         .filter((x): x is NonNullable<typeof x> => x !== null);
+    }),
+
+  /**
+   * Daily plays for the current user's tracks over a date range. Powers the
+   * "Plays Over Time" chart on /dashboard/analytics.
+   *
+   * Returns a contiguous array (no gaps): every day in the range is present,
+   * with count=0 for days that had no plays. The chart can render directly
+   * without client-side date filling.
+   *
+   * `previousPeriod` mirrors the same shape for the equal-length window
+   * immediately before the requested range, so the UI can compute a
+   * real "+X% vs prev period" delta without a second round trip.
+   */
+  playsTimeseries: protectedProcedure
+    .input(
+      z.object({
+        days: z.number().int().min(1).max(365).default(30),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const dayMs = 24 * 60 * 60 * 1000;
+      const now = Date.now();
+      const currentSince = new Date(now - input.days * dayMs);
+      const previousSince = new Date(now - 2 * input.days * dayMs);
+
+      // Single query covering both windows; we'll partition in JS.
+      const rows = await db
+        .select({
+          day: sql<string>`DATE(${trackPlays.playedAt} AT TIME ZONE 'UTC')::text`,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(trackPlays)
+        .innerJoin(tracks, eq(trackPlays.trackId, tracks.id))
+        .where(
+          and(
+            eq(tracks.userId, userId),
+            gte(trackPlays.playedAt, previousSince)
+          )
+        )
+        .groupBy(sql`DATE(${trackPlays.playedAt} AT TIME ZONE 'UTC')`)
+        .orderBy(sql`DATE(${trackPlays.playedAt} AT TIME ZONE 'UTC')`);
+
+      const buckets = new Map<string, number>(rows.map((r) => [r.day, r.count]));
+
+      const buildSeries = (startMs: number) => {
+        const out: { date: string; count: number }[] = [];
+        for (let i = input.days - 1; i >= 0; i--) {
+          const d = new Date(startMs + (input.days - 1 - i) * dayMs);
+          const key = d.toISOString().slice(0, 10);
+          out.push({ date: key, count: buckets.get(key) ?? 0 });
+        }
+        return out;
+      };
+
+      const current = buildSeries(currentSince.getTime());
+      const previous = buildSeries(previousSince.getTime());
+
+      const currentTotal = current.reduce((s, d) => s + d.count, 0);
+      const previousTotal = previous.reduce((s, d) => s + d.count, 0);
+
+      return {
+        days: input.days,
+        current,
+        currentTotal,
+        previousTotal,
+      };
     }),
 });
 
