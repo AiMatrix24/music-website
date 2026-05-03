@@ -9,7 +9,10 @@ import { CoverImageField } from '@/app/components/podcast/CoverImageField';
 const TRACK_GENRES = [
   'Synthwave', 'Lo-fi Hip Hop', 'Electronic', 'Indie Rock', 'Post-Punk',
   'Ambient', 'Alternative', 'Hip Hop', 'Pop', 'R&B', 'Jazz', 'Classical',
-  'Metal', 'Country', 'Folk', 'Reggae', 'Latin', 'Afrobeat', 'Other',
+  'Metal', 'Country', 'Folk', 'Reggae', 'Latin', 'Afrobeat',
+  'Christian Country', 'Southern Gospel', 'Worship', 'Christian Rock',
+  'Christian Hip Hop', 'CCM',
+  'Other',
 ];
 
 const AUDIO_TYPES = ['audio/mpeg', 'audio/mp3', 'audio/mp4', 'audio/m4a', 'audio/wav', 'audio/x-m4a', 'audio/flac'];

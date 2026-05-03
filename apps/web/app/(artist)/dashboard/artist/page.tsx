@@ -220,6 +220,8 @@ function MyTracksTab({ tracks }: { tracks: Array<MyTracksTabTrack> }) {
 const TRACK_GENRES = [
   'Synthwave', 'Lo-fi Hip Hop', 'Electronic', 'Indie Rock', 'Post-Punk',
   'Ambient', 'Alternative', 'Hip Hop', 'Pop', 'R&B', 'Jazz', 'Classical',
+  'Christian Country', 'Southern Gospel', 'Worship', 'Christian Rock',
+  'Christian Hip Hop', 'CCM',
 ];
 
 function UploadTab({ onSuccess }: { onSuccess: () => void }) {

@@ -117,24 +117,40 @@ export default function DashboardPage() {
           </div>
           {trackCount > 0 ? (
             <div className="space-y-3">
-              {myTracks?.slice(0, 5).map((track, i) => (
-                <Link
+              {myTracks?.slice(0, 5).map((track) => (
+                <div
                   key={track.id}
-                  href={`/track/${track.id}`}
                   className="flex items-center gap-4 rounded-xl bg-[#15151f] p-4 transition hover:bg-[#1a1a2e]"
                 >
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-sm font-bold">
-                    {track.genre?.charAt(0) ?? '♪'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold truncate">{track.title}</p>
-                    <p className="text-sm text-gray-400">{track.genre}</p>
-                  </div>
-                  <div className="text-right">
+                  <Link href={`/track/${track.id}`} className="flex items-center gap-4 flex-1 min-w-0">
+                    {(track as { coverUrl?: string | null }).coverUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={(track as { coverUrl?: string | null }).coverUrl ?? ''}
+                        alt=""
+                        className="w-10 h-10 rounded-lg object-cover shrink-0"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-sm font-bold shrink-0">
+                        {track.genre?.charAt(0) ?? '♪'}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold truncate">{track.title}</p>
+                      <p className="text-sm text-gray-400">{track.genre}</p>
+                    </div>
+                  </Link>
+                  <div className="text-right shrink-0">
                     <p className="text-sm text-red-400 font-semibold">{formatNumber(track.playCount ?? 0)}</p>
                     <p className="text-xs text-gray-500">plays</p>
                   </div>
-                </Link>
+                  <Link
+                    href={`/dashboard/track/${track.id}/edit`}
+                    className="shrink-0 rounded-lg bg-brand-950 hover:bg-brand-900 border border-brand-800/40 px-3 py-1.5 text-xs font-semibold text-gray-300 hover:text-white transition"
+                  >
+                    Edit
+                  </Link>
+                </div>
               ))}
             </div>
           ) : (

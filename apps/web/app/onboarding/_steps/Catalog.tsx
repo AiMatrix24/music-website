@@ -23,6 +23,8 @@ const GENRES = [
   '', 'Rock', 'Pop', 'Hip Hop', 'R&B', 'Country', 'Folk', 'Indie',
   'Electronic', 'House', 'Techno', 'Synthwave', 'Jazz', 'Classical',
   'Metal', 'Punk', 'Reggae', 'Latin', 'Ambient', 'Lo-fi', 'Singer-Songwriter',
+  'Christian Country', 'Southern Gospel', 'Worship', 'Christian Rock',
+  'Christian Hip Hop', 'CCM',
 ];
 
 const LICENSES = [

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useToast } from '../components/Toast';
 import { PushNotificationToggle } from '../components/PushNotificationToggle';
+import { useUploadThing } from '@/lib/uploadthing-client';
 
 const GENRE_OPTIONS = [
   'Synthwave', 'Lo-fi Hip Hop', 'Electronic', 'Indie Rock', 'Post-Punk',
@@ -31,6 +32,7 @@ export default function SettingsPage() {
   // Profile state
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
+  const [avatar, setAvatar] = useState('');
   const [customSlug, setCustomSlug] = useState('');
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [walletAddress, setWalletAddress] = useState('');
@@ -77,6 +79,7 @@ export default function SettingsPage() {
       const d = profile.data as any;
       setName(d.name ?? '');
       setBio(d.bio ?? '');
+      setAvatar(d.avatar ?? '');
       setWalletAddress(d.walletAddress ?? '');
       setSocialInstagram(d.socialInstagram ?? '');
       setSocialTwitter(d.socialTwitter ?? '');
@@ -96,10 +99,22 @@ export default function SettingsPage() {
     onError: (err) => toast(err.message || 'Save failed', 'error'),
   });
 
+  const { startUpload: startAvatarUpload, isUploading: avatarUploading } = useUploadThing('imageUpload', {
+    onClientUploadComplete: (res) => {
+      const url = res?.[0]?.ufsUrl ?? (res?.[0] as { url?: string })?.url;
+      if (url) {
+        setAvatar(url);
+        toast('Avatar uploaded — click Save Changes to apply', 'success');
+      }
+    },
+    onUploadError: (e) => toast(`Upload failed: ${e.message}`, 'error'),
+  });
+
   const handleSaveProfile = () => {
     updateMutation.mutate({
       name: name.trim() || undefined,
       bio: bio.trim() || undefined,
+      avatar: avatar || undefined,
       walletAddress: walletAddress.trim() || undefined,
       socialInstagram: socialInstagram.trim() || undefined,
       socialTwitter: socialTwitter.trim() || undefined,
@@ -174,12 +189,39 @@ export default function SettingsPage() {
               </div>
               {/* Avatar */}
               <div className="px-6 pb-6 -mt-12">
-                <div className="relative inline-block group cursor-pointer">
-                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-3xl font-black border-4 border-[#15151f]">
-                    {(name || session?.user?.name)?.charAt(0)?.toUpperCase() ?? '?'}
-                  </div>
-                  <div className="absolute inset-0 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition bg-black/50">
-                    <span className="text-xs font-semibold">📷</span>
+                <div className="flex items-end gap-4">
+                  {avatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={avatar}
+                      alt=""
+                      className="w-24 h-24 rounded-full object-cover border-4 border-[#15151f]"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-3xl font-black border-4 border-[#15151f]">
+                      {(name || session?.user?.name)?.charAt(0)?.toUpperCase() ?? '?'}
+                    </div>
+                  )}
+                  <div className="pb-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) startAvatarUpload([file]);
+                      }}
+                      disabled={avatarUploading}
+                      className="text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:bg-brand-950 file:text-gray-300 file:font-semibold hover:file:bg-brand-900 disabled:opacity-50"
+                    />
+                    {avatar && (
+                      <button
+                        type="button"
+                        onClick={() => setAvatar('')}
+                        className="ml-2 text-xs text-gray-500 hover:text-red-400"
+                      >
+                        Remove
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div className="mt-3">
