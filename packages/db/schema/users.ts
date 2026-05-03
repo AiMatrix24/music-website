@@ -43,6 +43,9 @@ export const users = pgTable(
     // Drives the blue ✓ badge on /artist, /track, /event detail pages.
     // Null = not verified.
     verifiedAt: timestamp('verified_at', { withTimezone: true }),
+    // Stamped when the user finishes (or explicitly skips) the /onboarding
+    // flow. Null = banner shows on the dashboard prompting them to set up.
+    onboardingCompletedAt: timestamp('onboarding_completed_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),

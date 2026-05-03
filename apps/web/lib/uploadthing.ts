@@ -3,9 +3,11 @@ import { createUploadthing, type FileRouter } from 'uploadthing/next';
 const f = createUploadthing();
 
 export const uploadRouter = {
-  // Audio file upload (tracks, podcasts)
+  // Audio file upload (tracks, podcasts). Bumped maxFileCount from 1 to 10
+  // for the onboarding bulk-catalog upload step. Per-file size cap stays at
+  // 64MB so the total batch is bounded at 640MB max — safe for UploadThing.
   audioUpload: f({
-    audio: { maxFileSize: '64MB', maxFileCount: 1 },
+    audio: { maxFileSize: '64MB', maxFileCount: 10 },
   }).onUploadComplete(({ file }) => {
     console.log('[UploadThing] Audio uploaded:', file.ufsUrl);
     return { url: file.ufsUrl };

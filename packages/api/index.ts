@@ -310,6 +310,20 @@ const usersRouter = createRouter({
         .limit(limit);
       return rows;
     }),
+
+  /**
+   * Stamp the current user's onboarding as complete. Called when the user
+   * finishes (or explicitly skips) the /onboarding flow. The dashboard
+   * banner uses the absence of this stamp to decide whether to nudge.
+   * Idempotent — calling it twice is a no-op.
+   */
+  completeOnboarding: protectedProcedure.mutation(async ({ ctx }) => {
+    await db
+      .update(users)
+      .set({ onboardingCompletedAt: new Date(), updatedAt: new Date() })
+      .where(eq(users.id, ctx.session.user.id));
+    return { ok: true };
+  }),
 });
 
 // ─── Subscriptions Router ───

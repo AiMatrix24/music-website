@@ -14,6 +14,11 @@ export default function DashboardPage() {
     { limit: 50 },
     { enabled: status === 'authenticated' }
   );
+  // Used to decide whether to nudge the user toward /onboarding. We don't
+  // auto-redirect — the banner is enough.
+  const { data: me } = trpc.users.getProfile.useQuery(undefined, {
+    enabled: status === 'authenticated',
+  });
 
   if (status !== 'authenticated') {
     return (
@@ -31,9 +36,29 @@ export default function DashboardPage() {
   const trackCount = myTracks?.length ?? 0;
   const eventCount = myEvents?.length ?? 0;
 
+  const showOnboardingBanner = me && !me.onboardingCompletedAt;
+
   return (
     <div className="min-h-screen py-16 px-6">
       <div className="max-w-5xl mx-auto">
+        {showOnboardingBanner && (
+          <Link
+            href="/onboarding"
+            className="block mb-6 rounded-2xl bg-gradient-to-r from-red-600/20 to-red-700/20 border border-red-600/40 p-4 hover:from-red-600/30 hover:to-red-700/30 transition group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="text-3xl shrink-0">🚀</div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-sm">Finish setting up your creator profile</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Add your bio, upload up to 10 tracks at once, get your shareable QR code. Takes about 5 minutes.
+                </p>
+              </div>
+              <span className="text-red-400 group-hover:text-red-300 text-sm font-bold shrink-0">Continue setup →</span>
+            </div>
+          </Link>
+        )}
+
         <div className="flex items-center gap-4 mb-8">
           <div className="w-16 h-16 rounded-full bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-2xl font-black">
             {session.user?.name?.charAt(0)?.toUpperCase() ?? '?'}
