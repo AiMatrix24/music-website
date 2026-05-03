@@ -138,14 +138,45 @@ export const authConfig: NextAuthConfig = {
 
   callbacks: {
     async jwt({ token, user, account }) {
+      // Initial sign-in — capture role + identity from the verifier callback
       if (user) {
         token.id = user.id;
         token.role = (user as { role?: string }).role ?? 'free';
+        token.roleCheckedAt = Date.now();
       }
       if (account) {
         token.provider = account.provider;
         token.providerAccountId = account.providerAccountId;
       }
+
+      // Re-fetch role from DB at most every 60 seconds. Without this, an
+      // admin promoting a user (or revoking their access) wouldn't take
+      // effect until the user signed out + back in. 60s is the sweet spot:
+      // role changes propagate fast enough to be useful, but we're not
+      // hitting the DB on every page paint.
+      const ROLE_TTL_MS = 60 * 1000;
+      const lastChecked = (token.roleCheckedAt as number | undefined) ?? 0;
+      if (token.id && Date.now() - lastChecked > ROLE_TTL_MS) {
+        try {
+          const fresh = await db.query.users.findFirst({
+            where: eq(users.id, token.id as string),
+            columns: { role: true },
+          });
+          if (fresh) {
+            token.role = fresh.role;
+          }
+          // If the user was deleted we leave the cached role alone — the
+          // next protected procedure will fail naturally and the user can
+          // re-authenticate. Logging them out from inside this callback is
+          // surprisingly hard in NextAuth.
+          token.roleCheckedAt = Date.now();
+        } catch (err) {
+          // DB hiccup — keep the cached role rather than logging the user
+          // out. They'll get the fresh value on the next successful refresh.
+          console.error('[auth.jwt] role refresh failed:', err);
+        }
+      }
+
       return token;
     },
 
