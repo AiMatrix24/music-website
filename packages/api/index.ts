@@ -3774,6 +3774,160 @@ const verificationRouter = createRouter({
     }),
 });
 
+// ─── Search Router ───
+/**
+ * Server-side search across the platform's main entity types.
+ *
+ * Strategy: parallel ILIKE queries against indexed text columns. Each bucket
+ * caps at 10 results — this is the global search surface, not a paginated
+ * deep-search; the user can drill into a specific section (e.g., /explore)
+ * for more.
+ *
+ * Public-only filters (status='published' for tracks, status='public' for
+ * articles, etc.) so we don't surface drafts in search results.
+ *
+ * Why ILIKE over Postgres FTS: at this scale (low thousands of rows) ILIKE
+ * with the existing slug/title indexes is plenty fast. When we cross ~50k
+ * rows in any one table we'll need to add a tsvector column + GIN index
+ * for proper relevance ranking. For now: ordered by recency within each
+ * bucket, no fancy scoring.
+ */
+const searchRouter = createRouter({
+  everything: publicProcedure
+    .input(
+      z.object({
+        query: z.string().trim().min(1).max(200),
+        limit: z.number().int().min(1).max(20).default(10),
+      })
+    )
+    .query(async ({ input }) => {
+      const q = `%${input.query}%`;
+      const limit = input.limit;
+
+      // Run all five lookups in parallel.
+      const [creatorRows, trackRows, eventRows, articleRows, listingRows] =
+        await Promise.all([
+          // Creators — ilike on name, only those who have a non-empty name
+          db
+            .select({
+              id: users.id,
+              name: users.name,
+              avatar: users.avatar,
+              role: users.role,
+              verifiedAt: users.verifiedAt,
+            })
+            .from(users)
+            .where(and(ilike(users.name, q), sql`${users.name} IS NOT NULL`))
+            .limit(limit),
+          // Tracks — published only, ilike on title or genre, joined for
+          // artist display name (which is also useful for matching by artist
+          // even though we don't filter on it directly here).
+          db
+            .select({
+              id: tracks.id,
+              title: tracks.title,
+              genre: tracks.genre,
+              duration: tracks.duration,
+              playCount: tracks.playCount,
+              coverUrl: tracks.coverUrl,
+              artistName: users.name,
+              artistId: tracks.userId,
+              createdAt: tracks.createdAt,
+            })
+            .from(tracks)
+            .leftJoin(users, eq(tracks.userId, users.id))
+            .where(
+              and(
+                eq(tracks.status, 'published'),
+                sql`(${tracks.title} ILIKE ${q} OR ${tracks.genre} ILIKE ${q} OR ${users.name} ILIKE ${q})`
+              )
+            )
+            .orderBy(desc(tracks.createdAt))
+            .limit(limit),
+          // Events — published or active only
+          db
+            .select({
+              id: events.id,
+              title: events.title,
+              startDate: events.startDate,
+              venueName: events.venueName,
+              venueCity: events.venueCity,
+              coverUrl: events.coverUrl,
+              hostName: users.name,
+              hostId: events.hostId,
+            })
+            .from(events)
+            .leftJoin(users, eq(events.hostId, users.id))
+            .where(
+              and(
+                sql`${events.status} IN ('published', 'active')`,
+                sql`(${events.title} ILIKE ${q} OR ${events.venueName} ILIKE ${q} OR ${events.venueCity} ILIKE ${q} OR ${users.name} ILIKE ${q})`
+              )
+            )
+            .orderBy(desc(events.startDate))
+            .limit(limit),
+          // Articles — public only
+          db
+            .select({
+              id: articles.id,
+              title: articles.title,
+              slug: articles.slug,
+              excerpt: articles.excerpt,
+              coverUrl: articles.coverUrl,
+              authorName: users.name,
+              publishedAt: articles.publishedAt,
+            })
+            .from(articles)
+            .leftJoin(users, eq(articles.authorId, users.id))
+            .where(
+              and(
+                eq(articles.status, 'public'),
+                sql`(${articles.title} ILIKE ${q} OR ${articles.excerpt} ILIKE ${q} OR ${users.name} ILIKE ${q})`
+              )
+            )
+            .orderBy(desc(articles.publishedAt))
+            .limit(limit),
+          // Marketplace listings — active only
+          db
+            .select({
+              id: listings.id,
+              title: listings.title,
+              description: listings.description,
+              price: listings.price,
+              imageUrls: listings.imageUrls,
+              sellerName: users.name,
+            })
+            .from(listings)
+            .leftJoin(users, eq(listings.sellerId, users.id))
+            .where(
+              and(
+                eq(listings.status, 'active'),
+                sql`(${listings.title} ILIKE ${q} OR ${listings.description} ILIKE ${q} OR ${users.name} ILIKE ${q})`
+              )
+            )
+            .orderBy(desc(listings.createdAt))
+            .limit(limit),
+        ]);
+
+      const totalResults =
+        creatorRows.length +
+        trackRows.length +
+        eventRows.length +
+        articleRows.length +
+        listingRows.length;
+
+      return {
+        query: input.query,
+        totalResults,
+        creators: creatorRows,
+        tracks: trackRows,
+        events: eventRows,
+        articles: articleRows,
+        listings: listingRows,
+      };
+    }),
+});
+
 // ─── App Router ───
 export const appRouter = createRouter({
   auth: authRouter,
@@ -3802,6 +3956,7 @@ export const appRouter = createRouter({
   notifications: notificationsRouter,
   pushSubscriptions: pushSubscriptionsRouter,
   verification: verificationRouter,
+  search: searchRouter,
 });
 
 export type AppRouter = typeof appRouter;
