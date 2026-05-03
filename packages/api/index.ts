@@ -708,11 +708,22 @@ const tracksRouter = createRouter({
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
       const dayMs = 24 * 60 * 60 * 1000;
-      const now = Date.now();
-      const currentSince = new Date(now - input.days * dayMs);
-      const previousSince = new Date(now - 2 * input.days * dayMs);
 
-      // Single query covering both windows; we'll partition in JS.
+      // Anchor the date series on today at UTC midnight so the loop walks
+      // back exactly `input.days` calendar days ENDING on today inclusive.
+      // (A previous version anchored on `now - days*dayMs` and walked
+      // forward, which produced a series ending YESTERDAY and silently
+      // dropped today's plays from the chart.)
+      const todayUtc = new Date();
+      todayUtc.setUTCHours(0, 0, 0, 0);
+      const currentEnd = todayUtc.getTime();
+      const previousEnd = currentEnd - input.days * dayMs;
+
+      // WHERE clause floor — the earliest timestamp we need to fetch is the
+      // first day of the previous window.
+      const earliestSince = new Date(previousEnd - (input.days - 1) * dayMs);
+
+      // Single query covering both windows; partitioned in JS.
       const rows = await db
         .select({
           day: sql<string>`DATE(${trackPlays.playedAt} AT TIME ZONE 'UTC')::text`,
@@ -723,7 +734,7 @@ const tracksRouter = createRouter({
         .where(
           and(
             eq(tracks.userId, userId),
-            gte(trackPlays.playedAt, previousSince)
+            gte(trackPlays.playedAt, earliestSince)
           )
         )
         .groupBy(sql`DATE(${trackPlays.playedAt} AT TIME ZONE 'UTC')`)
@@ -731,18 +742,19 @@ const tracksRouter = createRouter({
 
       const buckets = new Map<string, number>(rows.map((r) => [r.day, r.count]));
 
-      const buildSeries = (startMs: number) => {
+      // Walk back `days` days ending on (and including) `endMs`.
+      const buildSeries = (endMs: number) => {
         const out: { date: string; count: number }[] = [];
         for (let i = input.days - 1; i >= 0; i--) {
-          const d = new Date(startMs + (input.days - 1 - i) * dayMs);
+          const d = new Date(endMs - i * dayMs);
           const key = d.toISOString().slice(0, 10);
           out.push({ date: key, count: buckets.get(key) ?? 0 });
         }
         return out;
       };
 
-      const current = buildSeries(currentSince.getTime());
-      const previous = buildSeries(previousSince.getTime());
+      const current = buildSeries(currentEnd);
+      const previous = buildSeries(previousEnd);
 
       const currentTotal = current.reduce((s, d) => s + d.count, 0);
       const previousTotal = previous.reduce((s, d) => s + d.count, 0);
