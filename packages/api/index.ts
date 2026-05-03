@@ -2016,10 +2016,14 @@ const commentsRouter = createRouter({
     .input(
       z.object({
         trackId: z.string().uuid(),
-        limit: z.number().min(1).max(50).default(20),
+        // Cap raised so threaded replies aren't truncated below their parents
+        limit: z.number().min(1).max(200).default(100),
       })
     )
     .query(async ({ input }) => {
+      // Order ASC so the client can build threads in submission order. The
+      // UI groups by parentId — top-level comments first, replies under
+      // their parent.
       return db
         .select({
           id: comments.id,
@@ -2031,11 +2035,13 @@ const commentsRouter = createRouter({
           createdAt: comments.createdAt,
           userName: users.name,
           userAvatar: users.avatar,
+          // For the verified ✓ badge next to commenter names
+          userVerifiedAt: users.verifiedAt,
         })
         .from(comments)
         .leftJoin(users, eq(comments.userId, users.id))
         .where(eq(comments.trackId, input.trackId))
-        .orderBy(desc(comments.createdAt))
+        .orderBy(comments.createdAt)
         .limit(input.limit);
     }),
 
@@ -2049,16 +2055,71 @@ const commentsRouter = createRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const commenterId = ctx.session.user.id;
       const [comment] = await db
         .insert(comments)
         .values({
-          userId: ctx.session.user.id,
+          userId: commenterId,
           trackId: input.trackId,
           body: input.body,
           timestampMs: input.timestampMs ?? null,
           parentId: input.parentId ?? null,
         })
         .returning();
+
+      // Fire-and-forget notifications. Two recipients to consider:
+      //   - The track's owner (always, unless they ARE the commenter)
+      //   - The parent comment's author if this is a reply (avoid double-
+      //     notifying the track owner if they happen to BE the parent's
+      //     author)
+      void (async () => {
+        try {
+          const [commenter, track] = await Promise.all([
+            db.query.users.findFirst({ where: eq(users.id, commenterId) }),
+            db.query.tracks.findFirst({ where: eq(tracks.id, input.trackId) }),
+          ]);
+          const snippet =
+            input.body.length > 80 ? input.body.slice(0, 77) + '…' : input.body;
+          const link = `/track/${input.trackId}`;
+
+          // Track owner notif (skip self-comments)
+          if (track?.userId && track.userId !== commenterId) {
+            await notify({
+              userId: track.userId,
+              type: 'comment',
+              title: input.parentId ? 'New reply on your track' : 'New comment on your track',
+              body: `${commenter?.name ?? 'Someone'}: "${snippet}"`,
+              link,
+              metadata: { commentId: comment.id, trackId: input.trackId, commenterId },
+            });
+          }
+
+          // Parent author notif (only for replies; skip self + skip if
+          // they're the track owner we already notified above)
+          if (input.parentId) {
+            const parent = await db.query.comments.findFirst({
+              where: eq(comments.id, input.parentId),
+            });
+            if (
+              parent?.userId &&
+              parent.userId !== commenterId &&
+              parent.userId !== track?.userId
+            ) {
+              await notify({
+                userId: parent.userId,
+                type: 'comment',
+                title: 'Someone replied to your comment',
+                body: `${commenter?.name ?? 'Someone'}: "${snippet}"`,
+                link,
+                metadata: { commentId: comment.id, parentId: input.parentId, commenterId },
+              });
+            }
+          }
+        } catch (err) {
+          console.error('[comments.add] notification fan-out failed:', err);
+        }
+      })();
+
       return comment;
     }),
 
