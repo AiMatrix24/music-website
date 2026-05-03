@@ -72,11 +72,16 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Apply to all routes except static files and api.
-    // /api/* is excluded so webhooks, cron, and uploadthing callbacks work
-    // without basic auth. Static assets + service worker + PWA manifest
-    // are excluded so browsers can load them before presenting the auth
-    // dialog.
-    '/((?!_next/static|_next/image|favicon.ico|icon\\.png|apple-icon\\.png|icon-192\\.png|icon-512\\.png|icon-maskable-512\\.png|splash/|logo.png|manifest.json|sw.js|api/).*)',
+    // Apply to all routes except static files, api, and the public-facing
+    // entry points fans need to reach without the pre-launch password:
+    //   sub/      — QR subscription landing (fan scans creator's QR poster
+    //               at an event → lands here → subscribes)
+    //   auth/     — sign-in / sign-up flow that the QR landing redirects to
+    //               when the visitor isn't logged in yet
+    //   subscribe — public pricing / tier picker (linked from /sub on
+    //               post-payment success_url too)
+    // Static assets + service worker + PWA manifest are excluded so
+    // browsers can load them before presenting the auth dialog.
+    '/((?!_next/static|_next/image|favicon.ico|icon\\.png|apple-icon\\.png|icon-192\\.png|icon-512\\.png|icon-maskable-512\\.png|splash/|logo.png|manifest.json|sw.js|api/|sub/|auth/|subscribe).*)',
   ],
 };
