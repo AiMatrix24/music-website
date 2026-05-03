@@ -95,9 +95,18 @@ function ArtistsSection() {
           href={`/artist/${creator.id}`}
           className="rounded-2xl bg-[#15151f] p-6 transition hover:bg-[#1a1a2e] flex flex-col items-center text-center"
         >
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-2xl font-black mb-4">
-            {creator.name?.charAt(0)?.toUpperCase() ?? '?'}
-          </div>
+          {creator.avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={creator.avatar}
+              alt=""
+              className="w-20 h-20 rounded-full object-cover ring-2 ring-brand-800/40 mb-4"
+            />
+          ) : (
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-2xl font-black mb-4">
+              {creator.name?.charAt(0)?.toUpperCase() ?? '?'}
+            </div>
+          )}
           <h3 className="font-bold text-lg mb-1">{creator.name}</h3>
           <span className="text-xs bg-brand-600/20 text-brand-400 px-3 py-1 rounded-full">
             {creator.role}
