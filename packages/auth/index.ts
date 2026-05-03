@@ -185,6 +185,9 @@ export const authConfig: NextAuthConfig = {
       if (session.user) {
         session.user.id = token.id as string;
         (session.user as { role?: string }).role = token.role as string;
+        // Explicit — NextAuth v5 sometimes drops token.picture from session.user.image
+        // when a custom session callback is present.
+        session.user.image = (token.picture as string | null | undefined) ?? null;
       }
       return session;
     },
