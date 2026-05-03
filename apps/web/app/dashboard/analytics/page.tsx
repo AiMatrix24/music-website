@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useState } from 'react';
 
-type TimeRange = '7d' | '30d' | '90d' | 'all';
+type TimeRange = 'today' | '7d' | '30d' | '90d' | 'all';
 
 export default function AnalyticsPage() {
   const { data: session, status } = useSession();
@@ -23,11 +23,18 @@ export default function AnalyticsPage() {
   // Real timeseries from track_plays (logged by the audio player after 30s
   // of continuous play). Backend returns same-length window for the prior
   // period too so we can compute a real "+X% vs prev period" delta.
+  //
+  // 'today' tab uses a separate procedure that buckets by hour and pivots
+  // on UTC midnight; the others bucket by day.
   const chartDays = range === '7d' ? 7 : range === '30d' ? 30 : range === '90d' ? 90 : 180;
+  const isToday = range === 'today';
   const { data: timeseries } = trpc.tracks.playsTimeseries.useQuery(
     { days: chartDays },
-    { enabled: status === 'authenticated' }
+    { enabled: status === 'authenticated' && !isToday }
   );
+  const { data: todayseries } = trpc.tracks.playsToday.useQuery(undefined, {
+    enabled: status === 'authenticated' && isToday,
+  });
 
   if (status !== 'authenticated') {
     return (
@@ -43,13 +50,22 @@ export default function AnalyticsPage() {
   const topTracks = [...(myTracks ?? [])].sort((a, b) => (b.playCount ?? 0) - (a.playCount ?? 0)).slice(0, 10);
   const genreBreakdown = getGenreBreakdown(myTracks ?? []);
 
-  // Real chart data with per-day labels
-  const playHistory = (timeseries?.current ?? []).map((d) => ({
-    value: d.count,
-    label: new Date(d.date + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-  }));
-  const periodPlays = timeseries?.currentTotal ?? 0;
-  const previousPeriodPlays = timeseries?.previousTotal ?? 0;
+  // Chart data — Today tab uses hourly buckets; other tabs use daily.
+  const playHistory = isToday
+    ? (todayseries?.current ?? []).map((d) => ({ value: d.count, label: d.label }))
+    : (timeseries?.current ?? []).map((d) => ({
+        value: d.count,
+        label: new Date(d.date + 'T00:00:00Z').toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+        }),
+      }));
+  const periodPlays = isToday
+    ? todayseries?.currentTotal ?? 0
+    : timeseries?.currentTotal ?? 0;
+  const previousPeriodPlays = isToday
+    ? todayseries?.previousTotal ?? 0
+    : timeseries?.previousTotal ?? 0;
   const playsDelta =
     previousPeriodPlays > 0
       ? ((periodPlays - previousPeriodPlays) / previousPeriodPlays) * 100
@@ -65,12 +81,12 @@ export default function AnalyticsPage() {
             <h1 className="text-3xl font-bold">Analytics</h1>
           </div>
           <div className="flex gap-2">
-            {(['7d', '30d', '90d', 'all'] as TimeRange[]).map((r) => (
+            {(['today', '7d', '30d', '90d', 'all'] as TimeRange[]).map((r) => (
               <button key={r} onClick={() => setRange(r)}
                 className={`px-4 py-2 rounded-full text-xs font-semibold transition ${
                   range === r ? 'bg-red-600 text-white' : 'bg-[#15151f] text-gray-400 hover:text-white'
                 }`}>
-                {r === 'all' ? 'All Time' : r.toUpperCase()}
+                {r === 'all' ? 'All Time' : r === 'today' ? 'Today' : r.toUpperCase()}
               </button>
             ))}
           </div>
@@ -84,20 +100,26 @@ export default function AnalyticsPage() {
           <MetricCard
             label="Total Plays"
             value={formatNumber(totalPlays)}
-            change={playsDelta == null ? '' : `${playsDelta >= 0 ? '+' : ''}${playsDelta.toFixed(1)}% vs prev ${range}`}
+            change={playsDelta == null ? '' : `${playsDelta >= 0 ? '+' : ''}${playsDelta.toFixed(1)}% vs ${isToday ? 'yesterday by now' : `prev ${range}`}`}
             positive={playsDelta == null || playsDelta >= 0}
           />
           <MetricCard label="Followers" value={formatNumber(followerCount ?? 0)} change="" positive />
           <MetricCard label="Tracks" value={String(trackCount)} change="" positive />
-          <MetricCard label={`Plays this ${range}`} value={formatNumber(periodPlays)} change="" positive />
+          <MetricCard
+            label={isToday ? 'Plays today' : `Plays this ${range}`}
+            value={formatNumber(periodPlays)}
+            change=""
+            positive
+          />
         </div>
 
-        {/* Play Count Chart — real per-day data from track_plays */}
+        {/* Play Count Chart — real per-day (or per-hour for Today) data
+            from track_plays */}
         <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6 mb-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold">Plays Over Time</h2>
+            <h2 className="text-lg font-bold">{isToday ? 'Plays Today (by hour, UTC)' : 'Plays Over Time'}</h2>
             <span className="text-sm text-gray-500">
-              {formatNumber(periodPlays)} in last {range === 'all' ? '180 days' : range}
+              {formatNumber(periodPlays)} {isToday ? 'today' : `in last ${range === 'all' ? '180 days' : range}`}
             </span>
           </div>
           {playHistory.length === 0 ? (

@@ -766,6 +766,75 @@ const tracksRouter = createRouter({
         previousTotal,
       };
     }),
+
+  /**
+   * Hourly play counts for the current user's tracks for *today* (UTC
+   * calendar day) — bucketed 00:00 through the current hour. Powers the
+   * "Today" tab on /dashboard/analytics. Variable length: 1 bucket at
+   * 00:30 UTC, 24 buckets at 23:30 UTC.
+   *
+   * Previous-window comparison: yesterday up through the same hour, so
+   * the "+X% vs yesterday" delta means "by this hour yesterday" — fair
+   * regardless of what time the creator opens the page.
+   */
+  playsToday: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+    const hourMs = 60 * 60 * 1000;
+
+    const now = new Date();
+    const currentHourEnd = new Date(now);
+    currentHourEnd.setUTCMinutes(0, 0, 0); // floor to top of current hour
+    currentHourEnd.setUTCHours(currentHourEnd.getUTCHours() + 1); // next hour boundary
+    const todayMidnight = new Date(currentHourEnd);
+    todayMidnight.setUTCHours(0, 0, 0, 0);
+    const hoursElapsedToday = Math.max(
+      1,
+      Math.round((currentHourEnd.getTime() - todayMidnight.getTime()) / hourMs)
+    );
+
+    // Pull yesterday's full-equivalent window too for the delta.
+    const earliestSince = new Date(todayMidnight.getTime() - 24 * hourMs);
+
+    const rows = await db
+      .select({
+        bucket: sql<string>`to_char(date_trunc('hour', ${trackPlays.playedAt} AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24')`,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(trackPlays)
+      .innerJoin(tracks, eq(trackPlays.trackId, tracks.id))
+      .where(
+        and(
+          eq(tracks.userId, userId),
+          gte(trackPlays.playedAt, earliestSince)
+        )
+      )
+      .groupBy(sql`date_trunc('hour', ${trackPlays.playedAt} AT TIME ZONE 'UTC')`)
+      .orderBy(sql`date_trunc('hour', ${trackPlays.playedAt} AT TIME ZONE 'UTC')`);
+
+    const buckets = new Map<string, number>(rows.map((r) => [r.bucket, r.count]));
+
+    const buildSeries = (anchorMidnightMs: number, hours: number) => {
+      const out: { hour: string; label: string; count: number }[] = [];
+      for (let h = 0; h < hours; h++) {
+        const d = new Date(anchorMidnightMs + h * hourMs);
+        const iso = d.toISOString();
+        const key = iso.slice(0, 13);
+        const label = `${iso.slice(11, 13)}:00`;
+        out.push({ hour: key, label, count: buckets.get(key) ?? 0 });
+      }
+      return out;
+    };
+
+    const current = buildSeries(todayMidnight.getTime(), hoursElapsedToday);
+    const yesterdayMidnight = new Date(todayMidnight.getTime() - 24 * hourMs);
+    const previous = buildSeries(yesterdayMidnight.getTime(), hoursElapsedToday);
+
+    return {
+      current,
+      currentTotal: current.reduce((s, d) => s + d.count, 0),
+      previousTotal: previous.reduce((s, d) => s + d.count, 0),
+    };
+  }),
 });
 
 // ─── Albums Router ───
