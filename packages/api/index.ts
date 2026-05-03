@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { eq, desc, and, sql, ilike, isNull, inArray, gte } from 'drizzle-orm';
+import { eq, desc, and, or, sql, ilike, isNull, inArray, gte } from 'drizzle-orm';
 import {
   createRouter,
   createCallerFactory,
@@ -137,10 +137,27 @@ const usersRouter = createRouter({
       })
     )
     .query(async ({ input }) => {
+      // "Creator" for the /explore Creators tab means anyone with creator
+      // signal: explicit role='creator' OR an admin/super_admin who has
+      // uploaded content OR anyone who has shipped a published track.
+      // The literal role check alone misses two real cohorts:
+      //   - New signups default to role='free' until manually promoted;
+      //     they go through /onboarding, upload tracks, but stay 'free'.
+      //   - Admins (e.g., Lee promoted to 'admin' for /admin access) who
+      //     also have tracks would have been filtered out.
       return db
         .select()
         .from(users)
-        .where(eq(users.role, 'creator'))
+        .where(
+          or(
+            eq(users.role, 'creator'),
+            sql`EXISTS (
+              SELECT 1 FROM ${tracks}
+              WHERE ${tracks.userId} = ${users.id}
+                AND ${tracks.status} = 'published'
+            )`
+          )
+        )
         .orderBy(desc(users.createdAt))
         .limit(input.limit)
         .offset(input.offset);
