@@ -79,11 +79,12 @@ export default function PlaylistDetailPage() {
               <button
                 onClick={() => {
                   if (playlistTracks[0]) {
-                    const t = playlistTracks[0].track as typeof playlistTracks[0]['track'] & { audioUrl320?: string | null; audioUrl128?: string | null; coverUrl?: string | null };
+                    const first = playlistTracks[0];
+                    const t = first.track as typeof first['track'] & { audioUrl320?: string | null; audioUrl128?: string | null; coverUrl?: string | null };
                     play({
                       id: t.id,
                       title: t.title,
-                      creator: 'Unknown',
+                      creator: first.artistName ?? 'Unknown',
                       genre: t.genre ?? '',
                       duration: t.duration ?? 0,
                       audioUrl: t.audioUrl320 ?? t.audioUrl128 ?? null,
@@ -105,7 +106,7 @@ export default function PlaylistDetailPage() {
                     play({
                       id: pt.track.id,
                       title: pt.track.title,
-                      creator: 'Unknown',
+                      creator: pt.artistName ?? 'Unknown',
                       genre: pt.track.genre ?? '',
                       duration: pt.track.duration ?? 0,
                     })
@@ -128,7 +129,24 @@ export default function PlaylistDetailPage() {
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold truncate">{pt.track.title}</p>
-                    <p className="text-sm text-gray-400">{pt.track.genre}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {pt.artistAvatar ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={pt.artistAvatar}
+                          alt=""
+                          className="w-5 h-5 rounded-full object-cover shrink-0"
+                        />
+                      ) : (
+                        <div className="w-5 h-5 rounded-full bg-brand-700 flex items-center justify-center text-[10px] font-bold shrink-0">
+                          {pt.artistName?.charAt(0)?.toUpperCase() ?? '?'}
+                        </div>
+                      )}
+                      <p className="text-sm text-gray-400 truncate">
+                        {pt.artistName ?? 'Unknown'}
+                        {pt.track.genre && <span className="text-gray-600"> · {pt.track.genre}</span>}
+                      </p>
+                    </div>
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-gray-400">

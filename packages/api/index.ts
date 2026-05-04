@@ -1092,9 +1092,16 @@ const playlistsRouter = createRouter({
     .input(z.object({ playlistId: z.string().uuid() }))
     .query(async ({ input }) => {
       return db
-        .select({ track: tracks, position: playlistTracks.position })
+        .select({
+          track: tracks,
+          position: playlistTracks.position,
+          artistId: users.id,
+          artistName: users.name,
+          artistAvatar: users.avatar,
+        })
         .from(playlistTracks)
         .innerJoin(tracks, eq(playlistTracks.trackId, tracks.id))
+        .leftJoin(users, eq(tracks.userId, users.id))
         .where(eq(playlistTracks.playlistId, input.playlistId))
         .orderBy(playlistTracks.position);
     }),
