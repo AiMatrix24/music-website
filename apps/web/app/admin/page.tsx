@@ -93,6 +93,12 @@ export default function AdminDashboard() {
           >
             Verified Queue →
           </Link>
+          <Link
+            href="/admin/distribution"
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-[#15151f] text-gray-400 hover:text-white hover:bg-[#1a1a2e] transition whitespace-nowrap"
+          >
+            Distribution Queue →
+          </Link>
         </div>
 
         {activeTab === 'overview' && <OverviewTab />}

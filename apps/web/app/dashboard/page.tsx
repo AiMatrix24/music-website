@@ -106,6 +106,7 @@ export default function DashboardPage() {
           <QuickAction href="/dashboard/radio/channel" icon="📻" label="My Radio Channel" />
           <QuickAction href="/dashboard/radio/studio" icon="🎬" label="Go Live on Radio" />
           <QuickAction href="/dashboard/albums" icon="💿" label="Albums" />
+          <QuickAction href="/dashboard/distribute" icon="📡" label="Distribution" />
           <QuickAction href="/settings" icon="⚙️" label="Settings" />
         </div>
 

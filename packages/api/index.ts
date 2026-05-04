@@ -50,6 +50,7 @@ import {
   notifications,
   pushSubscriptions,
   verificationApplications,
+  distributionSubmissions,
 } from '@opynx/db';
 
 // ─── Auth Router ───
@@ -4315,6 +4316,159 @@ const searchRouter = createRouter({
 });
 
 // ─── App Router ───
+// ─── Distribution Router ───
+// Submission queue for pushing tracks/albums out to streaming services.
+// We don't directly integrate with any aggregator yet — admin manually
+// forwards each submission and updates status as it progresses.
+const distributionRouter = createRouter({
+  // Creator submits a request to distribute one of their own tracks/albums.
+  // Validates the subject belongs to the caller before creating the row.
+  submit: protectedProcedure
+    .input(
+      z.object({
+        subjectType: z.enum(['track', 'album']),
+        subjectId: z.string().uuid(),
+        targetTiers: z.array(z.string()).min(1),
+        releaseDate: z.string().datetime().optional(),
+        copyrightCertified: z.boolean(),
+        splitsConfirmed: z.boolean(),
+        creatorNotes: z.string().max(2000).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!input.copyrightCertified || !input.splitsConfirmed) {
+        throw new Error('Both copyright and splits must be confirmed before submission');
+      }
+
+      // Validate ownership of the subject — creators can't request distribution
+      // of someone else's track/album.
+      if (input.subjectType === 'track') {
+        const t = await db.query.tracks.findFirst({
+          where: and(eq(tracks.id, input.subjectId), eq(tracks.userId, ctx.session.user.id)),
+          columns: { id: true },
+        });
+        if (!t) throw new Error('Track not found or you are not the owner');
+      } else {
+        const a = await db.query.albums.findFirst({
+          where: and(eq(albums.id, input.subjectId), eq(albums.userId, ctx.session.user.id)),
+          columns: { id: true },
+        });
+        if (!a) throw new Error('Album not found or you are not the owner');
+      }
+
+      const [row] = await db
+        .insert(distributionSubmissions)
+        .values({
+          userId: ctx.session.user.id,
+          subjectType: input.subjectType,
+          subjectId: input.subjectId,
+          targetTiers: input.targetTiers,
+          releaseDate: input.releaseDate ? new Date(input.releaseDate) : null,
+          copyrightCertified: input.copyrightCertified,
+          splitsConfirmed: input.splitsConfirmed,
+          creatorNotes: input.creatorNotes ?? null,
+        })
+        .returning();
+      return row;
+    }),
+
+  // Creator's own submission history.
+  listMine: protectedProcedure.query(async ({ ctx }) => {
+    return db
+      .select()
+      .from(distributionSubmissions)
+      .where(eq(distributionSubmissions.userId, ctx.session.user.id))
+      .orderBy(desc(distributionSubmissions.submittedAt));
+  }),
+
+  // Creator can cancel a submission while it's still pending or in_review.
+  // After admin has forwarded it ('submitted' or later), they can't pull it back.
+  cancel: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const row = await db.query.distributionSubmissions.findFirst({
+        where: eq(distributionSubmissions.id, input.id),
+      });
+      if (!row || row.userId !== ctx.session.user.id) {
+        throw new Error('Submission not found');
+      }
+      if (row.status !== 'pending' && row.status !== 'in_review') {
+        throw new Error('This submission has already been forwarded — contact support to pull it');
+      }
+      const [updated] = await db
+        .update(distributionSubmissions)
+        .set({ status: 'cancelled' })
+        .where(eq(distributionSubmissions.id, input.id))
+        .returning();
+      return updated;
+    }),
+
+  // Admin queue — newest first. Joins user info for display.
+  adminList: adminProcedure
+    .input(
+      z
+        .object({
+          status: z
+            .enum(['pending', 'in_review', 'submitted', 'live', 'rejected', 'cancelled'])
+            .optional(),
+        })
+        .optional()
+    )
+    .query(async ({ input }) => {
+      const conditions = [];
+      if (input?.status) conditions.push(eq(distributionSubmissions.status, input.status));
+      return db
+        .select({
+          id: distributionSubmissions.id,
+          userId: distributionSubmissions.userId,
+          subjectType: distributionSubmissions.subjectType,
+          subjectId: distributionSubmissions.subjectId,
+          status: distributionSubmissions.status,
+          targetTiers: distributionSubmissions.targetTiers,
+          releaseDate: distributionSubmissions.releaseDate,
+          copyrightCertified: distributionSubmissions.copyrightCertified,
+          splitsConfirmed: distributionSubmissions.splitsConfirmed,
+          creatorNotes: distributionSubmissions.creatorNotes,
+          adminNotes: distributionSubmissions.adminNotes,
+          aggregatorName: distributionSubmissions.aggregatorName,
+          aggregatorRefId: distributionSubmissions.aggregatorRefId,
+          submittedAt: distributionSubmissions.submittedAt,
+          decidedAt: distributionSubmissions.decidedAt,
+          creatorName: users.name,
+          creatorAvatar: users.avatar,
+        })
+        .from(distributionSubmissions)
+        .leftJoin(users, eq(distributionSubmissions.userId, users.id))
+        .where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(desc(distributionSubmissions.submittedAt));
+    }),
+
+  // Admin updates status + adds notes / aggregator metadata.
+  adminUpdate: adminProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        status: z.enum(['pending', 'in_review', 'submitted', 'live', 'rejected', 'cancelled']).optional(),
+        adminNotes: z.string().max(2000).optional(),
+        aggregatorName: z.string().max(200).optional(),
+        aggregatorRefId: z.string().max(200).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...rest } = input;
+      const [updated] = await db
+        .update(distributionSubmissions)
+        .set({
+          ...rest,
+          decidedBy: ctx.session?.user?.id,
+          decidedAt: new Date(),
+        })
+        .where(eq(distributionSubmissions.id, id))
+        .returning();
+      return updated ?? null;
+    }),
+});
+
 export const appRouter = createRouter({
   auth: authRouter,
   users: usersRouter,
@@ -4343,6 +4497,7 @@ export const appRouter = createRouter({
   pushSubscriptions: pushSubscriptionsRouter,
   verification: verificationRouter,
   search: searchRouter,
+  distribution: distributionRouter,
 });
 
 export type AppRouter = typeof appRouter;
