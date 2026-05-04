@@ -50,9 +50,18 @@ export default function PlaylistDetailPage() {
 
         {/* Playlist header */}
         <div className="flex flex-col sm:flex-row gap-6 items-start mb-10">
-          <div className="w-40 h-40 rounded-2xl bg-gradient-to-br from-brand-500 to-purple-800 flex items-center justify-center text-5xl shrink-0 shadow-2xl shadow-brand-900/30">
-            🎧
-          </div>
+          {playlist.coverUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={playlist.coverUrl}
+              alt=""
+              className="w-40 h-40 rounded-2xl object-cover shrink-0 shadow-2xl shadow-brand-900/30"
+            />
+          ) : (
+            <div className="w-40 h-40 rounded-2xl bg-gradient-to-br from-brand-500 to-purple-800 flex items-center justify-center text-5xl shrink-0 shadow-2xl shadow-brand-900/30">
+              🎧
+            </div>
+          )}
           <div className="flex-1">
             <p className="text-sm text-brand-400 font-semibold uppercase tracking-wider mb-1">
               Playlist
@@ -60,6 +69,28 @@ export default function PlaylistDetailPage() {
             <h1 className="text-4xl font-black mb-3">{playlist.title}</h1>
             {playlist.description && (
               <p className="text-gray-400 mb-3">{playlist.description}</p>
+            )}
+            {(playlist.ownerName || playlist.ownerAvatar) && (
+              <Link
+                href={`/artist/${playlist.userId}`}
+                className="inline-flex items-center gap-2 mb-3 group"
+              >
+                {playlist.ownerAvatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={playlist.ownerAvatar}
+                    alt=""
+                    className="w-7 h-7 rounded-full object-cover ring-2 ring-brand-800/40"
+                  />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-brand-700 flex items-center justify-center text-xs font-bold">
+                    {playlist.ownerName?.charAt(0)?.toUpperCase() ?? '?'}
+                  </div>
+                )}
+                <span className="text-sm text-gray-300 group-hover:text-white transition">
+                  by {playlist.ownerName ?? 'Unknown'}
+                </span>
+              </Link>
             )}
             <div className="flex items-center gap-4 text-sm text-gray-400">
               <span>{playlistTracks?.length ?? 0} tracks</span>

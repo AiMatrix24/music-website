@@ -1013,10 +1013,23 @@ const playlistsRouter = createRouter({
   getById: publicProcedure
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ input }) => {
-      const playlist = await db.query.playlists.findFirst({
-        where: eq(playlists.id, input.id),
-      });
-      return playlist ?? null;
+      const rows = await db
+        .select({
+          id: playlists.id,
+          userId: playlists.userId,
+          title: playlists.title,
+          description: playlists.description,
+          coverUrl: playlists.coverUrl,
+          visibility: playlists.visibility,
+          createdAt: playlists.createdAt,
+          ownerName: users.name,
+          ownerAvatar: users.avatar,
+        })
+        .from(playlists)
+        .leftJoin(users, eq(playlists.userId, users.id))
+        .where(eq(playlists.id, input.id))
+        .limit(1);
+      return rows[0] ?? null;
     }),
 
   create: protectedProcedure
