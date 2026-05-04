@@ -119,9 +119,18 @@ export default function ArtistProfilePage() {
                   className="flex items-center gap-4 rounded-xl bg-[#15151f] p-4 transition hover:bg-[#1a1a2e]"
                 >
                   <span className="text-gray-500 text-sm w-8 text-right">{i + 1}</span>
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-sm font-bold">
-                    {track.genre?.charAt(0) ?? '♪'}
-                  </div>
+                  {(track as { coverUrl?: string | null }).coverUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={(track as { coverUrl?: string | null }).coverUrl ?? ''}
+                      alt=""
+                      className="w-10 h-10 rounded-lg object-cover shrink-0"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-sm font-bold shrink-0">
+                      {track.genre?.charAt(0) ?? '♪'}
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold truncate">{track.title}</p>
                     <p className="text-sm text-gray-400">{track.genre}</p>
