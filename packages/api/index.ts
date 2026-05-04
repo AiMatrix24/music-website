@@ -966,6 +966,63 @@ const albumsRouter = createRouter({
         .where(eq(albumTracks.albumId, input.albumId))
         .orderBy(albumTracks.position);
     }),
+
+  // Owner-gated: only the album's creator can add a track. Verified on the
+  // album row (not the track) — adding someone else's track to your own album
+  // is allowed (e.g. compilations, features), but you can't modify someone
+  // else's album.
+  addTrack: protectedProcedure
+    .input(
+      z.object({
+        albumId: z.string().uuid(),
+        trackId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const album = await db.query.albums.findFirst({
+        where: and(eq(albums.id, input.albumId), eq(albums.userId, ctx.session.user.id)),
+        columns: { id: true },
+      });
+      if (!album) throw new Error('Album not found or you are not the owner');
+
+      // Position = current count, so new tracks append to the end.
+      const existing = await db
+        .select({ count: albumTracks.id })
+        .from(albumTracks)
+        .where(eq(albumTracks.albumId, input.albumId));
+      const position = existing.length;
+
+      const [entry] = await db
+        .insert(albumTracks)
+        .values({
+          albumId: input.albumId,
+          trackId: input.trackId,
+          position,
+        })
+        .returning();
+      return entry;
+    }),
+
+  removeTrack: protectedProcedure
+    .input(
+      z.object({
+        albumId: z.string().uuid(),
+        trackId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const album = await db.query.albums.findFirst({
+        where: and(eq(albums.id, input.albumId), eq(albums.userId, ctx.session.user.id)),
+        columns: { id: true },
+      });
+      if (!album) throw new Error('Album not found or you are not the owner');
+
+      const [deleted] = await db
+        .delete(albumTracks)
+        .where(and(eq(albumTracks.albumId, input.albumId), eq(albumTracks.trackId, input.trackId)))
+        .returning();
+      return deleted ?? null;
+    }),
 });
 
 // ─── Playlists Router ───

@@ -3,14 +3,47 @@
 import { trpc } from '@/lib/trpc/client';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { useState } from 'react';
+import { useToast } from '@/app/components/Toast';
 
 export default function AlbumDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { data: session } = useSession();
+  const { toast } = useToast();
+  const utils = trpc.useUtils();
   const { data: album, isLoading, error } = trpc.albums.getById.useQuery({ id });
   const { data: albumTracks } = trpc.albums.getTracks.useQuery(
     { albumId: id },
     { enabled: !!album }
   );
+
+  const isOwner = !!album && (album as { userId?: string }).userId === session?.user?.id;
+  const [showPicker, setShowPicker] = useState(false);
+
+  // Only fetched when owner opens the picker — avoids leaking other users'
+  // tracks to non-owners and avoids a wasted query for visitors.
+  const { data: myTracks } = trpc.tracks.list.useQuery(
+    { limit: 100, userId: session?.user?.id ?? '' },
+    { enabled: showPicker && !!session?.user?.id }
+  );
+
+  const addTrack = trpc.albums.addTrack.useMutation({
+    onSuccess: () => {
+      utils.albums.getTracks.invalidate({ albumId: id });
+    },
+    onError: (err) => toast(err.message || 'Add failed', 'error'),
+  });
+
+  const removeTrack = trpc.albums.removeTrack.useMutation({
+    onSuccess: () => {
+      utils.albums.getTracks.invalidate({ albumId: id });
+    },
+    onError: (err) => toast(err.message || 'Remove failed', 'error'),
+  });
+
+  const trackIdsInAlbum = new Set(albumTracks?.map((at) => at.track.id) ?? []);
+  const addableTracks = myTracks?.filter((t) => !trackIdsInAlbum.has(t.id)) ?? [];
 
   if (isLoading) {
     return (
@@ -73,35 +106,110 @@ export default function AlbumDetailPage() {
         </div>
 
         {/* Tracklist */}
-        {albumTracks && albumTracks.length > 0 && (
+        {(albumTracks && albumTracks.length > 0) || isOwner ? (
           <div className="rounded-2xl bg-[#15151f] overflow-hidden">
-            <div className="px-6 py-4 border-b border-brand-800/20">
+            <div className="px-6 py-4 border-b border-brand-800/20 flex items-center justify-between">
               <h2 className="text-lg font-bold">Tracklist</h2>
+              {isOwner && (
+                <button
+                  onClick={() => setShowPicker((v) => !v)}
+                  className="text-sm bg-red-600 hover:bg-red-500 text-white px-4 py-1.5 rounded-full transition font-semibold"
+                >
+                  {showPicker ? 'Done' : '+ Add Track'}
+                </button>
+              )}
             </div>
+
+            {/* Owner: track picker. Shows the user's own tracks not already in the album. */}
+            {isOwner && showPicker && (
+              <div className="border-b border-brand-800/20 bg-brand-950/30 px-6 py-4">
+                {addableTracks.length > 0 ? (
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {addableTracks.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => addTrack.mutate({ albumId: id, trackId: t.id })}
+                        disabled={addTrack.isPending}
+                        className="w-full flex items-center gap-3 rounded-lg bg-[#15151f] hover:bg-[#1a1a2e] p-3 text-left transition disabled:opacity-50"
+                      >
+                        {(t as { coverUrl?: string | null }).coverUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={(t as { coverUrl?: string | null }).coverUrl ?? ''}
+                            alt=""
+                            className="w-10 h-10 rounded-lg object-cover shrink-0"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-sm font-bold shrink-0">
+                            {t.genre?.charAt(0) ?? '♪'}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold truncate text-sm">{t.title}</p>
+                          <p className="text-xs text-gray-500">{t.genre ?? 'No genre'}</p>
+                        </div>
+                        <span className="text-xs text-red-400 font-semibold shrink-0">+ Add</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 text-center py-4">
+                    {myTracks === undefined
+                      ? 'Loading your tracks…'
+                      : 'All your tracks are already in this album. Upload more from /dashboard.'}
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="divide-y divide-brand-800/10">
-              {albumTracks.map((at) => (
-                <Link
+              {albumTracks?.map((at) => (
+                <div
                   key={at.track.id}
-                  href={`/track/${at.track.id}`}
                   className="flex items-center gap-4 px-6 py-4 transition hover:bg-brand-950/50"
                 >
-                  <span className="text-gray-500 text-sm w-8 text-right font-mono">
-                    {at.position}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold truncate">{at.track.title}</p>
-                    <p className="text-sm text-gray-400">{at.track.genre}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-gray-400">
-                      {formatDuration(at.track.duration)}
-                    </p>
-                  </div>
-                </Link>
+                  <Link
+                    href={`/track/${at.track.id}`}
+                    className="flex items-center gap-4 flex-1 min-w-0"
+                  >
+                    <span className="text-gray-500 text-sm w-8 text-right font-mono shrink-0">
+                      {at.position + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold truncate">{at.track.title}</p>
+                      <p className="text-sm text-gray-400">{at.track.genre}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm text-gray-400">
+                        {formatDuration(at.track.duration)}
+                      </p>
+                    </div>
+                  </Link>
+                  {isOwner && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm(`Remove "${at.track.title}" from this album?`)) {
+                          removeTrack.mutate({ albumId: id, trackId: at.track.id });
+                        }
+                      }}
+                      disabled={removeTrack.isPending}
+                      className="shrink-0 text-xs text-gray-500 hover:text-red-400 px-2 py-1 transition disabled:opacity-50"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
               ))}
+              {albumTracks?.length === 0 && !showPicker && isOwner && (
+                <div className="px-6 py-8 text-center text-sm text-gray-500">
+                  No tracks yet. Click <span className="font-semibold text-red-400">+ Add Track</span> above.
+                </div>
+              )}
             </div>
           </div>
-        )}
+        ) : null}
 
         {/* Album info */}
         <div className="mt-6 rounded-2xl bg-[#15151f] p-6">
