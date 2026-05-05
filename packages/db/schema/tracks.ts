@@ -45,6 +45,10 @@ export const tracks = pgTable(
     coverUrl: text('cover_url'),
     originalFileKey: text('original_file_key'), // S3 key for raw upload
     license: text('license'),
+    // Composition / songwriting metadata for future MLC + PRO matching.
+    // Captured at upload/edit time; not used for any payment routing yet.
+    iswc: text('iswc'), // International Standard Musical Work Code (e.g. T-345246800-1)
+    ipi: text('ipi'),   // Interested Parties Information number (writer/publisher id)
     visibility: visibilityEnum('visibility').default('public').notNull(),
     status: trackStatusEnum('status').default('uploading').notNull(),
     price: integer('price'), // INTEGER CENTS, null = free

@@ -6,6 +6,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { NotificationBell } from './NotificationCenter';
+import { VerifiedBadge } from './VerifiedBadge';
 
 export function Navbar() {
   const { data: session, status } = useSession();
@@ -115,7 +116,7 @@ export function Navbar() {
               <Link
                 href="/settings"
                 aria-label="Settings"
-                className="block transition hover:opacity-80"
+                className="relative block transition hover:opacity-80"
               >
                 {session.user?.image ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -128,6 +129,11 @@ export function Navbar() {
                   <div className="w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center text-sm font-bold">
                     {session.user?.name?.charAt(0)?.toUpperCase() ?? '?'}
                   </div>
+                )}
+                {(session.user as { verifiedAt?: string | null })?.verifiedAt && (
+                  <span className="absolute -bottom-0.5 -right-0.5 ring-2 ring-brand-950 rounded-full">
+                    <VerifiedBadge size="sm" />
+                  </span>
                 )}
               </Link>
               <SubscriptionBadge role={(session.user as { role?: string })?.role} />

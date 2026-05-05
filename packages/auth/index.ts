@@ -160,11 +160,14 @@ export const authConfig: NextAuthConfig = {
         try {
           const fresh = await db.query.users.findFirst({
             where: eq(users.id, token.id as string),
-            columns: { role: true, avatar: true },
+            columns: { role: true, avatar: true, verifiedAt: true },
           });
           if (fresh) {
             token.role = fresh.role;
             token.picture = fresh.avatar ?? null;
+            (token as { verifiedAt?: string | null }).verifiedAt = fresh.verifiedAt
+              ? fresh.verifiedAt.toISOString()
+              : null;
           }
           // If the user was deleted we leave the cached role alone — the
           // next protected procedure will fail naturally and the user can
@@ -188,6 +191,8 @@ export const authConfig: NextAuthConfig = {
         // Explicit — NextAuth v5 sometimes drops token.picture from session.user.image
         // when a custom session callback is present.
         session.user.image = (token.picture as string | null | undefined) ?? null;
+        (session.user as { verifiedAt?: string | null }).verifiedAt =
+          (token as { verifiedAt?: string | null }).verifiedAt ?? null;
       }
       return session;
     },

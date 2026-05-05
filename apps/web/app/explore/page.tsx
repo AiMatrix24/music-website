@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { TrackListSkeleton, CardGridSkeleton, ArtistCardSkeleton, EventCardSkeleton } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
+import { AddToPlaylistModal } from '../components/AddToPlaylistModal';
 
 type Tab = 'tracks' | 'creators' | 'events' | 'marketplace' | 'playlists' | 'articles';
 
@@ -44,35 +45,63 @@ export default function ExplorePage() {
 
 function TracksSection() {
   const { data: tracks, isLoading } = trpc.tracks.list.useQuery({ limit: 20 });
+  const [addToPlaylistFor, setAddToPlaylistFor] = useState<{ id: string; title: string } | null>(null);
 
   if (isLoading) return <TrackListSkeleton count={8} />;
 
   return (
     <div className="space-y-3">
       {tracks?.map((track, i) => (
-        <Link
+        <div
           key={track.id}
-          href={`/track/${track.id}`}
           className="flex items-center gap-4 rounded-xl bg-[#15151f] p-4 transition hover:bg-[#1a1a2e]"
         >
-          <span className="text-gray-500 text-sm w-8 text-right">{i + 1}</span>
-          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-lg">
-            {track.genre?.charAt(0) ?? '♪'}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold truncate">{track.title}</p>
-            <p className="text-sm text-gray-400 truncate">
-              {track.artistName ?? 'Unknown creator'} · {track.genre ?? 'Unknown genre'}
-            </p>
-          </div>
-          <div className="text-right hidden sm:block">
-            <p className="text-sm text-gray-400">{formatDuration(track.duration)}</p>
-            <p className="text-xs text-gray-500">{formatPlays(track.playCount ?? 0)} plays</p>
-          </div>
-        </Link>
+          <Link href={`/track/${track.id}`} className="flex items-center gap-4 flex-1 min-w-0">
+            <span className="text-gray-500 text-sm w-8 text-right shrink-0">{i + 1}</span>
+            {(track as { coverUrl?: string | null }).coverUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={(track as { coverUrl?: string | null }).coverUrl ?? ''}
+                alt=""
+                className="w-12 h-12 rounded-lg object-cover shrink-0"
+              />
+            ) : (
+              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-lg shrink-0">
+                {track.genre?.charAt(0) ?? '♪'}
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold truncate">{track.title}</p>
+              <p className="text-sm text-gray-400 truncate">
+                {track.artistName ?? 'Unknown creator'} · {track.genre ?? 'Unknown genre'}
+              </p>
+            </div>
+            <div className="text-right hidden sm:block shrink-0">
+              <p className="text-sm text-gray-400">{formatDuration(track.duration)}</p>
+              <p className="text-xs text-gray-500">{formatPlays(track.playCount ?? 0)} plays</p>
+            </div>
+          </Link>
+          <button
+            type="button"
+            onClick={() => setAddToPlaylistFor({ id: track.id, title: track.title })}
+            aria-label="Add to playlist"
+            title="Add to playlist"
+            className="shrink-0 rounded-lg bg-brand-950 hover:bg-brand-900 border border-brand-800/40 px-2.5 py-1.5 text-xs font-bold text-gray-400 hover:text-white transition"
+          >
+            +
+          </button>
+        </div>
       ))}
       {(!tracks || tracks.length === 0) && (
         <EmptyState icon="🎵" title="No tracks yet" description="Be the first to upload a track and share your music with the world." actionLabel="Learn More" actionHref="/subscribe" />
+      )}
+      {addToPlaylistFor && (
+        <AddToPlaylistModal
+          trackId={addToPlaylistFor.id}
+          trackTitle={addToPlaylistFor.title}
+          isOpen={true}
+          onClose={() => setAddToPlaylistFor(null)}
+        />
       )}
     </div>
   );

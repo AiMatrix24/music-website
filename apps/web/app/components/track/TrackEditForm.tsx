@@ -27,6 +27,8 @@ export type EditableTrack = {
   price: number | null;
   audioUrl: string | null;
   coverUrl: string | null;
+  iswc?: string | null;
+  ipi?: string | null;
 };
 
 export function TrackEditForm({
@@ -45,6 +47,8 @@ export function TrackEditForm({
   const [visibility, setVisibility] = useState(track.visibility);
   const [price, setPrice] = useState(track.price ? (track.price / 100).toFixed(2) : '');
   const [coverUrl, setCoverUrl] = useState(track.coverUrl ?? '');
+  const [iswc, setIswc] = useState(track.iswc ?? '');
+  const [ipi, setIpi] = useState(track.ipi ?? '');
 
   // Audio replacement
   const [audioUrl, setAudioUrl] = useState(track.audioUrl ?? '');
@@ -136,6 +140,8 @@ export function TrackEditForm({
       price: price ? Math.round(parseFloat(price) * 100) : null,
       audioUrl: audioMode !== 'keep' && audioUrl ? audioUrl : undefined,
       coverUrl: coverUrl || null,
+      iswc: iswc.trim() || null,
+      ipi: ipi.trim() || null,
     });
   };
 
@@ -297,6 +303,41 @@ export function TrackEditForm({
           ))}
         </div>
       </div>
+
+      {/* Composition / songwriting metadata — for future MLC + PRO matching.
+          Not used for any payment routing yet. */}
+      <details className="rounded-xl bg-brand-950/30 border border-brand-800/20 p-3">
+        <summary className="text-xs font-bold uppercase tracking-wide text-gray-400 cursor-pointer">
+          Composition metadata (optional)
+        </summary>
+        <p className="text-xs text-gray-500 mt-2 mb-3">
+          Leave blank if you don't have these yet — you can fill them in later. Used for matching your work in songwriter rights databases.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">ISWC</label>
+            <input
+              type="text"
+              value={iswc}
+              onChange={(e) => setIswc(e.target.value)}
+              placeholder="T-345246800-1"
+              maxLength={20}
+              className="w-full bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:border-brand-500 outline-none transition font-mono"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">IPI / writer ID</label>
+            <input
+              type="text"
+              value={ipi}
+              onChange={(e) => setIpi(e.target.value)}
+              placeholder="00012345678"
+              maxLength={20}
+              className="w-full bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:border-brand-500 outline-none transition font-mono"
+            />
+          </div>
+        </div>
+      </details>
 
       <button
         type="submit"

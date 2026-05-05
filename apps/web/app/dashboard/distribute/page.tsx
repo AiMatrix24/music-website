@@ -250,7 +250,7 @@ export default function DistributePage() {
                   className="mt-1 accent-red-600"
                 />
                 <span className="text-sm text-gray-300">
-                  Royalty splits for this {subjectType} are correct in my account. Distribution earnings will follow the splits configured at the time of revenue posting.
+                  I will configure royalty splits for this {subjectType} (collaborators, publishers, etc.) before any earnings post. The splits config UI is coming soon — for now, any earnings sit in pending until splits are finalized.
                 </span>
               </label>
             </div>

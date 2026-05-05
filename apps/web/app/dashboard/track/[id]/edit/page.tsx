@@ -79,6 +79,8 @@ export default function EditTrackPage() {
     price: track.price ?? null,
     audioUrl: (track as { audioUrl?: string | null }).audioUrl ?? null,
     coverUrl: (track as { coverUrl?: string | null }).coverUrl ?? null,
+    iswc: (track as { iswc?: string | null }).iswc ?? null,
+    ipi: (track as { ipi?: string | null }).ipi ?? null,
   };
 
   return (

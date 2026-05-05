@@ -100,8 +100,8 @@ export default function DashboardPage() {
           <QuickAction href="/showcase" icon="🔦" label="Creator Showcase" />
           <QuickAction href="/dashboard/earnings" icon="💰" label="Earnings" />
           <QuickAction href="/dashboard/qr" icon="📱" label="QR Codes" />
-          <QuickAction href="/dashboard/rights" icon="📜" label="Rights & Splits" />
-          <QuickAction href="/dashboard/compliance" icon="🛡️" label="Royalty Compliance" />
+          <QuickAction href="/dashboard/rights" icon="📜" label="Rights & Splits" soon />
+          <QuickAction href="/dashboard/compliance" icon="🛡️" label="Royalty Compliance" soon />
           <QuickAction href="/marketplace/songwriting" icon="✏️" label="Songwriter Marketplace" />
           <QuickAction href="/dashboard/radio/channel" icon="📻" label="My Radio Channel" />
           <QuickAction href="/dashboard/radio/studio" icon="🎬" label="Go Live on Radio" />
@@ -219,14 +219,19 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
   );
 }
 
-function QuickAction({ href, icon, label }: { href: string; icon: string; label: string }) {
+function QuickAction({ href, icon, label, soon }: { href: string; icon: string; label: string; soon?: boolean }) {
   return (
     <Link
       href={href}
-      className="flex items-center gap-3 rounded-xl bg-[#15151f] border border-brand-800/20 p-4 transition hover:bg-[#1a1a2e] hover:border-red-600/30"
+      className="flex items-center gap-3 rounded-xl bg-[#15151f] border border-brand-800/20 p-4 transition hover:bg-[#1a1a2e] hover:border-red-600/30 relative"
     >
       <span className="text-2xl">{icon}</span>
-      <span className="font-semibold text-sm">{label}</span>
+      <span className="font-semibold text-sm flex-1">{label}</span>
+      {soon && (
+        <span className="text-[10px] uppercase tracking-wider bg-yellow-600/20 border border-yellow-600/40 text-yellow-400 px-2 py-0.5 rounded-full font-bold">
+          Soon
+        </span>
+      )}
     </Link>
   );
 }

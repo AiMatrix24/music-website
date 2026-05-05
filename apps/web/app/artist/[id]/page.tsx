@@ -3,11 +3,14 @@
 import { trpc } from '@/lib/trpc/client';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useState } from 'react';
 import { FollowButton } from '../../components/FollowButton';
 import { VerifiedBadge } from '../../components/VerifiedBadge';
+import { AddToPlaylistModal } from '../../components/AddToPlaylistModal';
 
 export default function ArtistProfilePage() {
   const { id } = useParams<{ id: string }>();
+  const [addToPlaylistFor, setAddToPlaylistFor] = useState<{ id: string; title: string } | null>(null);
   const { data: artist, isLoading, error } = trpc.users.getById.useQuery({ id });
   const { data: tracks } = trpc.tracks.list.useQuery(
     { userId: id, limit: 20 },
@@ -113,33 +116,43 @@ export default function ArtistProfilePage() {
             <h2 className="text-2xl font-bold mb-4">Tracks</h2>
             <div className="space-y-3">
               {tracks.map((track, i) => (
-                <Link
+                <div
                   key={track.id}
-                  href={`/track/${track.id}`}
                   className="flex items-center gap-4 rounded-xl bg-[#15151f] p-4 transition hover:bg-[#1a1a2e]"
                 >
-                  <span className="text-gray-500 text-sm w-8 text-right">{i + 1}</span>
-                  {(track as { coverUrl?: string | null }).coverUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={(track as { coverUrl?: string | null }).coverUrl ?? ''}
-                      alt=""
-                      className="w-10 h-10 rounded-lg object-cover shrink-0"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-sm font-bold shrink-0">
-                      {track.genre?.charAt(0) ?? '♪'}
+                  <Link href={`/track/${track.id}`} className="flex items-center gap-4 flex-1 min-w-0">
+                    <span className="text-gray-500 text-sm w-8 text-right shrink-0">{i + 1}</span>
+                    {(track as { coverUrl?: string | null }).coverUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={(track as { coverUrl?: string | null }).coverUrl ?? ''}
+                        alt=""
+                        className="w-10 h-10 rounded-lg object-cover shrink-0"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-sm font-bold shrink-0">
+                        {track.genre?.charAt(0) ?? '♪'}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold truncate">{track.title}</p>
+                      <p className="text-sm text-gray-400">{track.genre}</p>
                     </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold truncate">{track.title}</p>
-                    <p className="text-sm text-gray-400">{track.genre}</p>
-                  </div>
-                  <div className="text-right hidden sm:block">
-                    <p className="text-sm text-gray-400">{formatDuration(track.duration)}</p>
-                    <p className="text-xs text-gray-500">{formatPlays(track.playCount ?? 0)} plays</p>
-                  </div>
-                </Link>
+                    <div className="text-right hidden sm:block shrink-0">
+                      <p className="text-sm text-gray-400">{formatDuration(track.duration)}</p>
+                      <p className="text-xs text-gray-500">{formatPlays(track.playCount ?? 0)} plays</p>
+                    </div>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setAddToPlaylistFor({ id: track.id, title: track.title })}
+                    aria-label="Add to playlist"
+                    title="Add to playlist"
+                    className="shrink-0 rounded-lg bg-brand-950 hover:bg-brand-900 border border-brand-800/40 px-2.5 py-1.5 text-xs font-bold text-gray-400 hover:text-white transition"
+                  >
+                    +
+                  </button>
+                </div>
               ))}
             </div>
           </div>
@@ -179,6 +192,15 @@ export default function ArtistProfilePage() {
           </div>
         )}
       </div>
+
+      {addToPlaylistFor && (
+        <AddToPlaylistModal
+          trackId={addToPlaylistFor.id}
+          trackTitle={addToPlaylistFor.title}
+          isOpen={true}
+          onClose={() => setAddToPlaylistFor(null)}
+        />
+      )}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { Breadcrumbs } from '../../components/Breadcrumbs';
 import { TrackComments } from '../../components/TrackComments';
 import { TipJar } from '../../components/TipJar';
 import { VerifiedBadge } from '../../components/VerifiedBadge';
+import { AddToPlaylistModal } from '../../components/AddToPlaylistModal';
 
 export default function TrackDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -22,6 +23,7 @@ export default function TrackDetailPage() {
   // Purchase status — hasPurchased returns the purchase row if user owns it, else null
   const { data: ownership } = trpc.trackPurchases.hasPurchased.useQuery({ trackId: id });
   const [linkCopied, setLinkCopied] = useState(false);
+  const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
 
   const handleCopyLink = useCallback(() => {
     const url = typeof window !== 'undefined' ? window.location.href : '';
@@ -106,6 +108,12 @@ export default function TrackDetailPage() {
               />
               <LikeButton initialCount={Math.floor((track.playCount ?? 0) * 0.12)} />
               <ShareButton title={`${track.title} on OPYNX`} text={`Listen to ${track.title} by ${track.artistName ?? 'Unknown'} on OPYNX`} />
+              <button
+                onClick={() => setShowAddToPlaylist(true)}
+                className="rounded-full bg-brand-950 hover:bg-brand-900 border border-brand-800/40 px-4 py-2 text-sm font-semibold text-gray-300 hover:text-white transition"
+              >
+                + Playlist
+              </button>
               {/* Buy button (only for paid tracks not yet owned) */}
               {track.price && track.price > 0 && !ownership && (
                 <Link
@@ -257,6 +265,15 @@ export default function TrackDetailPage() {
           </div>
         )}
       </div>
+
+      {showAddToPlaylist && (
+        <AddToPlaylistModal
+          trackId={track.id}
+          trackTitle={track.title}
+          isOpen={true}
+          onClose={() => setShowAddToPlaylist(false)}
+        />
+      )}
     </div>
   );
 }
