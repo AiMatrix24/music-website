@@ -8,7 +8,7 @@
  * Errors are logged but never thrown; notification persistence must never
  * fail a webhook (the user already paid).
  */
-import { db, notifications, pushSubscriptions } from '@opynx/db';
+import { db, notifications, pushSubscriptions, users } from '@opynx/db';
 import { eq } from 'drizzle-orm';
 import webpush from 'web-push';
 
@@ -107,7 +107,49 @@ async function sendPush(args: NotifyArgs): Promise<void> {
   );
 }
 
+/**
+ * Map notification types → user preference column. Types not in the map
+ * (system, verification_status) bypass prefs and always notify — those
+ * are security/compliance, not noise.
+ */
+function prefColumnForType(type: NotificationType): keyof typeof users.$inferSelect | null {
+  switch (type) {
+    case 'follow': return 'notifFollows';
+    case 'ticket_sale': return 'notifTicketSales';
+    case 'track_sale': return 'notifTrackSales';
+    case 'tip_received': return 'notifTips';
+    case 'comment':
+    case 'mention': return 'notifComments';
+    case 'milestone': return 'notifMilestones';
+    case 'payout_processed':
+    case 'payout_rejected': return 'notifPayouts';
+    case 'subscription':
+    case 'marketplace_sale': return 'notifTrackSales'; // grouped with track_sales
+    default: return null; // system, verification_status — always notify
+  }
+}
+
+async function userOptedIn(userId: string, type: NotificationType): Promise<boolean> {
+  const col = prefColumnForType(type);
+  if (!col) return true; // mandatory types
+  try {
+    const u = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+      columns: { [col]: true } as never,
+    });
+    if (!u) return true; // user gone — don't block
+    return Boolean((u as Record<string, unknown>)[col]);
+  } catch (err) {
+    console.error('[notify] pref lookup failed, defaulting to send:', err);
+    return true;
+  }
+}
+
 export async function notify(args: NotifyArgs): Promise<void> {
+  // Check user's per-type pref first. Skip both channels (bell + push) if opted out.
+  const optedIn = await userOptedIn(args.userId, args.type);
+  if (!optedIn) return;
+
   // 1) In-app bell row — always attempted first
   try {
     await db.insert(notifications).values({

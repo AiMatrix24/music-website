@@ -86,6 +86,14 @@ const usersRouter = createRouter({
         socialSpotify: z.string().max(200).optional(),
         socialSoundcloud: z.string().max(200).optional(),
         socialWebsite: z.string().max(200).optional(),
+        notifFollows: z.boolean().optional(),
+        notifTicketSales: z.boolean().optional(),
+        notifTrackSales: z.boolean().optional(),
+        notifTips: z.boolean().optional(),
+        notifComments: z.boolean().optional(),
+        notifMilestones: z.boolean().optional(),
+        notifPayouts: z.boolean().optional(),
+        digestWeekly: z.boolean().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -513,6 +521,8 @@ const tracksRouter = createRouter({
           // For the verified ✓ badge next to the byline on /track/[id]
           artistVerifiedAt: users.verifiedAt,
           coverUrl: tracks.coverUrl,
+          iswc: tracks.iswc,
+          ipi: tracks.ipi,
           rawAudioUrl: sql<string | null>`COALESCE(${tracks.audioUrl320}, ${tracks.audioUrl128})`,
         })
         .from(tracks)
@@ -618,6 +628,8 @@ const tracksRouter = createRouter({
         visibility: z.enum(['public', 'private', 'unlisted', 'subscribers_only']).optional(),
         audioUrl: z.string().url().optional(),
         coverUrl: z.string().url().nullable().optional(),
+        iswc: z.string().max(20).nullable().optional(),
+        ipi: z.string().max(20).nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {

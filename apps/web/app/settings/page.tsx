@@ -51,14 +51,15 @@ export default function SettingsPage() {
   const [payoutThreshold, setPayoutThreshold] = useState('25.00');
   const [payoutSchedule, setPayoutSchedule] = useState<'weekly' | 'biweekly' | 'monthly'>('monthly');
 
-  // Notification state
-  const [notifNewFollower, setNotifNewFollower] = useState(true);
-  const [notifTicketSale, setNotifTicketSale] = useState(true);
-  const [notifBroadcast, setNotifBroadcast] = useState(true);
-  const [notifWeeklyDigest, setNotifWeeklyDigest] = useState(false);
-  const [notifPlayMilestone, setNotifPlayMilestone] = useState(true);
-  const [notifNewComment, setNotifNewComment] = useState(true);
-  const [notifPayoutComplete, setNotifPayoutComplete] = useState(true);
+  // Notification state — names match the users.* DB columns directly.
+  const [notifFollows, setNotifFollows] = useState(true);
+  const [notifTicketSales, setNotifTicketSales] = useState(true);
+  const [notifTrackSales, setNotifTrackSales] = useState(true);
+  const [notifTips, setNotifTips] = useState(true);
+  const [notifMilestones, setNotifMilestones] = useState(true);
+  const [notifComments, setNotifComments] = useState(true);
+  const [notifPayouts, setNotifPayouts] = useState(true);
+  const [digestWeekly, setDigestWeekly] = useState(false);
 
   // Privacy state
   const [profileVisibility, setProfileVisibility] = useState<'public' | 'followers' | 'private'>('public');
@@ -88,6 +89,15 @@ export default function SettingsPage() {
       setSocialSpotify(d.socialSpotify ?? '');
       setSocialSoundcloud(d.socialSoundcloud ?? '');
       setSocialWebsite(d.socialWebsite ?? '');
+      // Hydrate notification prefs (default true except digestWeekly which is opt-in)
+      setNotifFollows(d.notifFollows ?? true);
+      setNotifTicketSales(d.notifTicketSales ?? true);
+      setNotifTrackSales(d.notifTrackSales ?? true);
+      setNotifTips(d.notifTips ?? true);
+      setNotifMilestones(d.notifMilestones ?? true);
+      setNotifComments(d.notifComments ?? true);
+      setNotifPayouts(d.notifPayouts ?? true);
+      setDigestWeekly(d.digestWeekly ?? false);
     }
   }, [profile.data]);
 
@@ -458,21 +468,34 @@ export default function SettingsPage() {
           <div className="space-y-6">
             <PushNotificationToggle />
             <div className="rounded-2xl bg-[#15151f] p-6">
-              <h2 className="text-lg font-bold mb-4">Email Notifications</h2>
+              <h2 className="text-lg font-bold mb-4">Per-type notifications</h2>
+              <p className="text-xs text-gray-500 mb-4">Turn off any category to stop in-app + push notifications for it. Verification updates and system alerts always notify.</p>
               <div className="space-y-5">
-                <Toggle label="New followers" desc="When someone follows you" checked={notifNewFollower} onChange={setNotifNewFollower} />
-                <Toggle label="Ticket sales" desc="When someone buys a ticket to your event" checked={notifTicketSale} onChange={setNotifTicketSale} />
-                <Toggle label="Creator broadcasts" desc="Messages from creators you follow" checked={notifBroadcast} onChange={setNotifBroadcast} />
-                <Toggle label="Play milestones" desc="When your tracks hit 1K, 10K, 100K plays" checked={notifPlayMilestone} onChange={setNotifPlayMilestone} />
-                <Toggle label="New comments" desc="When someone comments on your tracks" checked={notifNewComment} onChange={setNotifNewComment} />
-                <Toggle label="Payout complete" desc="When a payout has been processed" checked={notifPayoutComplete} onChange={setNotifPayoutComplete} />
-                <Toggle label="Weekly digest" desc="Summary of your platform activity" checked={notifWeeklyDigest} onChange={setNotifWeeklyDigest} />
+                <Toggle label="New followers" desc="When someone follows you" checked={notifFollows} onChange={setNotifFollows} />
+                <Toggle label="Ticket sales" desc="When someone buys a ticket to your event" checked={notifTicketSales} onChange={setNotifTicketSales} />
+                <Toggle label="Track sales + subscriptions" desc="When someone buys your track or subscribes" checked={notifTrackSales} onChange={setNotifTrackSales} />
+                <Toggle label="Tips received" desc="When a fan tips you" checked={notifTips} onChange={setNotifTips} />
+                <Toggle label="Play milestones" desc="When your tracks hit 1K, 10K, 100K plays" checked={notifMilestones} onChange={setNotifMilestones} />
+                <Toggle label="New comments + mentions" desc="When someone comments on your tracks or mentions you" checked={notifComments} onChange={setNotifComments} />
+                <Toggle label="Payouts" desc="When a payout has been processed or rejected" checked={notifPayouts} onChange={setNotifPayouts} />
+                <Toggle label="Weekly email digest" desc="Once-a-week summary of your plays, follows, and earnings" checked={digestWeekly} onChange={setDigestWeekly} />
               </div>
             </div>
 
-            <button onClick={() => toast('Notification preferences saved!')}
-              className="w-full rounded-full bg-red-600 py-3 font-semibold text-white transition hover:bg-red-500">
-              Save Notification Settings
+            <button
+              onClick={() => updateMutation.mutate({
+                notifFollows,
+                notifTicketSales,
+                notifTrackSales,
+                notifTips,
+                notifMilestones,
+                notifComments,
+                notifPayouts,
+                digestWeekly,
+              })}
+              disabled={updateMutation.isPending}
+              className="w-full rounded-full bg-red-600 py-3 font-semibold text-white transition hover:bg-red-500 disabled:opacity-50">
+              {updateMutation.isPending ? 'Saving…' : 'Save Notification Settings'}
             </button>
           </div>
         )}

@@ -3,6 +3,7 @@ import {
   uuid,
   text,
   timestamp,
+  boolean,
   pgEnum,
   index,
   uniqueIndex,
@@ -46,6 +47,22 @@ export const users = pgTable(
     // Stamped when the user finishes (or explicitly skips) the /onboarding
     // flow. Null = banner shows on the dashboard prompting them to set up.
     onboardingCompletedAt: timestamp('onboarding_completed_at', { withTimezone: true }),
+    // Per-type notification opt-out switches. Default all true (notify by
+    // default). Checked inside notify() before sending in-app bell + push.
+    // 'system' and 'verification_status' types ignore these and always
+    // notify — they're security/compliance, not noise.
+    notifFollows: boolean('notif_follows').default(true).notNull(),
+    notifTicketSales: boolean('notif_ticket_sales').default(true).notNull(),
+    notifTrackSales: boolean('notif_track_sales').default(true).notNull(),
+    notifTips: boolean('notif_tips').default(true).notNull(),
+    notifComments: boolean('notif_comments').default(true).notNull(),
+    notifMilestones: boolean('notif_milestones').default(true).notNull(),
+    notifPayouts: boolean('notif_payouts').default(true).notNull(),
+    // Email digest opt-in. Off by default — opt-in not opt-out.
+    digestWeekly: boolean('digest_weekly').default(false).notNull(),
+    // Last time we sent this user a digest. Null = never sent (so first
+    // digest fires on the next cron tick after they opt in).
+    lastDigestSentAt: timestamp('last_digest_sent_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),
