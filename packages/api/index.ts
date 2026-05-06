@@ -572,6 +572,16 @@ const tracksRouter = createRouter({
           status: 'published',
         })
         .returning();
+
+      // Auto-promote free → creator on first track. The conditional WHERE
+      // makes this a no-op for any role !== 'free' (admin, super_admin,
+      // creator, etc. are all preserved). Role refresh on the next jwt()
+      // tick (60s TTL) propagates the new role to the live session.
+      await db
+        .update(users)
+        .set({ role: 'creator', updatedAt: new Date() })
+        .where(and(eq(users.id, ctx.session.user.id), eq(users.role, 'free')));
+
       return track;
     }),
 
@@ -614,6 +624,14 @@ const tracksRouter = createRouter({
           duration: input.duration ?? null,
         })
         .returning();
+
+      // Auto-promote free → creator on first track. See tracks.create above
+      // for rationale. Conditional WHERE makes this a no-op for non-free roles.
+      await db
+        .update(users)
+        .set({ role: 'creator', updatedAt: new Date() })
+        .where(and(eq(users.id, ctx.session.user.id), eq(users.role, 'free')));
+
       return track;
     }),
 
