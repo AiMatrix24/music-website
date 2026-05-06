@@ -7,6 +7,7 @@ import {
   publicProcedure,
   protectedProcedure,
   adminProcedure,
+  rateLimit,
 } from '../../apps/web/lib/trpc/server';
 import { notify, fmtCents } from '../../apps/web/lib/services/notifications';
 import { db } from '@opynx/db';
@@ -1388,6 +1389,7 @@ const eventsRouter = createRouter({
 // ─── Tickets Router ───
 const ticketsRouter = createRouter({
   purchase: protectedProcedure
+    .use(rateLimit({ limit: 10, windowSec: 60 }))
     .input(
       z.object({
         ticketTypeId: z.string().uuid(),
@@ -1813,6 +1815,7 @@ const marketplaceRouter = createRouter({
    * out-of-band for now (MVP).
    */
   buy: protectedProcedure
+    .use(rateLimit({ limit: 10, windowSec: 60 }))
     .input(
       z.object({
         listingId: z.string().uuid(),
@@ -2384,6 +2387,7 @@ const commentsRouter = createRouter({
     }),
 
   add: protectedProcedure
+    .use(rateLimit({ limit: 30, windowSec: 60 }))
     .input(
       z.object({
         trackId: z.string().uuid(),
@@ -2508,6 +2512,7 @@ const broadcastsRouter = createRouter({
     }),
 
   send: protectedProcedure
+    .use(rateLimit({ limit: 5, windowSec: 3600 }))
     .input(
       z.object({
         title: z.string().min(1).max(200),
@@ -2963,6 +2968,7 @@ const trackPurchasesRouter = createRouter({
    * see owned tracks.
    */
   buy: protectedProcedure
+    .use(rateLimit({ limit: 10, windowSec: 60 }))
     .input(z.object({ trackId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
@@ -3134,6 +3140,7 @@ const trackPurchasesRouter = createRouter({
  */
 const tipsRouter = createRouter({
   send: protectedProcedure
+    .use(rateLimit({ limit: 10, windowSec: 60 }))
     .input(
       z.object({
         recipientUserId: z.string().uuid(),
@@ -4336,6 +4343,7 @@ const distributionRouter = createRouter({
   // Creator submits a request to distribute one of their own tracks/albums.
   // Validates the subject belongs to the caller before creating the row.
   submit: protectedProcedure
+    .use(rateLimit({ limit: 5, windowSec: 3600 }))
     .input(
       z.object({
         subjectType: z.enum(['track', 'album']),

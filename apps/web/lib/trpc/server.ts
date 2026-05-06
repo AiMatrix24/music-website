@@ -2,6 +2,7 @@ import { initTRPC, TRPCError } from '@trpc/server';
 import superjson from 'superjson';
 import pino from 'pino';
 import type { Session } from 'next-auth';
+import { checkRateLimit } from '../services/rate-limit';
 
 // ─── Logger ───
 const logger = pino({
@@ -97,6 +98,38 @@ const enforceAdmin = t.middleware(async ({ ctx, next }) => {
     },
   });
 });
+
+// ─── Middleware factory: Rate Limit ───
+/**
+ * Per-user fixed-window rate limit. Use on money + spam-prone mutations:
+ *
+ *   tipsRouter = createRouter({
+ *     send: protectedProcedure.use(rateLimit({ limit: 10, windowSec: 60 })).input(...).mutation(...)
+ *   })
+ *
+ * Keys are scoped by tRPC path + user id; users are isolated from each
+ * other. Anonymous callers fall back to a coarse IP-derived key so they
+ * still get rate-limited (less precise than userId but better than nothing).
+ *
+ * Fails OPEN on Redis errors — logs but doesn't block.
+ */
+export function rateLimit(opts: { limit: number; windowSec: number }) {
+  return t.middleware(async ({ ctx, path, next }) => {
+    const userId = ctx.session?.user?.id;
+    const ip = ctx.req?.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'anon';
+    const id = userId ?? `ip:${ip}`;
+    const key = `rl:${path}:${id}`;
+
+    const result = await checkRateLimit({ key, limit: opts.limit, windowSec: opts.windowSec });
+    if (!result.allowed) {
+      throw new TRPCError({
+        code: 'TOO_MANY_REQUESTS',
+        message: `You're doing that too quickly. Try again in ${result.retryAfterSec ?? opts.windowSec}s.`,
+      });
+    }
+    return next();
+  });
+}
 
 // ─── Exports ───
 export const createRouter = t.router;
