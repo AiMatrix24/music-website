@@ -88,7 +88,7 @@ export default function HomePage() {
             Full transparency. Every cent accounted for. Verified on Polygon.
           </p>
           </FadeIn>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <WaterfallCard
               amount="$1.00"
               label="Creator"
@@ -102,9 +102,15 @@ export default function HomePage() {
               color="from-pink-500 to-rose-500"
             />
             <WaterfallCard
-              amount="$7.20"
+              amount="$1.00–$1.50"
+              label="Outlier"
+              description="VIP influencers + brand partners who drove scaled reach."
+              color="from-amber-500 to-orange-500"
+            />
+            <WaterfallCard
+              amount="$5.73–$7.48"
               label="Platform"
-              description="Infrastructure, CDN, support, and growth."
+              description="Infrastructure, CDN, support, and growth. Varies by referral path."
               color="from-blue-500 to-cyan-500"
             />
           </div>
