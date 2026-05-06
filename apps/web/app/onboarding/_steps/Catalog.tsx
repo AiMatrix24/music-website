@@ -67,6 +67,10 @@ export function CatalogStep({ onNext, onBack }: { onNext: () => void; onBack: ()
   const [license, setLicense] = useState(LICENSES[0].value);
   const [visibility] = useState<'public' | 'private' | 'unlisted' | 'subscribers_only'>('public');
   const [submitting, setSubmitting] = useState(false);
+  // Batch-level originality gate. Bulk upload assumes original works only —
+  // creators with covers/samples should use the single-upload path where
+  // the cover-attestation form lives.
+  const [allOriginal, setAllOriginal] = useState(false);
 
   const uploadMutation = trpc.tracks.upload.useMutation();
 
@@ -103,6 +107,10 @@ export function CatalogStep({ onNext, onBack }: { onNext: () => void; onBack: ()
     if (pending.length === 0) return;
     if (pending.some((t) => !t.title.trim())) {
       toast('Every track needs a title.', 'error');
+      return;
+    }
+    if (!allOriginal) {
+      toast('Confirm all tracks are original works you wrote + own. For covers/samples, use the single-track uploader.', 'error');
       return;
     }
     setSubmitting(true);
@@ -272,6 +280,21 @@ export function CatalogStep({ onNext, onBack }: { onNext: () => void; onBack: ()
             ))}
           </select>
         </div>
+      )}
+
+      {/* Originality gate. Only shown when there's something to upload. */}
+      {tracks.length > 0 && !allDone && (
+        <label className="flex items-start gap-3 cursor-pointer rounded-xl bg-brand-950/40 border border-brand-800/30 p-4">
+          <input
+            type="checkbox"
+            checked={allOriginal}
+            onChange={(e) => setAllOriginal(e.target.checked)}
+            className="mt-1 accent-red-600"
+          />
+          <span className="text-xs text-gray-300">
+            I confirm every track in this batch is an <strong>original work</strong> I wrote and own. For covers, samples, or interpolations, use the single-track uploader where you can attest how rights were cleared.
+          </span>
+        </label>
       )}
 
       {/* Action row */}

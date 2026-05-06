@@ -4,6 +4,7 @@ import {
   text,
   integer,
   timestamp,
+  boolean,
   pgEnum,
   jsonb,
   index,
@@ -49,6 +50,12 @@ export const tracks = pgTable(
     // Captured at upload/edit time; not used for any payment routing yet.
     iswc: text('iswc'), // International Standard Musical Work Code (e.g. T-345246800-1)
     ipi: text('ipi'),   // Interested Parties Information number (writer/publisher id)
+    // Cover-song / sample / interpolation gate. If derivativeWork=true, the
+    // creator must provide derivativeAttestation describing how they cleared
+    // rights (mechanical license number, public domain status, etc). Enforced
+    // at the tracks.create + tracks.upload procedure level.
+    derivativeWork: boolean('derivative_work').default(false).notNull(),
+    derivativeAttestation: text('derivative_attestation'),
     visibility: visibilityEnum('visibility').default('public').notNull(),
     status: trackStatusEnum('status').default('uploading').notNull(),
     price: integer('price'), // INTEGER CENTS, null = free

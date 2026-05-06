@@ -524,6 +524,8 @@ const tracksRouter = createRouter({
           coverUrl: tracks.coverUrl,
           iswc: tracks.iswc,
           ipi: tracks.ipi,
+          derivativeWork: tracks.derivativeWork,
+          derivativeAttestation: tracks.derivativeAttestation,
           rawAudioUrl: sql<string | null>`COALESCE(${tracks.audioUrl320}, ${tracks.audioUrl128})`,
         })
         .from(tracks)
@@ -551,9 +553,18 @@ const tracksRouter = createRouter({
         price: z.number().int().min(0).optional(),
         audioUrl: z.string().url().optional(),
         coverUrl: z.string().url().optional(),
+        derivativeWork: z.boolean().default(false),
+        derivativeAttestation: z.string().max(2000).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Cover-song / sample / interpolation gate: if derivativeWork, the
+      // creator MUST attest how they cleared rights. Block at the procedure
+      // level so a malicious client bypassing the form can't slip through.
+      if (input.derivativeWork && (!input.derivativeAttestation || input.derivativeAttestation.trim().length < 5)) {
+        throw new Error('Derivative works (covers, samples, interpolations) require a rights-clearance attestation.');
+      }
+
       const [track] = await db
         .insert(tracks)
         .values({
@@ -570,6 +581,8 @@ const tracksRouter = createRouter({
           audioUrl320: input.audioUrl ?? null,
           coverUrl: input.coverUrl ?? null,
           status: 'published',
+          derivativeWork: input.derivativeWork,
+          derivativeAttestation: input.derivativeAttestation?.trim() ?? null,
         })
         .returning();
 
@@ -600,9 +613,16 @@ const tracksRouter = createRouter({
         duration: z.number().int().min(0).optional(),
         // Legacy field kept for backwards compatibility with old form callers
         originalFileKey: z.string().optional(),
+        derivativeWork: z.boolean().default(false),
+        derivativeAttestation: z.string().max(2000).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Cover-song / sample / interpolation gate — see tracks.create.
+      if (input.derivativeWork && (!input.derivativeAttestation || input.derivativeAttestation.trim().length < 5)) {
+        throw new Error('Derivative works (covers, samples, interpolations) require a rights-clearance attestation.');
+      }
+
       const [track] = await db
         .insert(tracks)
         .values({
@@ -622,6 +642,8 @@ const tracksRouter = createRouter({
           audioUrl320: input.audioUrl ?? null,
           coverUrl: input.coverUrl ?? null,
           duration: input.duration ?? null,
+          derivativeWork: input.derivativeWork,
+          derivativeAttestation: input.derivativeAttestation?.trim() ?? null,
         })
         .returning();
 
@@ -649,6 +671,8 @@ const tracksRouter = createRouter({
         coverUrl: z.string().url().nullable().optional(),
         iswc: z.string().max(20).nullable().optional(),
         ipi: z.string().max(20).nullable().optional(),
+        derivativeWork: z.boolean().optional(),
+        derivativeAttestation: z.string().max(2000).nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {

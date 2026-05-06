@@ -29,6 +29,8 @@ export type EditableTrack = {
   coverUrl: string | null;
   iswc?: string | null;
   ipi?: string | null;
+  derivativeWork?: boolean;
+  derivativeAttestation?: string | null;
 };
 
 export function TrackEditForm({
@@ -49,6 +51,8 @@ export function TrackEditForm({
   const [coverUrl, setCoverUrl] = useState(track.coverUrl ?? '');
   const [iswc, setIswc] = useState(track.iswc ?? '');
   const [ipi, setIpi] = useState(track.ipi ?? '');
+  const [derivativeWork, setDerivativeWork] = useState(track.derivativeWork ?? false);
+  const [derivativeAttestation, setDerivativeAttestation] = useState(track.derivativeAttestation ?? '');
 
   // Audio replacement
   const [audioUrl, setAudioUrl] = useState(track.audioUrl ?? '');
@@ -130,6 +134,11 @@ export function TrackEditForm({
       return;
     }
     setSubmitting(true);
+    if (derivativeWork && derivativeAttestation.trim().length < 5) {
+      toast('Cover/sample tracks need a rights-clearance attestation.', 'error');
+      setSubmitting(false);
+      return;
+    }
     updateMutation.mutate({
       id: track.id,
       title: title.trim(),
@@ -142,6 +151,8 @@ export function TrackEditForm({
       coverUrl: coverUrl || null,
       iswc: iswc.trim() || null,
       ipi: ipi.trim() || null,
+      derivativeWork,
+      derivativeAttestation: derivativeWork ? derivativeAttestation.trim() : null,
     });
   };
 
@@ -302,6 +313,38 @@ export function TrackEditForm({
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Cover-song / sample / interpolation gate */}
+      <div className="rounded-xl bg-brand-950/30 border border-brand-800/20 p-3">
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={derivativeWork}
+            onChange={(e) => setDerivativeWork(e.target.checked)}
+            className="mt-1 accent-red-600"
+          />
+          <div className="flex-1">
+            <p className="text-sm font-semibold">This track contains a cover, sample, or interpolation</p>
+            <p className="text-xs text-gray-500 mt-1">Tick if you didn't write the underlying composition or your recording uses a sample.</p>
+          </div>
+        </label>
+        {derivativeWork && (
+          <div className="mt-3">
+            <label className="block text-xs font-bold uppercase tracking-wide text-gray-400 mb-1">
+              Rights clearance
+            </label>
+            <textarea
+              value={derivativeAttestation}
+              onChange={(e) => setDerivativeAttestation(e.target.value)}
+              rows={3}
+              maxLength={2000}
+              placeholder="License #, public domain status, direct deal, etc."
+              className="w-full bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:border-brand-500 outline-none transition resize-none"
+            />
+            <p className="text-xs text-gray-600 mt-1">{derivativeAttestation.length}/2000</p>
+          </div>
+        )}
       </div>
 
       {/* Composition / songwriting metadata — for future MLC + PRO matching.

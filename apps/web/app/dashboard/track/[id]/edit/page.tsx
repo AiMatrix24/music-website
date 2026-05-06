@@ -81,6 +81,8 @@ export default function EditTrackPage() {
     coverUrl: (track as { coverUrl?: string | null }).coverUrl ?? null,
     iswc: (track as { iswc?: string | null }).iswc ?? null,
     ipi: (track as { ipi?: string | null }).ipi ?? null,
+    derivativeWork: (track as { derivativeWork?: boolean }).derivativeWork ?? false,
+    derivativeAttestation: (track as { derivativeAttestation?: string | null }).derivativeAttestation ?? null,
   };
 
   return (

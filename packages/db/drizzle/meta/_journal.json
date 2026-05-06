@@ -148,6 +148,13 @@
       "when": 1778019732718,
       "tag": "0020_user_digest_sent_at",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1778088383657,
+      "tag": "0021_tracks_derivative_attestation",
+      "breakpoints": true
     }
   ]
 }

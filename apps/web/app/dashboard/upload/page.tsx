@@ -35,6 +35,9 @@ export default function UploadTrackPage() {
   const [coverUrl, setCoverUrl] = useState<string>('');
   const [uploading, setUploading] = useState(false);
   const [step, setStep] = useState<'details' | 'file' | 'review'>('details');
+  // Cover-song / sample / interpolation gate
+  const [derivativeWork, setDerivativeWork] = useState(false);
+  const [derivativeAttestation, setDerivativeAttestation] = useState('');
 
   if (status !== 'authenticated') {
     return (
@@ -48,6 +51,10 @@ export default function UploadTrackPage() {
   const handlePublish = async () => {
     if (!title) {
       toast('Please enter a track title', 'error');
+      return;
+    }
+    if (derivativeWork && derivativeAttestation.trim().length < 5) {
+      toast('Cover/sample tracks need a rights-clearance attestation. Tell us how you cleared rights (license number, public domain, etc.)', 'error');
       return;
     }
 
@@ -76,6 +83,8 @@ export default function UploadTrackPage() {
         price: price ? Math.round(parseFloat(price) * 100) : undefined,
         audioUrl,
         coverUrl: coverUrl || undefined,
+        derivativeWork,
+        derivativeAttestation: derivativeWork ? derivativeAttestation.trim() : undefined,
       });
 
       toast('Track published successfully!', 'success');
@@ -197,6 +206,41 @@ export default function UploadTrackPage() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Cover-song / sample / interpolation gate. UGC platforms have to
+                ask this — if a creator is using someone else's composition,
+                the platform needs proof they cleared rights. */}
+            <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-5">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={derivativeWork}
+                  onChange={(e) => setDerivativeWork(e.target.checked)}
+                  className="mt-1 accent-red-600"
+                />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold">This track contains a cover, sample, or interpolation of someone else's work</p>
+                  <p className="text-xs text-gray-500 mt-1">Tick this if your recording includes any composition you didn't write yourself, or any sample of an existing recording.</p>
+                </div>
+              </label>
+
+              {derivativeWork && (
+                <div className="mt-4">
+                  <label className="block text-xs font-bold uppercase tracking-wide text-gray-400 mb-1">
+                    How did you clear rights?
+                  </label>
+                  <textarea
+                    value={derivativeAttestation}
+                    onChange={(e) => setDerivativeAttestation(e.target.value)}
+                    rows={3}
+                    maxLength={2000}
+                    placeholder="e.g., 'Mechanical license #ML-12345 via Songfile' / 'Composition is public domain (composer d. before 1928)' / 'Sample cleared via direct deal with rights holder, agreement on file'"
+                    className="w-full bg-brand-950 border border-brand-800/30 rounded-xl px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:border-red-600 outline-none transition resize-none"
+                  />
+                  <p className="text-xs text-gray-600 mt-1">{derivativeAttestation.length}/2000 — required for cover/sample tracks. False attestations are subject to takedown and account suspension.</p>
+                </div>
+              )}
             </div>
 
             <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-5">
