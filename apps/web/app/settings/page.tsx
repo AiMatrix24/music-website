@@ -33,6 +33,7 @@ export default function SettingsPage() {
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
   const [avatar, setAvatar] = useState('');
+  const [bannerUrl, setBannerUrl] = useState('');
   const [customSlug, setCustomSlug] = useState('');
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [walletAddress, setWalletAddress] = useState('');
@@ -81,6 +82,7 @@ export default function SettingsPage() {
       setName(d.name ?? '');
       setBio(d.bio ?? '');
       setAvatar(d.avatar ?? '');
+      setBannerUrl(d.bannerUrl ?? '');
       setWalletAddress(d.walletAddress ?? '');
       setSocialInstagram(d.socialInstagram ?? '');
       setSocialTwitter(d.socialTwitter ?? '');
@@ -120,11 +122,23 @@ export default function SettingsPage() {
     onUploadError: (e) => toast(`Upload failed: ${e.message}`, 'error'),
   });
 
+  const { startUpload: startBannerUpload, isUploading: bannerUploading } = useUploadThing('imageUpload', {
+    onClientUploadComplete: (res) => {
+      const url = res?.[0]?.ufsUrl ?? (res?.[0] as { url?: string })?.url;
+      if (url) {
+        setBannerUrl(url);
+        toast('Banner uploaded — click Save Changes to apply', 'success');
+      }
+    },
+    onUploadError: (e) => toast(`Upload failed: ${e.message}`, 'error'),
+  });
+
   const handleSaveProfile = () => {
     updateMutation.mutate({
       name: name.trim() || undefined,
       bio: bio.trim() || undefined,
       avatar: avatar || undefined,
+      bannerUrl: bannerUrl || null,
       walletAddress: walletAddress.trim() || undefined,
       socialInstagram: socialInstagram.trim() || undefined,
       socialTwitter: socialTwitter.trim() || undefined,
@@ -191,12 +205,43 @@ export default function SettingsPage() {
           <div className="space-y-6">
             {/* Avatar & Banner */}
             <div className="rounded-2xl bg-[#15151f] overflow-hidden">
-              {/* Banner */}
-              <div className="h-32 bg-gradient-to-r from-red-900/40 to-brand-900/40 relative group cursor-pointer">
-                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition bg-black/40">
-                  <span className="text-sm font-semibold">Upload Cover Image</span>
+              {/* Banner — clickable; whole strip is a label wrapping a hidden file input.
+                  Renders the live banner image if set; otherwise the gradient placeholder. */}
+              <label className="block h-32 relative group cursor-pointer overflow-hidden">
+                {bannerUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={bannerUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-r from-red-900/40 to-brand-900/40" />
+                )}
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition bg-black/50">
+                  <span className="text-sm font-semibold">{bannerUploading ? 'Uploading…' : (bannerUrl ? 'Replace banner' : 'Upload banner')}</span>
+                  <span className="text-[11px] text-gray-300">JPG/PNG/WebP · 8MB max · 1500×500 recommended</span>
                 </div>
-              </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={bannerUploading}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) startBannerUpload([file]);
+                    // Clear the input value so re-selecting the same file fires onChange
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+              {bannerUrl && (
+                <div className="px-6 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setBannerUrl('')}
+                    className="text-xs text-gray-500 hover:text-red-400 transition"
+                  >
+                    Remove banner
+                  </button>
+                </div>
+              )}
               {/* Avatar */}
               <div className="px-6 pb-6 -mt-12">
                 <div className="flex items-end gap-4">
@@ -232,6 +277,7 @@ export default function SettingsPage() {
                         Remove
                       </button>
                     )}
+                    <p className="text-[11px] text-gray-600 mt-1">JPG/PNG/WebP · 8MB max · square works best</p>
                   </div>
                 </div>
                 <div className="mt-3">

@@ -78,6 +78,7 @@ const usersRouter = createRouter({
       z.object({
         name: z.string().min(1).max(100).optional(),
         avatar: z.string().url().optional(),
+        bannerUrl: z.string().url().nullable().optional(),
         locale: z.string().max(10).optional(),
         walletAddress: z.string().optional(),
         bio: z.string().max(500).optional(),

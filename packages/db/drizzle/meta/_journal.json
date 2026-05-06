@@ -162,6 +162,13 @@
       "when": 1778088808361,
       "tag": "0022_dmca",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1778092324018,
+      "tag": "0023_users_banner_url",
+      "breakpoints": true
     }
   ]
 }

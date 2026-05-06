@@ -33,6 +33,9 @@ export const users = pgTable(
     email: text('email').unique(),
     name: text('name'),
     avatar: text('avatar'),
+    // Profile cover banner (the wide image above the avatar on /settings and
+    // /artist/[id]). UploadThing imageUpload — 8MB max, recommended 1500×500.
+    bannerUrl: text('banner_url'),
     role: userRoleEnum('role').default('free').notNull(),
     bio: text('bio'),
     walletAddress: text('wallet_address'),
