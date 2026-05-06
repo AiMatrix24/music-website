@@ -214,9 +214,8 @@ export default function SettingsPage() {
                 ) : (
                   <div className="absolute inset-0 bg-gradient-to-r from-red-900/40 to-brand-900/40" />
                 )}
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition bg-black/50">
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition bg-black/50">
                   <span className="text-sm font-semibold">{bannerUploading ? 'Uploading…' : (bannerUrl ? 'Replace banner' : 'Upload banner')}</span>
-                  <span className="text-[11px] text-gray-300">JPG/PNG/WebP · 8MB max · 1500×500 recommended</span>
                 </div>
                 <input
                   type="file"
@@ -231,17 +230,22 @@ export default function SettingsPage() {
                   }}
                 />
               </label>
-              {bannerUrl && (
-                <div className="px-6 pt-2">
+              {/* Always-visible banner caption — was hover-only before, which got
+                  read as belonging to the avatar input directly below it. */}
+              <div className="px-6 pt-2 flex items-center gap-3">
+                <p className="text-[11px] text-gray-600">
+                  <span className="text-gray-400 font-semibold">Banner:</span> JPG/PNG/WebP · 8MB max · 1500×500 recommended
+                </p>
+                {bannerUrl && (
                   <button
                     type="button"
                     onClick={() => setBannerUrl('')}
                     className="text-xs text-gray-500 hover:text-red-400 transition"
                   >
-                    Remove banner
+                    Remove
                   </button>
-                </div>
-              )}
+                )}
+              </div>
               {/* Avatar */}
               <div className="px-6 pb-6 -mt-12">
                 <div className="flex items-end gap-4">
@@ -277,7 +281,9 @@ export default function SettingsPage() {
                         Remove
                       </button>
                     )}
-                    <p className="text-[11px] text-gray-600 mt-1">JPG/PNG/WebP · 8MB max · square works best</p>
+                    <p className="text-[11px] text-gray-600 mt-1">
+                      <span className="text-gray-400 font-semibold">Avatar:</span> JPG/PNG/WebP · 8MB max · square works best
+                    </p>
                   </div>
                 </div>
                 <div className="mt-3">
