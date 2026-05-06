@@ -230,8 +230,12 @@ export default function SettingsPage() {
                   }}
                 />
               </label>
-              {/* Avatar — overlaps the banner via -mt-12, classic profile layout */}
-              <div className="px-6 pb-6 -mt-12">
+              {/* Avatar — overlaps the banner via -mt-12. The `relative z-10`
+                  is critical: the banner label has `position: relative` which
+                  creates a stacking context that paints AFTER static siblings,
+                  so without matching `relative` here the banner would paint on
+                  top of the avatar even though the avatar comes later in DOM. */}
+              <div className="relative z-10 px-6 pb-6 -mt-12">
                 <div className="flex items-end gap-4">
                   {avatar ? (
                     // eslint-disable-next-line @next/next/no-img-element
