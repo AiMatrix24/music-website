@@ -230,23 +230,7 @@ export default function SettingsPage() {
                   }}
                 />
               </label>
-              {/* Always-visible banner caption — was hover-only before, which got
-                  read as belonging to the avatar input directly below it. */}
-              <div className="px-6 pt-2 flex items-center gap-3">
-                <p className="text-[11px] text-gray-600">
-                  <span className="text-gray-400 font-semibold">Banner:</span> JPG/PNG/WebP · 8MB max · 1500×500 recommended
-                </p>
-                {bannerUrl && (
-                  <button
-                    type="button"
-                    onClick={() => setBannerUrl('')}
-                    className="text-xs text-gray-500 hover:text-red-400 transition"
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-              {/* Avatar */}
+              {/* Avatar — overlaps the banner via -mt-12, classic profile layout */}
               <div className="px-6 pb-6 -mt-12">
                 <div className="flex items-end gap-4">
                   {avatar ? (
@@ -289,6 +273,22 @@ export default function SettingsPage() {
                 <div className="mt-3">
                   <p className="font-bold text-lg">{name || session?.user?.name}</p>
                   <p className="text-sm text-gray-400">{session?.user?.email}</p>
+                </div>
+                {/* Banner caption — placed below the avatar row so it doesn't
+                    interrupt the negative-margin overlap of avatar onto banner. */}
+                <div className="mt-4 pt-3 border-t border-brand-800/20 flex items-center gap-3 flex-wrap">
+                  <p className="text-[11px] text-gray-600">
+                    <span className="text-gray-400 font-semibold">Banner:</span> JPG/PNG/WebP · 8MB max · 1500×500 recommended
+                  </p>
+                  {bannerUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setBannerUrl('')}
+                      className="text-xs text-gray-500 hover:text-red-400 transition"
+                    >
+                      Remove banner
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
