@@ -52,6 +52,7 @@ import {
   pushSubscriptions,
   verificationApplications,
   distributionSubmissions,
+  takedownNotices,
 } from '@opynx/db';
 
 // ─── Auth Router ───
@@ -4531,6 +4532,167 @@ const distributionRouter = createRouter({
     }),
 });
 
+// ─── DMCA Router ───
+// Public submission of DMCA §512(c)(3) takedown notices, plus admin queue
+// for reviewing + acting on them. The submit endpoint is rate-limited by
+// IP since rights-holders aren't necessarily authenticated users.
+const dmcaRouter = createRouter({
+  // Anyone can file a takedown — claimants aren't expected to be OPYNX users.
+  submit: publicProcedure
+    .use(rateLimit({ limit: 5, windowSec: 3600 }))
+    .input(
+      z.object({
+        targetUrl: z.string().url(),
+        trackId: z.string().uuid().optional(), // if claimant pasted a /track/[id] link the form can pre-extract this
+        claimantName: z.string().min(1).max(200),
+        claimantEmail: z.string().email().max(200),
+        claimantOrganization: z.string().max(200).optional(),
+        claimantAddress: z.string().min(5).max(1000),
+        claimantPhone: z.string().max(50).optional(),
+        infringedWorkTitle: z.string().min(1).max(500),
+        infringedWorkOwner: z.string().min(1).max(500),
+        description: z.string().min(20).max(5000),
+        // Sworn statements per §512(c)(3)(A)
+        goodFaithStatement: z.boolean().refine((v) => v === true, 'Good faith statement is required'),
+        accuracyStatement: z.boolean().refine((v) => v === true, 'Accuracy statement is required'),
+        signature: z.string().min(2).max(200),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const ip = ctx.req?.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+      const [row] = await db
+        .insert(takedownNotices)
+        .values({
+          trackId: input.trackId ?? null,
+          targetUrl: input.targetUrl,
+          claimantName: input.claimantName,
+          claimantEmail: input.claimantEmail,
+          claimantOrganization: input.claimantOrganization ?? null,
+          claimantAddress: input.claimantAddress,
+          claimantPhone: input.claimantPhone ?? null,
+          infringedWorkTitle: input.infringedWorkTitle,
+          infringedWorkOwner: input.infringedWorkOwner,
+          description: input.description,
+          goodFaithStatement: input.goodFaithStatement,
+          accuracyStatement: input.accuracyStatement,
+          signature: input.signature,
+          submittedFromIp: ip,
+        })
+        .returning();
+      return { id: row.id };
+    }),
+
+  adminList: adminProcedure
+    .input(
+      z
+        .object({
+          status: z.enum(['pending', 'approved', 'rejected', 'withdrawn']).optional(),
+        })
+        .optional()
+    )
+    .query(async ({ input }) => {
+      const conditions = [];
+      if (input?.status) conditions.push(eq(takedownNotices.status, input.status));
+      return db
+        .select({
+          id: takedownNotices.id,
+          trackId: takedownNotices.trackId,
+          targetUrl: takedownNotices.targetUrl,
+          claimantName: takedownNotices.claimantName,
+          claimantEmail: takedownNotices.claimantEmail,
+          claimantOrganization: takedownNotices.claimantOrganization,
+          infringedWorkTitle: takedownNotices.infringedWorkTitle,
+          infringedWorkOwner: takedownNotices.infringedWorkOwner,
+          description: takedownNotices.description,
+          status: takedownNotices.status,
+          adminNotes: takedownNotices.adminNotes,
+          submittedAt: takedownNotices.submittedAt,
+          decidedAt: takedownNotices.decidedAt,
+          // Joined track context — title + owner (so admin can see who's hit)
+          trackTitle: tracks.title,
+          trackUserId: tracks.userId,
+          ownerName: users.name,
+          ownerEmail: users.email,
+          ownerStrikes: users.dmcaStrikes,
+        })
+        .from(takedownNotices)
+        .leftJoin(tracks, eq(takedownNotices.trackId, tracks.id))
+        .leftJoin(users, eq(tracks.userId, users.id))
+        .where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(desc(takedownNotices.submittedAt));
+    }),
+
+  // Admin decision. On 'approved': hide the track (visibility=private),
+  // bump the owner's dmcaStrikes counter; if strikes >= 3, set
+  // role='suspended' which the protectedProcedure middleware enforces.
+  adminDecide: adminProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        decision: z.enum(['approved', 'rejected', 'withdrawn']),
+        adminNotes: z.string().max(2000).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const notice = await db.query.takedownNotices.findFirst({
+        where: eq(takedownNotices.id, input.id),
+      });
+      if (!notice) throw new Error('Takedown notice not found');
+      if (notice.status !== 'pending') {
+        throw new Error('Notice has already been decided');
+      }
+
+      const adminId = ctx.session?.user?.id;
+      const now = new Date();
+
+      // Decision metadata first — always recorded
+      await db
+        .update(takedownNotices)
+        .set({
+          status: input.decision,
+          adminNotes: input.adminNotes ?? null,
+          decidedBy: adminId ?? null,
+          decidedAt: now,
+        })
+        .where(eq(takedownNotices.id, input.id));
+
+      let strikeUserId: string | null = null;
+      let newStrikes = 0;
+      let suspended = false;
+
+      if (input.decision === 'approved' && notice.trackId) {
+        // Hide the track (reversible — content stays in DB for audit)
+        const [updatedTrack] = await db
+          .update(tracks)
+          .set({ visibility: 'private', updatedAt: now })
+          .where(eq(tracks.id, notice.trackId))
+          .returning({ userId: tracks.userId });
+
+        if (updatedTrack) {
+          strikeUserId = updatedTrack.userId;
+          // Bump the owner's strike counter atomically
+          const [stricken] = await db
+            .update(users)
+            .set({ dmcaStrikes: sql`${users.dmcaStrikes} + 1`, updatedAt: now })
+            .where(eq(users.id, updatedTrack.userId))
+            .returning({ strikes: users.dmcaStrikes, role: users.role });
+          newStrikes = stricken?.strikes ?? 0;
+
+          // 3-strikes rule — suspend (don't downgrade if already higher than 'free' admin etc.)
+          if (newStrikes >= 3 && stricken?.role !== 'admin' && stricken?.role !== 'super_admin') {
+            await db
+              .update(users)
+              .set({ role: 'suspended', updatedAt: now })
+              .where(eq(users.id, updatedTrack.userId));
+            suspended = true;
+          }
+        }
+      }
+
+      return { ok: true, strikeUserId, newStrikes, suspended };
+    }),
+});
+
 export const appRouter = createRouter({
   auth: authRouter,
   users: usersRouter,
@@ -4560,6 +4722,7 @@ export const appRouter = createRouter({
   verification: verificationRouter,
   search: searchRouter,
   distribution: distributionRouter,
+  dmca: dmcaRouter,
 });
 
 export type AppRouter = typeof appRouter;

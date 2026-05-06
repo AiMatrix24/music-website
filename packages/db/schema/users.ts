@@ -2,6 +2,7 @@ import {
   pgTable,
   uuid,
   text,
+  integer,
   timestamp,
   boolean,
   pgEnum,
@@ -19,6 +20,10 @@ export const userRoleEnum = pgEnum('user_role', [
   'editor',
   'subscriber',
   'free',
+  // 'suspended' = DMCA repeat-infringer (3 strikes) or admin sanction.
+  // protectedProcedure middleware blocks all writes for suspended users.
+  // Reversible — admin can flip them back to a normal role.
+  'suspended',
 ]);
 
 export const users = pgTable(
@@ -63,6 +68,10 @@ export const users = pgTable(
     // Last time we sent this user a digest. Null = never sent (so first
     // digest fires on the next cron tick after they opt in).
     lastDigestSentAt: timestamp('last_digest_sent_at', { withTimezone: true }),
+    // DMCA repeat-infringer counter. Incremented in dmca.adminDecide on
+    // each approved takedown. At 3 strikes, the same procedure flips
+    // role='suspended'. Visible to admins only.
+    dmcaStrikes: integer('dmca_strikes').default(0).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),

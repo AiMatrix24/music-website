@@ -1,164 +1,265 @@
 'use client';
 
+import { trpc } from '@/lib/trpc/client';
 import Link from 'next/link';
+import { useState } from 'react';
+import { useToast } from '@/app/components/Toast';
 
-export default function DMCAPage() {
+/**
+ * DMCA §512(c)(3) takedown submission form. Public — rights holders
+ * aren't necessarily OPYNX users. Rate-limited at the procedure level.
+ *
+ * Counter-notice flow is deferred to v1.1; a "contact us" path is the
+ * fallback for now (alleged infringers email support).
+ */
+export default function DmcaPage() {
+  const { toast } = useToast();
+  const [submitted, setSubmitted] = useState(false);
+
+  const [targetUrl, setTargetUrl] = useState('');
+  const [claimantName, setClaimantName] = useState('');
+  const [claimantEmail, setClaimantEmail] = useState('');
+  const [claimantOrganization, setClaimantOrganization] = useState('');
+  const [claimantAddress, setClaimantAddress] = useState('');
+  const [claimantPhone, setClaimantPhone] = useState('');
+  const [infringedWorkTitle, setInfringedWorkTitle] = useState('');
+  const [infringedWorkOwner, setInfringedWorkOwner] = useState('');
+  const [description, setDescription] = useState('');
+  const [goodFaithStatement, setGoodFaithStatement] = useState(false);
+  const [accuracyStatement, setAccuracyStatement] = useState(false);
+  const [signature, setSignature] = useState('');
+
+  const submit = trpc.dmca.submit.useMutation({
+    onSuccess: () => {
+      setSubmitted(true);
+      toast('Notice submitted — we\'ll review within 48 hours', 'success');
+    },
+    onError: (err) => toast(err.message || 'Submission failed', 'error'),
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!goodFaithStatement || !accuracyStatement) {
+      toast('Both sworn statements are required', 'error');
+      return;
+    }
+    if (!signature.trim()) {
+      toast('Electronic signature is required', 'error');
+      return;
+    }
+
+    let trackId: string | undefined;
+    const match = targetUrl.match(/\/track\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+    if (match) trackId = match[1];
+
+    submit.mutate({
+      targetUrl,
+      trackId,
+      claimantName: claimantName.trim(),
+      claimantEmail: claimantEmail.trim(),
+      claimantOrganization: claimantOrganization.trim() || undefined,
+      claimantAddress: claimantAddress.trim(),
+      claimantPhone: claimantPhone.trim() || undefined,
+      infringedWorkTitle: infringedWorkTitle.trim(),
+      infringedWorkOwner: infringedWorkOwner.trim(),
+      description: description.trim(),
+      goodFaithStatement,
+      accuracyStatement,
+      signature: signature.trim(),
+    });
+  };
+
+  if (submitted) {
+    return (
+      <div className="min-h-screen pt-24 pb-16 px-6">
+        <div className="max-w-2xl mx-auto text-center">
+          <div className="text-5xl mb-4">📬</div>
+          <h1 className="text-3xl font-black mb-3">Notice received</h1>
+          <p className="text-gray-400 mb-6">
+            Your DMCA takedown notice has been submitted to OPYNX. Our team will review it within 48 hours and email you with the decision at the address you provided. If you need to follow up sooner, write to <a href="mailto:dmca@opynx.com" className="text-red-400 hover:underline">dmca@opynx.com</a> with the work title in the subject.
+          </p>
+          <Link href="/" className="text-red-400 hover:text-red-300 transition">← Back to OPYNX</Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen pt-24 pb-16 px-6">
-      <div className="max-w-3xl mx-auto prose prose-invert">
-        <Link href="/" className="text-sm text-gray-400 hover:text-white transition mb-8 inline-block no-underline">
-          &larr; Back to Home
-        </Link>
+      <div className="max-w-2xl mx-auto">
+        <Link href="/" className="text-sm text-gray-400 hover:text-white transition mb-6 inline-block">← Back to OPYNX</Link>
 
-        <h1 className="text-3xl font-black mb-2">Copyright &amp; DMCA Policy</h1>
-        <p className="text-sm text-gray-500 mb-8">Last updated: March 27, 2026</p>
+        <h1 className="text-3xl font-black mb-2">DMCA Takedown Notice</h1>
+        <p className="text-sm text-gray-500 mb-6">
+          File a takedown notice under 17 U.S.C. § 512(c)(3) against allegedly infringing content on OPYNX. False statements made under penalty of perjury can result in liability — please review the requirements before submitting.
+        </p>
 
-        <section className="space-y-6 text-gray-300 text-sm leading-relaxed">
-          {/* 1 */}
-          <div>
-            <h2 className="text-xl font-bold text-white mb-3">1. Our Commitment to Copyright</h2>
-            <p>
-              OPYNX respects the intellectual property rights of creators, creators, and all rights
-              holders. We are committed to complying with the Digital Millennium Copyright Act
-              (DMCA) and other applicable copyright laws. We expect all users of our platform to
-              respect these rights as well.
-            </p>
-            <p className="mt-2">
-              As a platform built on the principle of empowering creators, we take copyright
-              infringement seriously and will respond promptly to valid takedown notices.
-            </p>
+        <div className="rounded-2xl bg-yellow-950/20 border border-yellow-700/30 p-4 mb-6 text-sm">
+          <p className="font-bold text-yellow-400 mb-1">Before you file</p>
+          <ul className="text-yellow-200/80 text-xs space-y-1 list-disc pl-5">
+            <li>You must own the rights to the work, or be authorized to act on the owner's behalf.</li>
+            <li>Your contact information must be real — we'll use it to reach you about the notice and may forward it to the alleged infringer if they file a counter-notice.</li>
+            <li>Knowingly false statements are subject to civil and criminal liability under § 512(f).</li>
+          </ul>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="rounded-2xl bg-[#15151f] p-5 space-y-4">
+            <h2 className="text-lg font-bold">What's being infringed</h2>
+            <Field label="URL of the allegedly infringing content on OPYNX" hint="Paste the full /track/[id] link.">
+              <input
+                type="url"
+                value={targetUrl}
+                onChange={(e) => setTargetUrl(e.target.value)}
+                required
+                placeholder="https://opynx.com/track/abc-123-..."
+                className="w-full bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:border-red-600 outline-none"
+              />
+            </Field>
+            <Field label="Title of the work you own">
+              <input
+                type="text"
+                value={infringedWorkTitle}
+                onChange={(e) => setInfringedWorkTitle(e.target.value)}
+                required
+                maxLength={500}
+                className="w-full bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-sm text-white focus:border-red-600 outline-none"
+              />
+            </Field>
+            <Field label="Rights holder (you or the entity you represent)">
+              <input
+                type="text"
+                value={infringedWorkOwner}
+                onChange={(e) => setInfringedWorkOwner(e.target.value)}
+                required
+                maxLength={500}
+                className="w-full bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-sm text-white focus:border-red-600 outline-none"
+              />
+            </Field>
+            <Field label="Describe the infringement" hint="What part is yours? Where can the original be found? Any other context.">
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                required
+                minLength={20}
+                maxLength={5000}
+                rows={5}
+                className="w-full bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-sm text-white focus:border-red-600 outline-none resize-none"
+              />
+            </Field>
           </div>
 
-          {/* 2 */}
-          <div>
-            <h2 className="text-xl font-bold text-white mb-3">2. How to File a DMCA Takedown Notice</h2>
-            <p className="mb-3">
-              If you believe that content hosted on OPYNX infringes your copyright, you may submit
-              a DMCA takedown notice to our designated agent. Your notice must include the following:
-            </p>
-            <ol className="list-decimal list-inside space-y-2 text-gray-300">
-              <li>
-                <span className="text-white font-semibold">Identification of the copyrighted work</span> &mdash;
-                A description of the copyrighted work you claim has been infringed, or a representative
-                list if multiple works are involved.
-              </li>
-              <li>
-                <span className="text-white font-semibold">Identification of the infringing material</span> &mdash;
-                The URL(s) or other specific identification of the material you claim is infringing,
-                with enough detail for us to locate it on the platform.
-              </li>
-              <li>
-                <span className="text-white font-semibold">Your contact information</span> &mdash;
-                Your full legal name, mailing address, telephone number, and email address.
-              </li>
-              <li>
-                <span className="text-white font-semibold">Good faith statement</span> &mdash;
-                A statement that you have a good faith belief that use of the material in the manner
-                complained of is not authorized by the copyright owner, its agent, or the law.
-              </li>
-              <li>
-                <span className="text-white font-semibold">Accuracy statement</span> &mdash;
-                A statement, made under penalty of perjury, that the information in the notification
-                is accurate and that you are the copyright owner or authorized to act on behalf of
-                the copyright owner.
-              </li>
-              <li>
-                <span className="text-white font-semibold">Signature</span> &mdash;
-                A physical or electronic signature of the copyright owner or a person authorized to
-                act on their behalf.
-              </li>
-            </ol>
+          <div className="rounded-2xl bg-[#15151f] p-5 space-y-4">
+            <h2 className="text-lg font-bold">Your contact information</h2>
+            <p className="text-xs text-gray-500">Required by § 512(c)(3)(A). False or fake contact info invalidates the notice.</p>
+            <Field label="Full legal name">
+              <input
+                type="text"
+                value={claimantName}
+                onChange={(e) => setClaimantName(e.target.value)}
+                required
+                maxLength={200}
+                className="w-full bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-sm text-white focus:border-red-600 outline-none"
+              />
+            </Field>
+            <Field label="Email">
+              <input
+                type="email"
+                value={claimantEmail}
+                onChange={(e) => setClaimantEmail(e.target.value)}
+                required
+                maxLength={200}
+                className="w-full bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-sm text-white focus:border-red-600 outline-none"
+              />
+            </Field>
+            <Field label="Organization (optional, e.g., 'Acme Records')">
+              <input
+                type="text"
+                value={claimantOrganization}
+                onChange={(e) => setClaimantOrganization(e.target.value)}
+                maxLength={200}
+                className="w-full bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-sm text-white focus:border-red-600 outline-none"
+              />
+            </Field>
+            <Field label="Mailing address">
+              <textarea
+                value={claimantAddress}
+                onChange={(e) => setClaimantAddress(e.target.value)}
+                required
+                minLength={5}
+                maxLength={1000}
+                rows={3}
+                className="w-full bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-sm text-white focus:border-red-600 outline-none resize-none"
+              />
+            </Field>
+            <Field label="Phone (optional)">
+              <input
+                type="tel"
+                value={claimantPhone}
+                onChange={(e) => setClaimantPhone(e.target.value)}
+                maxLength={50}
+                className="w-full bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-sm text-white focus:border-red-600 outline-none"
+              />
+            </Field>
           </div>
 
-          {/* 3 */}
-          <div>
-            <h2 className="text-xl font-bold text-white mb-3">3. Counter-Notification Process</h2>
-            <p className="mb-3">
-              If you believe your content was removed in error or is not infringing, you may file a
-              counter-notification. Your counter-notification must include:
-            </p>
-            <ol className="list-decimal list-inside space-y-2 text-gray-300">
-              <li>Identification of the material that was removed and its location before removal.</li>
-              <li>
-                A statement under penalty of perjury that you have a good faith belief the material
-                was removed or disabled as a result of mistake or misidentification.
-              </li>
-              <li>Your name, address, telephone number, and email address.</li>
-              <li>
-                A statement that you consent to the jurisdiction of the federal district court for
-                the judicial district in which your address is located, and that you will accept
-                service of process from the person who provided the original DMCA notification.
-              </li>
-              <li>Your physical or electronic signature.</li>
-            </ol>
-            <p className="mt-3">
-              Upon receiving a valid counter-notification, OPYNX will forward it to the original
-              complainant. If the complainant does not file a court action within 10&ndash;14
-              business days, we will restore the removed content.
-            </p>
-          </div>
-
-          {/* 4 */}
-          <div>
-            <h2 className="text-xl font-bold text-white mb-3">4. Repeat Infringer Policy</h2>
-            <p>
-              OPYNX maintains a strict repeat infringer policy. Users who repeatedly upload
-              infringing content will face escalating consequences:
-            </p>
-            <ul className="list-disc list-inside space-y-1 mt-2 text-gray-300">
-              <li><span className="text-white font-semibold">First offense:</span> Content removal and written warning.</li>
-              <li><span className="text-white font-semibold">Second offense:</span> Content removal, 30-day upload restriction, and final warning.</li>
-              <li><span className="text-white font-semibold">Third offense:</span> Permanent account termination and forfeiture of pending revenue.</li>
-            </ul>
-            <p className="mt-2">
-              We reserve the right to terminate any account at any time for egregious or willful
-              copyright infringement, even on a first offense.
-            </p>
-          </div>
-
-          {/* 5 */}
-          <div>
-            <h2 className="text-xl font-bold text-white mb-3">5. Content ID System</h2>
-            <div className="bg-[#15151f] border border-brand-800/30 rounded-lg p-4">
-              <span className="inline-block bg-red-600/20 text-red-400 text-xs font-bold px-2 py-0.5 rounded mb-2">
-                Coming Soon
+          <div className="rounded-2xl bg-[#15151f] p-5 space-y-3 border border-red-800/30">
+            <h2 className="text-lg font-bold">Sworn statements</h2>
+            <p className="text-xs text-gray-500">Both required by 17 U.S.C. § 512(c)(3)(A)(v) and (vi).</p>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={goodFaithStatement}
+                onChange={(e) => setGoodFaithStatement(e.target.checked)}
+                className="mt-1 accent-red-600"
+              />
+              <span className="text-sm text-gray-300">
+                I have a good faith belief that use of the material in the manner complained of is not authorized by the copyright owner, its agent, or the law.
               </span>
-              <p>
-                OPYNX is developing an automated Content ID system that will scan uploaded audio
-                against a database of registered works. This system will help identify potential
-                copyright issues before content goes live, protecting both rights holders and
-                uploading creators.
-              </p>
-              <p className="mt-2">
-                Rights holders will be able to register their catalogs with our Content ID system
-                to receive automated notifications and choose how matches are handled (block,
-                monetize, or allow).
-              </p>
-            </div>
+            </label>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={accuracyStatement}
+                onChange={(e) => setAccuracyStatement(e.target.checked)}
+                className="mt-1 accent-red-600"
+              />
+              <span className="text-sm text-gray-300">
+                The information in this notification is accurate, and under penalty of perjury, I am the owner of an exclusive right that is allegedly infringed, or am authorized to act on the owner's behalf.
+              </span>
+            </label>
+            <Field label="Electronic signature (type your full name)">
+              <input
+                type="text"
+                value={signature}
+                onChange={(e) => setSignature(e.target.value)}
+                required
+                minLength={2}
+                maxLength={200}
+                className="w-full bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-sm text-white focus:border-red-600 outline-none font-serif italic"
+              />
+            </Field>
           </div>
 
-          {/* 6 */}
-          <div>
-            <h2 className="text-xl font-bold text-white mb-3">6. Contact</h2>
-            <p>
-              To submit a DMCA takedown notice, counter-notification, or any copyright-related
-              inquiry, please contact our designated DMCA agent:
-            </p>
-            <div className="bg-[#15151f] border border-brand-800/30 rounded-lg p-4 mt-3">
-              <p className="text-white font-semibold">OPYNX DMCA Agent</p>
-              <p className="mt-1">
-                Email:{' '}
-                <a href="mailto:dmca@opynx.com" className="text-red-400 hover:text-red-300 transition">
-                  dmca@opynx.com
-                </a>
-              </p>
-              <p className="text-gray-400 text-xs mt-2">
-                Please include &quot;DMCA&quot; in the subject line for fastest processing.
-              </p>
-            </div>
-          </div>
-        </section>
+          <button
+            type="submit"
+            disabled={submit.isPending}
+            className="w-full rounded-full bg-red-600 hover:bg-red-500 px-5 py-3 text-sm font-bold text-white transition disabled:opacity-50"
+          >
+            {submit.isPending ? 'Submitting…' : 'Submit takedown notice'}
+          </button>
+        </form>
       </div>
+    </div>
+  );
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-xs font-bold uppercase tracking-wide text-gray-400 mb-1">{label}</label>
+      {hint && <p className="text-xs text-gray-600 mb-1">{hint}</p>}
+      {children}
     </div>
   );
 }

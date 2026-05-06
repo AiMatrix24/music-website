@@ -58,6 +58,20 @@ const enforceAuth = t.middleware(async ({ ctx, next }) => {
     });
   }
 
+  // Block suspended users from any protected mutation/query. This is the
+  // DMCA repeat-infringer enforcement point — once a user accumulates 3
+  // strikes, dmca.adminDecide flips their role to 'suspended', and from
+  // that moment onward they hit this throw on every protected procedure.
+  // Sign-in still works (so admin can lift the suspension), but they can't
+  // upload, comment, tip, etc.
+  const suspendedRole = (ctx.session.user as { role?: string }).role === 'suspended';
+  if (suspendedRole) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Your account has been suspended. Contact support if you believe this is an error.',
+    });
+  }
+
   return next({
     ctx: {
       ...ctx,

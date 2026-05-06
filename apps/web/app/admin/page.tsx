@@ -99,6 +99,12 @@ export default function AdminDashboard() {
           >
             Distribution Queue →
           </Link>
+          <Link
+            href="/admin/dmca"
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-[#15151f] text-gray-400 hover:text-white hover:bg-[#1a1a2e] transition whitespace-nowrap"
+          >
+            DMCA Queue →
+          </Link>
         </div>
 
         {activeTab === 'overview' && <OverviewTab />}
