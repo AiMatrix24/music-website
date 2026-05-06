@@ -9,7 +9,14 @@ export default function TermsPage() {
         </Link>
 
         <h1 className="text-3xl font-black mb-2">Terms of Service</h1>
-        <p className="text-sm text-gray-500 mb-8">Last updated: March 22, 2026</p>
+        <p className="text-sm text-gray-500 mb-2">Last updated: March 22, 2026</p>
+
+        <div className="rounded-2xl bg-yellow-950/20 border border-yellow-700/30 p-4 mb-8 not-prose">
+          <p className="font-bold text-yellow-400 text-sm mb-1">⚠ Draft — pending legal review</p>
+          <p className="text-xs text-yellow-200/80">
+            This document is a working draft and has not yet been reviewed by qualified counsel. It does not constitute a binding agreement until finalized. Final terms will be posted before public launch.
+          </p>
+        </div>
 
         <section className="space-y-6 text-gray-300 text-sm leading-relaxed">
           <div>

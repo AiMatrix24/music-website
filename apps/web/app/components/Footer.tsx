@@ -53,7 +53,8 @@ export function Footer() {
               <li><Link href="/contact" className="text-gray-500 hover:text-brand-400 transition">Contact</Link></li>
               <li><Link href="/help" className="text-gray-500 hover:text-brand-400 transition">Help / FAQ</Link></li>
               <li><Link href="/developers" className="text-gray-500 hover:text-brand-400 transition">Developers</Link></li>
-              <li><Link href="/dmca" className="text-gray-500 hover:text-brand-400 transition">DMCA</Link></li>
+              <li><Link href="/dmca-policy" className="text-gray-500 hover:text-brand-400 transition">Copyright + DMCA Policy</Link></li>
+              <li><Link href="/dmca" className="text-gray-500 hover:text-brand-400 transition">File a takedown</Link></li>
               <li><Link href="/accessibility" className="text-gray-500 hover:text-brand-400 transition">Accessibility</Link></li>
               <li><Link href="/changelog" className="text-gray-500 hover:text-brand-400 transition">Changelog</Link></li>
               <li><Link href="/status" className="text-gray-500 hover:text-brand-400 transition">Status</Link></li>
