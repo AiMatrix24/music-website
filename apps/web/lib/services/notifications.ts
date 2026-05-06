@@ -12,7 +12,7 @@ import { db, notifications, pushSubscriptions, users } from '@opynx/db';
 import { eq } from 'drizzle-orm';
 import webpush from 'web-push';
 
-type NotificationType =
+export type NotificationType =
   | 'ticket_sale'
   | 'track_sale'
   | 'subscription'
@@ -111,8 +111,10 @@ async function sendPush(args: NotifyArgs): Promise<void> {
  * Map notification types → user preference column. Types not in the map
  * (system, verification_status) bypass prefs and always notify — those
  * are security/compliance, not noise.
+ *
+ * Exported for tests; not used outside this file at runtime.
  */
-function prefColumnForType(type: NotificationType): keyof typeof users.$inferSelect | null {
+export function prefColumnForType(type: NotificationType): keyof typeof users.$inferSelect | null {
   switch (type) {
     case 'follow': return 'notifFollows';
     case 'ticket_sale': return 'notifTicketSales';
