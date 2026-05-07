@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { eq, desc, and, or, sql, ilike, isNull, inArray, gte } from 'drizzle-orm';
+import { eq, desc, and, or, sql, ilike, isNull, isNotNull, inArray, gte } from 'drizzle-orm';
 import {
   createRouter,
   createCallerFactory,
@@ -53,6 +53,7 @@ import {
   verificationApplications,
   distributionSubmissions,
   takedownNotices,
+  trackSimilarities,
 } from '@opynx/db';
 
 // ─── Auth Router ───
@@ -924,6 +925,156 @@ const tracksRouter = createRouter({
       previousTotal: previous.reduce((s, d) => s + d.count, 0),
     };
   }),
+
+  // ─── Recommendations ───
+  // Read-only consumers of the track_similarities table populated by
+  // /api/cron/recompute-similarities. See apps/web/lib/services/recommendations.ts
+  // for the algorithm (Jaccard over user interactions).
+
+  /** Tracks similar to a given track. Powers /track/[id] "Similar tracks" rail. */
+  similar: publicProcedure
+    .input(z.object({ trackId: z.string().uuid(), limit: z.number().min(1).max(50).default(10) }))
+    .query(async ({ input }) => {
+      const rows = await db
+        .select({
+          score: trackSimilarities.score,
+          id: tracks.id,
+          title: tracks.title,
+          slug: tracks.slug,
+          genre: tracks.genre,
+          duration: tracks.duration,
+          playCount: tracks.playCount,
+          coverUrl: tracks.coverUrl,
+          artistName: users.name,
+        })
+        .from(trackSimilarities)
+        .innerJoin(tracks, eq(trackSimilarities.trackBId, tracks.id))
+        .leftJoin(users, eq(tracks.userId, users.id))
+        .where(
+          and(
+            eq(trackSimilarities.trackAId, input.trackId),
+            eq(tracks.status, 'published')
+          )
+        )
+        .orderBy(desc(trackSimilarities.score))
+        .limit(input.limit);
+      return rows;
+    }),
+
+  /**
+   * Personalized "for you" feed. Aggregates similar-tracks for the
+   * current user's recent plays + likes, dedupes the user's own
+   * interactions, ranks by combined similarity score.
+   *
+   * Cold-start: user with no plays + no likes gets a trending fallback
+   * (most-played published tracks). Caller doesn't need to handle empty
+   * recommendations — this always returns something.
+   */
+  recommendedForMe: protectedProcedure
+    .input(z.object({ limit: z.number().min(1).max(50).default(20) }).optional())
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const limit = input?.limit ?? 20;
+
+      // Seeds: tracks the user has actually engaged with (played or liked)
+      const recentPlays = await db
+        .select({ trackId: trackPlays.trackId })
+        .from(trackPlays)
+        .where(eq(trackPlays.userId, userId))
+        .orderBy(desc(trackPlays.playedAt))
+        .limit(50);
+      const userLikes = await db
+        .select({ trackId: likes.trackId })
+        .from(likes)
+        .where(and(eq(likes.userId, userId), isNotNull(likes.trackId)));
+
+      const seedIds = new Set<string>();
+      for (const r of recentPlays) seedIds.add(r.trackId);
+      for (const r of userLikes) if (r.trackId) seedIds.add(r.trackId);
+
+      // Cold-start fallback: trending if no seeds
+      if (seedIds.size === 0) {
+        const trending = await db
+          .select({
+            id: tracks.id,
+            title: tracks.title,
+            slug: tracks.slug,
+            genre: tracks.genre,
+            duration: tracks.duration,
+            playCount: tracks.playCount,
+            coverUrl: tracks.coverUrl,
+            artistName: users.name,
+          })
+          .from(tracks)
+          .leftJoin(users, eq(tracks.userId, users.id))
+          .where(eq(tracks.status, 'published'))
+          .orderBy(desc(tracks.playCount))
+          .limit(limit);
+        return { source: 'trending' as const, tracks: trending };
+      }
+
+      // Aggregate similar tracks across all seeds, summing scores
+      const seedArr = Array.from(seedIds);
+      const sims = await db
+        .select({
+          trackBId: trackSimilarities.trackBId,
+          score: trackSimilarities.score,
+        })
+        .from(trackSimilarities)
+        .where(inArray(trackSimilarities.trackAId, seedArr));
+
+      const aggregate = new Map<string, number>();
+      for (const s of sims) {
+        if (seedIds.has(s.trackBId)) continue; // skip stuff the user already engaged with
+        aggregate.set(s.trackBId, (aggregate.get(s.trackBId) ?? 0) + s.score);
+      }
+
+      if (aggregate.size === 0) {
+        // User has seeds but no similars yet — fall back to trending so they
+        // see something, not an empty for-you page
+        const trending = await db
+          .select({
+            id: tracks.id,
+            title: tracks.title,
+            slug: tracks.slug,
+            genre: tracks.genre,
+            duration: tracks.duration,
+            playCount: tracks.playCount,
+            coverUrl: tracks.coverUrl,
+            artistName: users.name,
+          })
+          .from(tracks)
+          .leftJoin(users, eq(tracks.userId, users.id))
+          .where(eq(tracks.status, 'published'))
+          .orderBy(desc(tracks.playCount))
+          .limit(limit);
+        return { source: 'trending' as const, tracks: trending };
+      }
+
+      const ranked = [...aggregate.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit);
+      const ids = ranked.map(([id]) => id);
+
+      const trackRows = await db
+        .select({
+          id: tracks.id,
+          title: tracks.title,
+          slug: tracks.slug,
+          genre: tracks.genre,
+          duration: tracks.duration,
+          playCount: tracks.playCount,
+          coverUrl: tracks.coverUrl,
+          artistName: users.name,
+        })
+        .from(tracks)
+        .leftJoin(users, eq(tracks.userId, users.id))
+        .where(and(inArray(tracks.id, ids), eq(tracks.status, 'published')));
+
+      // Preserve aggregate-score order (DB query result is unordered)
+      const byId = new Map(trackRows.map((r) => [r.id, r]));
+      const ordered = ids.map((id) => byId.get(id)).filter((t): t is typeof trackRows[number] => !!t);
+
+      return { source: 'personalized' as const, tracks: ordered };
+    }),
 });
 
 // ─── Albums Router ───

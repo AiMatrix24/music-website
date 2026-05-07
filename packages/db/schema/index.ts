@@ -15,3 +15,4 @@ export * from './notifications';
 export * from './verification';
 export * from './distribution';
 export * from './dmca';
+export * from './recommendations';

@@ -16,9 +16,16 @@ import { AddToPlaylistModal } from '../../components/AddToPlaylistModal';
 export default function TrackDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: track, isLoading, error } = trpc.tracks.getById.useQuery({ id });
+  // Similar tracks (item-based collaborative filtering — see
+  // packages/db/schema/recommendations.ts). Falls back to recent tracks
+  // when this track has no similars yet (cold start, freshly published).
+  const { data: similarTracks } = trpc.tracks.similar.useQuery(
+    { trackId: id, limit: 4 },
+    { enabled: !!track }
+  );
   const { data: relatedTracks } = trpc.tracks.list.useQuery(
     { limit: 4 },
-    { enabled: !!track }
+    { enabled: !!track && (similarTracks?.length ?? 0) === 0 }
   );
   // Purchase status — hasPurchased returns the purchase row if user owns it, else null
   const { data: ownership } = trpc.trackPurchases.hasPurchased.useQuery({ trackId: id });
@@ -228,13 +235,18 @@ export default function TrackDetailPage() {
           <TrackComments trackId={track.id} />
         </div>
 
-        {/* Related Tracks */}
-        {relatedTracks && relatedTracks.filter((t) => t.id !== track.id).length > 0 && (
+        {/* Similar / Related Tracks — recommendations engine first, recent-tracks fallback */}
+        {((similarTracks && similarTracks.length > 0) ||
+          (relatedTracks && relatedTracks.filter((t) => t.id !== track.id).length > 0)) && (
           <div className="rounded-2xl bg-[#15151f] p-6">
-            <h2 className="text-lg font-bold mb-4">More Tracks</h2>
+            <h2 className="text-lg font-bold mb-4">
+              {similarTracks && similarTracks.length > 0 ? 'Similar tracks' : 'More tracks'}
+            </h2>
             <div className="space-y-3">
-              {relatedTracks
-                .filter((t) => t.id !== track.id)
+              {(similarTracks && similarTracks.length > 0
+                ? similarTracks
+                : (relatedTracks ?? []).filter((t) => t.id !== track.id)
+              )
                 .slice(0, 3)
                 .map((t) => (
                   <Link

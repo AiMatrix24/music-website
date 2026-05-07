@@ -12,6 +12,10 @@
     {
       "path": "/api/cron/digest",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/recompute-similarities",
+      "schedule": "0 4 * * *"
     }
   ]
 }

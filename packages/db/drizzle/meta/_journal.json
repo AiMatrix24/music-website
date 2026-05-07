@@ -169,6 +169,13 @@
       "when": 1778092324018,
       "tag": "0023_users_banner_url",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1778170024472,
+      "tag": "0024_track_similarities",
+      "breakpoints": true
     }
   ]
 }
