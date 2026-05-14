@@ -183,6 +183,13 @@
       "when": 1778763278136,
       "tag": "0025_track_splits",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1778778459601,
+      "tag": "0026_track_split_payouts",
+      "breakpoints": true
     }
   ]
 }

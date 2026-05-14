@@ -61,6 +61,28 @@ export const splitActionEnum = pgEnum('split_action', [
   'revoked',
 ]);
 
+/**
+ * Split payout lifecycle (Commit B — money routing):
+ *   credited   — recipient's share is theirs immediately (owner residual,
+ *                or an already-accepted collaborator at payment time)
+ *   escrowed   — collaborator was still pending at payment time; held
+ *                until they accept/reject
+ *   released   — collaborator accepted post-payment; escrow → spendable
+ *   returned   — collaborator rejected (or owner revoked while pending);
+ *                a sibling 'credited' row is generated for the owner
+ *   clawed_back — the source payment was refunded; row no longer counts
+ *                toward earnings
+ *
+ * Spendable earnings = status IN ('credited', 'released').
+ */
+export const splitPayoutStatusEnum = pgEnum('split_payout_status', [
+  'credited',
+  'escrowed',
+  'released',
+  'returned',
+  'clawed_back',
+]);
+
 export const trackSplits = pgTable(
   'track_splits',
   {
@@ -142,6 +164,68 @@ export const trackSplitHistory = pgTable(
   ]
 );
 
+/**
+ * Per-recipient credit ledger for track-driven money events. Written on the
+ * 'finished' branch of the NOWPayments webhook for sources where a track is
+ * the revenue object: trackPurchases (always) and tips with a track_id.
+ *
+ * One source payment fans out to N payout rows, one per accepted-split
+ * collaborator + the owner residual. Pending-split collaborators get
+ * 'escrowed' rows that wait for splits.accept (→ released) or splits.reject
+ * / splits.revoke (→ returned + a sibling 'credited' row for the owner).
+ *
+ * Earnings = SUM(amount_cents) WHERE recipient_user_id = X
+ *            AND status IN ('credited', 'released').
+ *
+ * Refunds set status='clawed_back' across all rows for the source.
+ *
+ * percent_bp is snapshotted at payment time so the row stays auditable even
+ * if track_splits gets edited later. amount_cents is computed using
+ * largest-remainder rounding so the per-row sum matches the source pool
+ * exactly (no orphan cents).
+ */
+export const trackSplitPayouts = pgTable(
+  'track_split_payouts',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    // 'track_purchase' | 'tip' (extend as new sources go through splits)
+    sourceType: text('source_type').notNull(),
+    sourceId: uuid('source_id').notNull(),
+    trackId: uuid('track_id')
+      .references(() => tracks.id, { onDelete: 'cascade' })
+      .notNull(),
+    recipientUserId: uuid('recipient_user_id')
+      .references(() => users.id, { onDelete: 'restrict' })
+      .notNull(),
+    // Null when the row represents the owner residual on a track with no
+    // splits (or the regenerated owner-credit after a return).
+    trackSplitId: uuid('track_split_id').references(() => trackSplits.id, {
+      onDelete: 'set null',
+    }),
+    // Lineage: a 'returned' escrow row points its sibling 'credited' row
+    // (owner refund) back here so the audit chain is walkable.
+    parentPayoutId: uuid('parent_payout_id'),
+    splitType: splitTypeEnum('split_type').default('master').notNull(),
+    percentBp: integer('percent_bp').notNull(),
+    amountCents: integer('amount_cents').notNull(),
+    status: splitPayoutStatusEnum('status').default('credited').notNull(),
+    releasedAt: timestamp('released_at', { withTimezone: true }),
+    returnedAt: timestamp('returned_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index('split_payouts_recipient_status_idx').on(t.recipientUserId, t.status),
+    index('split_payouts_source_idx').on(t.sourceType, t.sourceId),
+    index('split_payouts_track_split_status_idx').on(t.trackSplitId, t.status),
+    index('split_payouts_track_idx').on(t.trackId),
+  ]
+);
+
 export const trackSplitsRelations = relations(trackSplits, ({ one }) => ({
   track: one(tracks, {
     fields: [trackSplits.trackId],
@@ -167,5 +251,20 @@ export const trackSplitHistoryRelations = relations(trackSplitHistory, ({ one })
   actor: one(users, {
     fields: [trackSplitHistory.actorId],
     references: [users.id],
+  }),
+}));
+
+export const trackSplitPayoutsRelations = relations(trackSplitPayouts, ({ one }) => ({
+  track: one(tracks, {
+    fields: [trackSplitPayouts.trackId],
+    references: [tracks.id],
+  }),
+  recipient: one(users, {
+    fields: [trackSplitPayouts.recipientUserId],
+    references: [users.id],
+  }),
+  trackSplit: one(trackSplits, {
+    fields: [trackSplitPayouts.trackSplitId],
+    references: [trackSplits.id],
   }),
 }));

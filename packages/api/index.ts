@@ -56,6 +56,7 @@ import {
   trackSimilarities,
   trackSplits,
   trackSplitHistory,
+  trackSplitPayouts,
 } from '@opynx/db';
 
 // ─── Auth Router ───
@@ -3497,7 +3498,10 @@ const earningsRouter = createRouter({
     const userId = ctx.session.user.id;
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-    // Tips received (completed)
+    // Tips received: untracked tips route directly to the recipient (no
+    // splits possible without a track). Tracked tips have been fanned out
+    // through the master-split distribution and are read from track_split_payouts
+    // below — exclude them here to avoid double-counting.
     const tipsTotal = await db
       .select({
         lifetime: sql<number>`COALESCE(SUM(${tips.amount}), 0)::int`,
@@ -3505,18 +3509,37 @@ const earningsRouter = createRouter({
         count: sql<number>`COUNT(*)::int`,
       })
       .from(tips)
-      .where(and(eq(tips.recipientUserId, userId), eq(tips.status, 'completed')));
+      .where(and(
+        eq(tips.recipientUserId, userId),
+        eq(tips.status, 'completed'),
+        isNull(tips.trackId)
+      ));
 
-    // Track purchases (buyer paid for tracks this user owns)
-    const trackTotal = await db
+    // Track-driven earnings (Commit B): track purchases + tracked tips run
+    // through the master-split waterfall and land per-recipient as either
+    // 'credited' (immediate) or 'released' (post-acceptance from escrow).
+    // 'escrowed' shares belong to a collaborator who hasn't accepted yet;
+    // 'returned' shares already produced sibling 'credited' rows for the owner.
+    const trackPayouts = await db
       .select({
-        lifetime: sql<number>`COALESCE(SUM(${trackPurchases.pricePaid}), 0)::int`,
-        recent: sql<number>`COALESCE(SUM(CASE WHEN ${trackPurchases.createdAt} >= ${thirtyDaysAgo} THEN ${trackPurchases.pricePaid} ELSE 0 END), 0)::int`,
+        sourceType: trackSplitPayouts.sourceType,
+        lifetime: sql<number>`COALESCE(SUM(${trackSplitPayouts.amountCents}), 0)::int`,
+        recent: sql<number>`COALESCE(SUM(CASE WHEN ${trackSplitPayouts.createdAt} >= ${thirtyDaysAgo} THEN ${trackSplitPayouts.amountCents} ELSE 0 END), 0)::int`,
         count: sql<number>`COUNT(*)::int`,
       })
-      .from(trackPurchases)
-      .innerJoin(tracks, eq(trackPurchases.trackId, tracks.id))
-      .where(and(eq(tracks.userId, userId), eq(trackPurchases.status, 'completed')));
+      .from(trackSplitPayouts)
+      .where(and(
+        eq(trackSplitPayouts.recipientUserId, userId),
+        sql`${trackSplitPayouts.status} IN ('credited', 'released')`
+      ))
+      .groupBy(trackSplitPayouts.sourceType);
+
+    const trackPurchaseEarnings = trackPayouts.find((r) => r.sourceType === 'track_purchase') ?? {
+      lifetime: 0, recent: 0, count: 0,
+    };
+    const trackedTipEarnings = trackPayouts.find((r) => r.sourceType === 'tip') ?? {
+      lifetime: 0, recent: 0, count: 0,
+    };
 
     // Ticket sales (buyer paid for tickets to events this user hosts)
     const ticketTotal = await db
@@ -3557,17 +3580,22 @@ const earningsRouter = createRouter({
       ));
 
     const t = tipsTotal[0] ?? { lifetime: 0, recent: 0, count: 0 };
-    const tr = trackTotal[0] ?? { lifetime: 0, recent: 0, count: 0 };
+    const trPurchase = trackPurchaseEarnings;
+    const trTip = trackedTipEarnings;
     const tk = ticketTotal[0] ?? { lifetime: 0, recent: 0, count: 0 };
     const m = merchTotal[0] ?? { lifetime: 0, recent: 0, count: 0 };
     const s = subTotal[0] ?? { lifetime: 0, recent: 0, count: 0 };
 
+    const tipsLifetime = t.lifetime + trTip.lifetime;
+    const tipsRecent = t.recent + trTip.recent;
+    const tipsCount = t.count + trTip.count;
+
     return {
-      lifetime: t.lifetime + tr.lifetime + tk.lifetime + m.lifetime + s.lifetime,
-      thirtyDay: t.recent + tr.recent + tk.recent + m.recent + s.recent,
+      lifetime: tipsLifetime + trPurchase.lifetime + tk.lifetime + m.lifetime + s.lifetime,
+      thirtyDay: tipsRecent + trPurchase.recent + tk.recent + m.recent + s.recent,
       bySource: {
-        tips: { lifetime: t.lifetime, recent: t.recent, count: t.count },
-        tracks: { lifetime: tr.lifetime, recent: tr.recent, count: tr.count },
+        tips: { lifetime: tipsLifetime, recent: tipsRecent, count: tipsCount },
+        tracks: { lifetime: trPurchase.lifetime, recent: trPurchase.recent, count: trPurchase.count },
         tickets: { lifetime: tk.lifetime, recent: tk.recent, count: tk.count },
         marketplace: { lifetime: m.lifetime, recent: m.recent, count: m.count },
         subscriptions: { lifetime: s.lifetime, recent: s.recent, count: s.count },
@@ -3583,8 +3611,10 @@ const earningsRouter = createRouter({
     const userId = ctx.session.user.id;
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-    // Five queries in parallel, then merge + sort in app layer (simpler than SQL UNION)
-    const [tipRows, trackRows, ticketRows, merchRows, subRows] = await Promise.all([
+    // Five queries in parallel, then merge + sort in app layer (simpler than SQL UNION).
+    // Track-driven earnings come from track_split_payouts (post-master-split distribution).
+    // Untracked tips still come straight from the tips table (no track → no splits).
+    const [tipRows, trackPayoutRows, ticketRows, merchRows, subRows] = await Promise.all([
       db
         .select({
           id: tips.id,
@@ -3596,26 +3626,28 @@ const earningsRouter = createRouter({
         .where(and(
           eq(tips.recipientUserId, userId),
           eq(tips.status, 'completed'),
+          isNull(tips.trackId),
           sql`${tips.createdAt} >= ${thirtyDaysAgo}`
         ))
         .orderBy(desc(tips.createdAt))
         .limit(20),
       db
         .select({
-          id: trackPurchases.id,
-          amount: trackPurchases.pricePaid,
-          createdAt: trackPurchases.createdAt,
+          id: trackSplitPayouts.id,
+          sourceType: trackSplitPayouts.sourceType,
+          amount: trackSplitPayouts.amountCents,
+          createdAt: trackSplitPayouts.createdAt,
           trackTitle: tracks.title,
         })
-        .from(trackPurchases)
-        .innerJoin(tracks, eq(trackPurchases.trackId, tracks.id))
+        .from(trackSplitPayouts)
+        .innerJoin(tracks, eq(trackSplitPayouts.trackId, tracks.id))
         .where(and(
-          eq(tracks.userId, userId),
-          eq(trackPurchases.status, 'completed'),
-          sql`${trackPurchases.createdAt} >= ${thirtyDaysAgo}`
+          eq(trackSplitPayouts.recipientUserId, userId),
+          sql`${trackSplitPayouts.status} IN ('credited', 'released')`,
+          sql`${trackSplitPayouts.createdAt} >= ${thirtyDaysAgo}`
         ))
-        .orderBy(desc(trackPurchases.createdAt))
-        .limit(20),
+        .orderBy(desc(trackSplitPayouts.createdAt))
+        .limit(40),
       db
         .select({
           id: tickets.id,
@@ -3673,12 +3705,14 @@ const earningsRouter = createRouter({
         createdAt: r.createdAt,
         label: r.message ? `Tip: "${r.message.slice(0, 40)}..."` : 'Tip received',
       })),
-      ...trackRows.map((r) => ({
+      ...trackPayoutRows.map((r) => ({
         id: r.id,
-        source: 'track' as const,
+        source: (r.sourceType === 'tip' ? 'tip' : 'track') as 'tip' | 'track',
         amount: r.amount,
         createdAt: r.createdAt,
-        label: `Track sale: ${r.trackTitle}`,
+        label: r.sourceType === 'tip'
+          ? `Tip on "${r.trackTitle}"`
+          : `Track sale: ${r.trackTitle}`,
       })),
       ...ticketRows.map((r) => ({
         id: r.id,
@@ -3735,21 +3769,29 @@ const payoutsRouter = createRouter({
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
     // Reuse the same aggregation as earningsRouter.summary inline (kept
-    // independent so payouts can evolve without touching earnings UI)
-    const [tipsAgg, trackAgg, ticketAgg, merchAgg, subAgg, payoutAgg, user] = await Promise.all([
+    // independent so payouts can evolve without touching earnings UI).
+    // Track-driven earnings (track purchases + tracked tips) come from
+    // track_split_payouts post-Commit-B; untracked tips stay on the legacy path.
+    const [tipsAgg, trackPayoutAgg, ticketAgg, merchAgg, subAgg, payoutAgg, user] = await Promise.all([
       db
         .select({
           lifetime: sql<number>`COALESCE(SUM(${tips.amount}), 0)::int`,
         })
         .from(tips)
-        .where(and(eq(tips.recipientUserId, userId), eq(tips.status, 'completed'))),
+        .where(and(
+          eq(tips.recipientUserId, userId),
+          eq(tips.status, 'completed'),
+          isNull(tips.trackId)
+        )),
       db
         .select({
-          lifetime: sql<number>`COALESCE(SUM(${trackPurchases.pricePaid}), 0)::int`,
+          lifetime: sql<number>`COALESCE(SUM(${trackSplitPayouts.amountCents}), 0)::int`,
         })
-        .from(trackPurchases)
-        .innerJoin(tracks, eq(trackPurchases.trackId, tracks.id))
-        .where(and(eq(tracks.userId, userId), eq(trackPurchases.status, 'completed'))),
+        .from(trackSplitPayouts)
+        .where(and(
+          eq(trackSplitPayouts.recipientUserId, userId),
+          sql`${trackSplitPayouts.status} IN ('credited', 'released')`
+        )),
       db
         .select({
           lifetime: sql<number>`COALESCE(SUM(${ticketTypes.price}), 0)::int`,
@@ -3789,7 +3831,7 @@ const payoutsRouter = createRouter({
 
     const lifetimeEarned =
       (tipsAgg[0]?.lifetime ?? 0) +
-      (trackAgg[0]?.lifetime ?? 0) +
+      (trackPayoutAgg[0]?.lifetime ?? 0) +
       (ticketAgg[0]?.lifetime ?? 0) +
       (merchAgg[0]?.lifetime ?? 0) +
       (subAgg[0]?.lifetime ?? 0);
@@ -3867,16 +3909,24 @@ const payoutsRouter = createRouter({
 
       // Compute available balance inline (don't trust client-provided amount)
       // Reuses the same logic as summary; kept here for atomicity at request time.
-      const [tipsAgg, trackAgg, ticketAgg, merchAgg, subAgg, payoutAgg] = await Promise.all([
+      // Track-driven earnings come from track_split_payouts (Commit B); untracked
+      // tips stay on the legacy path.
+      const [tipsAgg, trackPayoutAgg, ticketAgg, merchAgg, subAgg, payoutAgg] = await Promise.all([
         db
           .select({ lifetime: sql<number>`COALESCE(SUM(${tips.amount}), 0)::int` })
           .from(tips)
-          .where(and(eq(tips.recipientUserId, userId), eq(tips.status, 'completed'))),
+          .where(and(
+            eq(tips.recipientUserId, userId),
+            eq(tips.status, 'completed'),
+            isNull(tips.trackId)
+          )),
         db
-          .select({ lifetime: sql<number>`COALESCE(SUM(${trackPurchases.pricePaid}), 0)::int` })
-          .from(trackPurchases)
-          .innerJoin(tracks, eq(trackPurchases.trackId, tracks.id))
-          .where(and(eq(tracks.userId, userId), eq(trackPurchases.status, 'completed'))),
+          .select({ lifetime: sql<number>`COALESCE(SUM(${trackSplitPayouts.amountCents}), 0)::int` })
+          .from(trackSplitPayouts)
+          .where(and(
+            eq(trackSplitPayouts.recipientUserId, userId),
+            sql`${trackSplitPayouts.status} IN ('credited', 'released')`
+          )),
         db
           .select({ lifetime: sql<number>`COALESCE(SUM(${ticketTypes.price}), 0)::int` })
           .from(tickets)
@@ -3908,7 +3958,7 @@ const payoutsRouter = createRouter({
 
       const lifetimeEarned =
         (tipsAgg[0]?.lifetime ?? 0) +
-        (trackAgg[0]?.lifetime ?? 0) +
+        (trackPayoutAgg[0]?.lifetime ?? 0) +
         (ticketAgg[0]?.lifetime ?? 0) +
         (merchAgg[0]?.lifetime ?? 0) +
         (subAgg[0]?.lifetime ?? 0);
@@ -5209,6 +5259,18 @@ const splitsRouter = createRouter({
           newData: updated as unknown as Record<string, unknown>,
           actorId: userId,
         });
+
+        // Commit B: release any escrowed payouts that were waiting on this
+        // collaborator's acceptance. Their share becomes spendable.
+        await tx
+          .update(trackSplitPayouts)
+          .set({ status: 'released', releasedAt: new Date(), updatedAt: new Date() })
+          .where(
+            and(
+              eq(trackSplitPayouts.trackSplitId, input.splitId),
+              eq(trackSplitPayouts.status, 'escrowed')
+            )
+          );
       });
 
       // Notify the track owner that the collaborator accepted
@@ -5295,6 +5357,11 @@ const splitsRouter = createRouter({
             actorId: userId,
           });
         }
+
+        // Commit B: return any escrowed payouts to the track owner. For each
+        // escrowed row, flip it to 'returned' and insert a sibling 'credited'
+        // row for the owner with the same amount + lineage pointer.
+        await returnEscrowedPayoutsToOwner(tx, input.splitId, track.userId);
       });
 
       await notify({
@@ -5384,6 +5451,12 @@ const splitsRouter = createRouter({
             actorId: userId,
           });
         }
+
+        // Commit B: return any still-escrowed payouts to the owner. Already-
+        // 'released' or 'credited' payouts (from accepted shares) stay with
+        // the collaborator — we don't claw back money the system already
+        // promised them when they accepted.
+        await returnEscrowedPayoutsToOwner(tx, input.splitId, track.userId);
       });
 
       // Notify the collaborator they were revoked
@@ -5398,6 +5471,59 @@ const splitsRouter = createRouter({
       return { ok: true };
     }),
 });
+
+/**
+ * Returns escrowed payouts (track_split_payouts rows tied to splitId in
+ * 'escrowed' status) back to the track owner. For each escrowed row:
+ *   1. Flip its status to 'returned' (terminal).
+ *   2. Insert a sibling 'credited' row for the owner with the same
+ *      amount, source, and a parent_payout_id pointer for audit lineage.
+ *
+ * Called from splits.reject and splits.revoke. No-op when there are no
+ * escrowed rows (e.g. revoking a split before any payment ever ran).
+ */
+async function returnEscrowedPayoutsToOwner(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  splitId: string,
+  ownerUserId: string
+): Promise<void> {
+  const escrowed = await tx
+    .select()
+    .from(trackSplitPayouts)
+    .where(
+      and(
+        eq(trackSplitPayouts.trackSplitId, splitId),
+        eq(trackSplitPayouts.status, 'escrowed')
+      )
+    );
+  if (escrowed.length === 0) return;
+
+  const now = new Date();
+  await tx
+    .update(trackSplitPayouts)
+    .set({ status: 'returned', returnedAt: now, updatedAt: now })
+    .where(
+      and(
+        eq(trackSplitPayouts.trackSplitId, splitId),
+        eq(trackSplitPayouts.status, 'escrowed')
+      )
+    );
+
+  await tx.insert(trackSplitPayouts).values(
+    escrowed.map((e) => ({
+      sourceType: e.sourceType,
+      sourceId: e.sourceId,
+      trackId: e.trackId,
+      recipientUserId: ownerUserId,
+      trackSplitId: null,
+      parentPayoutId: e.id,
+      splitType: e.splitType,
+      percentBp: e.percentBp,
+      amountCents: e.amountCents,
+      status: 'credited' as const,
+    }))
+  );
+}
 
 export const appRouter = createRouter({
   auth: authRouter,

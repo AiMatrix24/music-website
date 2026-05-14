@@ -4,6 +4,7 @@ import { db, subscriptions, subEvents } from '@opynx/db';
 import { tickets, ticketTypes, trackPurchases, tips, orders, orderItems, listings, commissions } from '@opynx/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { processCommissionWaterfall } from '@/lib/services/commissions';
+import { distributeTrackSplitPayouts, clawBackTrackSplitPayouts } from '@/lib/services/track-split-distribution';
 import { captureError, startTransaction } from '@/lib/services/monitoring';
 import { sendPaymentReceipt, sendCreatorEarningsNotification } from '@/lib/services/email-sender';
 import { notify, fmtCents } from '@/lib/services/notifications';
@@ -439,6 +440,23 @@ async function handleTrackPurchase(
       .update(trackPurchases)
       .set({ status: 'completed', updatedAt: new Date() })
       .where(eq(trackPurchases.id, purchaseId));
+
+    // Fan the price out across master-split collaborators (Commit B). Failure
+    // here must NOT block the purchase activation — log and continue.
+    try {
+      await distributeTrackSplitPayouts({
+        sourceType: 'track_purchase',
+        sourceId: purchaseId,
+        trackId: purchase.trackId,
+        poolCents: purchase.pricePaid,
+      });
+    } catch (err) {
+      console.error(
+        `[NOWPayments Webhook] Split distribution failed for track purchase ${purchaseId}:`,
+        err
+      );
+    }
+
     console.log(
       `[NOWPayments Webhook] Track purchase ${purchaseId} completed (trackId=${purchase.trackId})`
     );
@@ -500,7 +518,10 @@ async function handleTrackPurchase(
       .update(trackPurchases)
       .set({ status: 'refunded', updatedAt: new Date() })
       .where(eq(trackPurchases.id, purchaseId));
-    console.log(`[NOWPayments Webhook] Track purchase ${purchaseId} refunded`);
+    const cleared = await clawBackTrackSplitPayouts('track_purchase', purchaseId);
+    console.log(
+      `[NOWPayments Webhook] Track purchase ${purchaseId} refunded; clawed back ${cleared} payout rows`
+    );
   }
 }
 
@@ -531,6 +552,26 @@ async function handleTipPayment(
       .update(tips)
       .set({ status: 'completed', updatedAt: new Date() })
       .where(eq(tips.id, tipId));
+
+    // If the tip is tied to a specific track, run it through master-split
+    // distribution. Untracked tips skip splits and go 100% to the recipient
+    // via the tips table directly (legacy earnings path).
+    if (tip.trackId) {
+      try {
+        await distributeTrackSplitPayouts({
+          sourceType: 'tip',
+          sourceId: tipId,
+          trackId: tip.trackId,
+          poolCents: tip.amount,
+        });
+      } catch (err) {
+        console.error(
+          `[NOWPayments Webhook] Split distribution failed for tip ${tipId}:`,
+          err
+        );
+      }
+    }
+
     console.log(
       `[NOWPayments Webhook] Tip ${tipId} completed: ${tip.amount} cents to ${tip.recipientUserId}`
     );
@@ -586,7 +627,14 @@ async function handleTipPayment(
       .update(tips)
       .set({ status: 'refunded', updatedAt: new Date() })
       .where(eq(tips.id, tipId));
-    console.log(`[NOWPayments Webhook] Tip ${tipId} refunded`);
+    if (tip.trackId) {
+      const cleared = await clawBackTrackSplitPayouts('tip', tipId);
+      console.log(
+        `[NOWPayments Webhook] Tip ${tipId} refunded; clawed back ${cleared} payout rows`
+      );
+    } else {
+      console.log(`[NOWPayments Webhook] Tip ${tipId} refunded`);
+    }
   }
 }
 
