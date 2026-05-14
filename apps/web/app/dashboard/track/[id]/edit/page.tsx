@@ -102,6 +102,20 @@ export default function EditTrackPage() {
           onCancel={() => router.push('/dashboard')}
         />
 
+        {/* Splits manager link — surfaced here so owners find it. */}
+        <div className="mt-6 rounded-2xl bg-[#15151f] border border-brand-800/30 p-4 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold">Royalty splits</p>
+            <p className="text-xs text-gray-500 mt-0.5">Invite collaborators and configure master + publishing splits.</p>
+          </div>
+          <Link
+            href={`/dashboard/splits/${id}`}
+            className="shrink-0 rounded-full bg-brand-950 hover:bg-brand-900 border border-brand-800/40 px-4 py-1.5 text-xs font-semibold text-gray-300 hover:text-white transition"
+          >
+            Manage →
+          </Link>
+        </div>
+
         {/* Danger zone — separated from edit form to avoid mis-clicks */}
         <div className="mt-10 pt-6 border-t border-red-900/30">
           <h2 className="text-sm font-bold uppercase tracking-wide text-red-400 mb-2">Danger zone</h2>

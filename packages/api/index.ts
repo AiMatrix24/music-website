@@ -54,6 +54,8 @@ import {
   distributionSubmissions,
   takedownNotices,
   trackSimilarities,
+  trackSplits,
+  trackSplitHistory,
 } from '@opynx/db';
 
 // ─── Auth Router ───
@@ -4845,6 +4847,558 @@ const dmcaRouter = createRouter({
     }),
 });
 
+// ─── Splits Router ───
+/**
+ * Royalty splits per (track, split_type). The track owner is the
+ * implicit 100% holder until they invite collaborators; the system
+ * auto-maintains the owner's row so the sum across (accepted + pending
+ * + owner) rows always equals 10000 basis points (100.00%).
+ *
+ * Payout integration lives in Commit B (separate session). This Commit
+ * A surfaces the management layer only — splits get recorded but the
+ * track owner still receives 100% of payouts. Once Commit B lands, the
+ * existing tip/purchase/etc. flows will look up these splits and divide
+ * the creator pool according to status='accepted' rows.
+ *
+ * All split events are notified to collaborators + owner using the
+ * existing 'system' notification type — those bypass user prefs so
+ * collaborators can't accidentally mute split invitations (which would
+ * be bad — they'd never know they were invited).
+ */
+const splitsRouter = createRouter({
+  /**
+   * Read-only summary of a track's splits. Returns BOTH split types
+   * (master + publishing) so the UI can render them side-by-side.
+   * Includes the owner's implicit/explicit row.
+   */
+  list: publicProcedure
+    .input(z.object({ trackId: z.string().uuid() }))
+    .query(async ({ input }) => {
+      const track = await db.query.tracks.findFirst({
+        where: eq(tracks.id, input.trackId),
+        columns: { id: true, userId: true, title: true },
+      });
+      if (!track) throw new TRPCError({ code: 'NOT_FOUND', message: 'Track not found' });
+
+      const rows = await db
+        .select({
+          id: trackSplits.id,
+          trackId: trackSplits.trackId,
+          collaboratorUserId: trackSplits.collaboratorUserId,
+          splitType: trackSplits.splitType,
+          role: trackSplits.role,
+          percentBp: trackSplits.percentBp,
+          status: trackSplits.status,
+          createdAt: trackSplits.createdAt,
+          acceptedAt: trackSplits.acceptedAt,
+          collaboratorName: users.name,
+          collaboratorAvatar: users.avatar,
+        })
+        .from(trackSplits)
+        .leftJoin(users, eq(trackSplits.collaboratorUserId, users.id))
+        .where(eq(trackSplits.trackId, input.trackId));
+
+      const master = rows.filter((r) => r.splitType === 'master');
+      const publishing = rows.filter((r) => r.splitType === 'publishing');
+
+      return {
+        track,
+        master,
+        publishing,
+        // Helper: if no rows exist for a type, owner is implicit 100%.
+        // UI can use this to render a "fully owned by [owner]" placeholder.
+        masterHasSplits: master.length > 0,
+        publishingHasSplits: publishing.length > 0,
+      };
+    }),
+
+  /** Current user's collaborator-side splits, grouped by status. */
+  listMine: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+    return db
+      .select({
+        id: trackSplits.id,
+        trackId: trackSplits.trackId,
+        splitType: trackSplits.splitType,
+        role: trackSplits.role,
+        percentBp: trackSplits.percentBp,
+        status: trackSplits.status,
+        createdAt: trackSplits.createdAt,
+        acceptedAt: trackSplits.acceptedAt,
+        rejectionReason: trackSplits.rejectionReason,
+        trackTitle: tracks.title,
+        trackCoverUrl: tracks.coverUrl,
+        ownerName: users.name,
+      })
+      .from(trackSplits)
+      .innerJoin(tracks, eq(trackSplits.trackId, tracks.id))
+      .leftJoin(users, eq(tracks.userId, users.id))
+      .where(eq(trackSplits.collaboratorUserId, userId))
+      .orderBy(desc(trackSplits.createdAt));
+  }),
+
+  /** Owner- or collaborator-visible audit log for a track. */
+  history: protectedProcedure
+    .input(z.object({ trackId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const track = await db.query.tracks.findFirst({
+        where: eq(tracks.id, input.trackId),
+        columns: { id: true, userId: true },
+      });
+      if (!track) throw new TRPCError({ code: 'NOT_FOUND' });
+
+      // Authz: owner OR someone with a split (any status) on this track
+      let allowed = track.userId === userId;
+      if (!allowed) {
+        const existing = await db.query.trackSplits.findFirst({
+          where: and(
+            eq(trackSplits.trackId, input.trackId),
+            eq(trackSplits.collaboratorUserId, userId)
+          ),
+          columns: { id: true },
+        });
+        allowed = !!existing;
+      }
+      if (!allowed) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'You are not a party to this track\'s splits' });
+      }
+
+      return db
+        .select({
+          id: trackSplitHistory.id,
+          splitType: trackSplitHistory.splitType,
+          action: trackSplitHistory.action,
+          priorData: trackSplitHistory.priorData,
+          newData: trackSplitHistory.newData,
+          actorId: trackSplitHistory.actorId,
+          actorName: users.name,
+          createdAt: trackSplitHistory.createdAt,
+        })
+        .from(trackSplitHistory)
+        .leftJoin(users, eq(trackSplitHistory.actorId, users.id))
+        .where(eq(trackSplitHistory.trackId, input.trackId))
+        .orderBy(desc(trackSplitHistory.createdAt));
+    }),
+
+  /**
+   * Owner invites a collaborator to a track for one split type.
+   * Auto-manages the owner's row. Idempotent for terminal-status
+   * re-invites (a rejected/revoked row gets reactivated to pending
+   * with the new percent).
+   */
+  invite: protectedProcedure
+    .use(rateLimit({ limit: 30, windowSec: 60 }))
+    .input(
+      z.object({
+        trackId: z.string().uuid(),
+        splitType: z.enum(['master', 'publishing']),
+        collaboratorUserId: z.string().uuid(),
+        role: z.enum(['co_writer', 'producer', 'featured_artist', 'mixer', 'publisher', 'other']),
+        percentBp: z.number().int().min(1).max(9999),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+
+      const track = await db.query.tracks.findFirst({
+        where: eq(tracks.id, input.trackId),
+        columns: { id: true, userId: true, title: true },
+      });
+      if (!track) throw new TRPCError({ code: 'NOT_FOUND', message: 'Track not found' });
+      if (track.userId !== userId) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Only the track owner can manage splits' });
+      }
+      if (input.collaboratorUserId === userId) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'You can\'t invite yourself as a collaborator — you\'re the owner' });
+      }
+
+      return db.transaction(async (tx) => {
+        // Find existing row for this (track, type, collab)
+        const existing = await tx.query.trackSplits.findFirst({
+          where: and(
+            eq(trackSplits.trackId, input.trackId),
+            eq(trackSplits.splitType, input.splitType),
+            eq(trackSplits.collaboratorUserId, input.collaboratorUserId)
+          ),
+        });
+
+        // Find or initialize the owner's row for this (track, type).
+        // If no rows exist at all for this type, materialize the owner row at 10000bp first.
+        const allRows = await tx
+          .select()
+          .from(trackSplits)
+          .where(
+            and(
+              eq(trackSplits.trackId, input.trackId),
+              eq(trackSplits.splitType, input.splitType)
+            )
+          );
+
+        let ownerRow = allRows.find((r) => r.collaboratorUserId === track.userId);
+        if (!ownerRow) {
+          const [inserted] = await tx
+            .insert(trackSplits)
+            .values({
+              trackId: input.trackId,
+              collaboratorUserId: track.userId,
+              splitType: input.splitType,
+              role: 'owner',
+              percentBp: 10000,
+              status: 'accepted',
+              acceptedAt: new Date(),
+              createdBy: userId,
+            })
+            .returning();
+          ownerRow = inserted;
+          await tx.insert(trackSplitHistory).values({
+            trackSplitId: ownerRow.id,
+            trackId: input.trackId,
+            collaboratorUserId: track.userId,
+            splitType: input.splitType,
+            action: 'created',
+            priorData: null,
+            newData: ownerRow as unknown as Record<string, unknown>,
+            actorId: userId,
+          });
+        }
+
+        // Compute non-terminal sum EXCLUDING the existing row's contribution
+        // (since we're about to replace it) and EXCLUDING the owner.
+        const nonTerminalNonOwner = allRows.filter(
+          (r) =>
+            (r.status === 'pending' || r.status === 'accepted') &&
+            r.collaboratorUserId !== track.userId &&
+            r.id !== existing?.id
+        );
+        const reservedBp = nonTerminalNonOwner.reduce((sum, r) => sum + r.percentBp, 0);
+        const availableBp = 10000 - reservedBp;
+        if (input.percentBp > availableBp - 1) {
+          // -1: owner must keep at least 1 bp; otherwise the percent isn't free
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Only ${(availableBp - 1) / 100}% available for new collaborators on this ${input.splitType} split. Adjust other splits first.`,
+          });
+        }
+
+        const newOwnerBp = 10000 - reservedBp - input.percentBp;
+
+        if (existing) {
+          // Re-invite path: update existing row back to pending with new percent
+          const priorData = { ...existing };
+          const [updated] = await tx
+            .update(trackSplits)
+            .set({
+              status: 'pending',
+              percentBp: input.percentBp,
+              role: input.role,
+              acceptedAt: null,
+              rejectedAt: null,
+              revokedAt: null,
+              rejectionReason: null,
+              createdBy: userId,
+              updatedAt: new Date(),
+            })
+            .where(eq(trackSplits.id, existing.id))
+            .returning();
+          await tx.insert(trackSplitHistory).values({
+            trackSplitId: updated.id,
+            trackId: input.trackId,
+            collaboratorUserId: input.collaboratorUserId,
+            splitType: input.splitType,
+            action: 'created',
+            priorData: priorData as unknown as Record<string, unknown>,
+            newData: updated as unknown as Record<string, unknown>,
+            actorId: userId,
+          });
+        } else {
+          // Fresh invite
+          const [inserted] = await tx
+            .insert(trackSplits)
+            .values({
+              trackId: input.trackId,
+              collaboratorUserId: input.collaboratorUserId,
+              splitType: input.splitType,
+              role: input.role,
+              percentBp: input.percentBp,
+              status: 'pending',
+              createdBy: userId,
+            })
+            .returning();
+          await tx.insert(trackSplitHistory).values({
+            trackSplitId: inserted.id,
+            trackId: input.trackId,
+            collaboratorUserId: input.collaboratorUserId,
+            splitType: input.splitType,
+            action: 'created',
+            priorData: null,
+            newData: inserted as unknown as Record<string, unknown>,
+            actorId: userId,
+          });
+        }
+
+        // Adjust owner's row
+        await tx
+          .update(trackSplits)
+          .set({ percentBp: newOwnerBp, updatedAt: new Date() })
+          .where(eq(trackSplits.id, ownerRow.id));
+        await tx.insert(trackSplitHistory).values({
+          trackSplitId: ownerRow.id,
+          trackId: input.trackId,
+          collaboratorUserId: track.userId,
+          splitType: input.splitType,
+          action: 'percent_changed',
+          priorData: { percentBp: ownerRow.percentBp },
+          newData: { percentBp: newOwnerBp },
+          actorId: userId,
+        });
+
+        // Notify the collaborator (system type — bypasses prefs so they always see it)
+        await notify({
+          userId: input.collaboratorUserId,
+          type: 'system',
+          title: `Split invitation: ${track.title}`,
+          body: `You've been invited to a ${input.splitType} split on "${track.title}" at ${input.percentBp / 100}%. Review and accept in your splits dashboard.`,
+          link: '/dashboard/splits/pending',
+        });
+
+        return { ok: true };
+      });
+    }),
+
+  /** Collaborator accepts their pending split. */
+  accept: protectedProcedure
+    .input(z.object({ splitId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const row = await db.query.trackSplits.findFirst({
+        where: eq(trackSplits.id, input.splitId),
+      });
+      if (!row) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (row.collaboratorUserId !== userId) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Only the collaborator can accept' });
+      }
+      if (row.status !== 'pending') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: `This split is already ${row.status}` });
+      }
+
+      const track = await db.query.tracks.findFirst({
+        where: eq(tracks.id, row.trackId),
+        columns: { userId: true, title: true },
+      });
+      if (!track) throw new TRPCError({ code: 'NOT_FOUND' });
+
+      await db.transaction(async (tx) => {
+        const priorData = { ...row };
+        const [updated] = await tx
+          .update(trackSplits)
+          .set({
+            status: 'accepted',
+            acceptedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(trackSplits.id, input.splitId))
+          .returning();
+        await tx.insert(trackSplitHistory).values({
+          trackSplitId: updated.id,
+          trackId: row.trackId,
+          collaboratorUserId: userId,
+          splitType: row.splitType,
+          action: 'accepted',
+          priorData: priorData as unknown as Record<string, unknown>,
+          newData: updated as unknown as Record<string, unknown>,
+          actorId: userId,
+        });
+      });
+
+      // Notify the track owner that the collaborator accepted
+      await notify({
+        userId: track.userId,
+        type: 'system',
+        title: 'Split accepted',
+        body: `A collaborator accepted their split on "${track.title}".`,
+        link: `/dashboard/splits/${row.trackId}`,
+      });
+
+      return { ok: true };
+    }),
+
+  /**
+   * Collaborator rejects a pending split. Frees the bp back to owner.
+   */
+  reject: protectedProcedure
+    .input(z.object({ splitId: z.string().uuid(), reason: z.string().max(500).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const row = await db.query.trackSplits.findFirst({
+        where: eq(trackSplits.id, input.splitId),
+      });
+      if (!row) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (row.collaboratorUserId !== userId) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
+      if (row.status !== 'pending') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: `This split is already ${row.status}` });
+      }
+
+      const track = await db.query.tracks.findFirst({
+        where: eq(tracks.id, row.trackId),
+        columns: { userId: true, title: true },
+      });
+      if (!track) throw new TRPCError({ code: 'NOT_FOUND' });
+
+      await db.transaction(async (tx) => {
+        const priorData = { ...row };
+        const [updated] = await tx
+          .update(trackSplits)
+          .set({
+            status: 'rejected',
+            rejectedAt: new Date(),
+            rejectionReason: input.reason ?? null,
+            updatedAt: new Date(),
+          })
+          .where(eq(trackSplits.id, input.splitId))
+          .returning();
+        await tx.insert(trackSplitHistory).values({
+          trackSplitId: updated.id,
+          trackId: row.trackId,
+          collaboratorUserId: userId,
+          splitType: row.splitType,
+          action: 'rejected',
+          priorData: priorData as unknown as Record<string, unknown>,
+          newData: updated as unknown as Record<string, unknown>,
+          actorId: userId,
+        });
+
+        // Return bp to owner
+        const ownerRow = await tx.query.trackSplits.findFirst({
+          where: and(
+            eq(trackSplits.trackId, row.trackId),
+            eq(trackSplits.splitType, row.splitType),
+            eq(trackSplits.collaboratorUserId, track.userId)
+          ),
+        });
+        if (ownerRow) {
+          const newOwnerBp = ownerRow.percentBp + row.percentBp;
+          await tx
+            .update(trackSplits)
+            .set({ percentBp: newOwnerBp, updatedAt: new Date() })
+            .where(eq(trackSplits.id, ownerRow.id));
+          await tx.insert(trackSplitHistory).values({
+            trackSplitId: ownerRow.id,
+            trackId: row.trackId,
+            collaboratorUserId: track.userId,
+            splitType: row.splitType,
+            action: 'percent_changed',
+            priorData: { percentBp: ownerRow.percentBp },
+            newData: { percentBp: newOwnerBp },
+            actorId: userId,
+          });
+        }
+      });
+
+      await notify({
+        userId: track.userId,
+        type: 'system',
+        title: 'Split rejected',
+        body: `A collaborator rejected their split on "${track.title}"${input.reason ? `: ${input.reason}` : '.'}`,
+        link: `/dashboard/splits/${row.trackId}`,
+      });
+
+      return { ok: true };
+    }),
+
+  /**
+   * Owner revokes a collaborator. Terminal; bp returns to owner.
+   * Cannot revoke the owner's own row (the system manages that).
+   */
+  revoke: protectedProcedure
+    .input(z.object({ splitId: z.string().uuid(), reason: z.string().max(500).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const row = await db.query.trackSplits.findFirst({
+        where: eq(trackSplits.id, input.splitId),
+      });
+      if (!row) throw new TRPCError({ code: 'NOT_FOUND' });
+
+      const track = await db.query.tracks.findFirst({
+        where: eq(tracks.id, row.trackId),
+        columns: { userId: true, title: true },
+      });
+      if (!track) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (track.userId !== userId) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Only the track owner can revoke' });
+      }
+      if (row.role === 'owner') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'The owner row is system-managed and cannot be revoked' });
+      }
+      if (row.status === 'revoked' || row.status === 'rejected') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: `This split is already ${row.status}` });
+      }
+
+      await db.transaction(async (tx) => {
+        const priorData = { ...row };
+        const [updated] = await tx
+          .update(trackSplits)
+          .set({
+            status: 'revoked',
+            revokedAt: new Date(),
+            rejectionReason: input.reason ?? null,
+            updatedAt: new Date(),
+          })
+          .where(eq(trackSplits.id, input.splitId))
+          .returning();
+        await tx.insert(trackSplitHistory).values({
+          trackSplitId: updated.id,
+          trackId: row.trackId,
+          collaboratorUserId: row.collaboratorUserId,
+          splitType: row.splitType,
+          action: 'revoked',
+          priorData: priorData as unknown as Record<string, unknown>,
+          newData: updated as unknown as Record<string, unknown>,
+          actorId: userId,
+        });
+
+        // Return bp to owner
+        const ownerRow = await tx.query.trackSplits.findFirst({
+          where: and(
+            eq(trackSplits.trackId, row.trackId),
+            eq(trackSplits.splitType, row.splitType),
+            eq(trackSplits.collaboratorUserId, track.userId)
+          ),
+        });
+        if (ownerRow) {
+          const newOwnerBp = ownerRow.percentBp + row.percentBp;
+          await tx
+            .update(trackSplits)
+            .set({ percentBp: newOwnerBp, updatedAt: new Date() })
+            .where(eq(trackSplits.id, ownerRow.id));
+          await tx.insert(trackSplitHistory).values({
+            trackSplitId: ownerRow.id,
+            trackId: row.trackId,
+            collaboratorUserId: track.userId,
+            splitType: row.splitType,
+            action: 'percent_changed',
+            priorData: { percentBp: ownerRow.percentBp },
+            newData: { percentBp: newOwnerBp },
+            actorId: userId,
+          });
+        }
+      });
+
+      // Notify the collaborator they were revoked
+      await notify({
+        userId: row.collaboratorUserId,
+        type: 'system',
+        title: 'Split revoked',
+        body: `Your split on "${track.title}" was revoked by the track owner${input.reason ? `: ${input.reason}` : '.'}`,
+        link: '/dashboard/splits/mine',
+      });
+
+      return { ok: true };
+    }),
+});
+
 export const appRouter = createRouter({
   auth: authRouter,
   users: usersRouter,
@@ -4875,6 +5429,7 @@ export const appRouter = createRouter({
   search: searchRouter,
   distribution: distributionRouter,
   dmca: dmcaRouter,
+  splits: splitsRouter,
 });
 
 export type AppRouter = typeof appRouter;

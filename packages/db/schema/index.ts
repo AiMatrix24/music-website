@@ -16,3 +16,4 @@ export * from './verification';
 export * from './distribution';
 export * from './dmca';
 export * from './recommendations';
+export * from './splits';

@@ -1,736 +1,354 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { trpc } from '@/lib/trpc/client';
 import { useSession } from 'next-auth/react';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import {
-  validateSplits,
-  type Writer,
-  type Publisher,
-  type MasterOwnership,
-} from '@/lib/services/split-sheet';
+import { useState } from 'react';
+import { useToast } from '@/app/components/Toast';
 
-type ProAffiliation = Writer['proAffiliation'];
+/**
+ * Owner-facing splits manager for a single track. Shows both master and
+ * publishing split tables side-by-side, with invite/revoke controls.
+ *
+ * Owner row is system-managed — percent auto-decreases when a
+ * collaborator is invited, auto-increases when one is rejected/revoked.
+ * Owner can't be revoked.
+ *
+ * Note: splits are recorded but NOT yet routed through payouts (that's
+ * Commit B). The header banner makes this explicit so creators don't
+ * expect splits to affect their next tip-share.
+ */
+export default function TrackSplitsPage() {
+  const { trackId } = useParams<{ trackId: string }>();
+  const { data: session, status: authStatus } = useSession();
+  const { toast } = useToast();
+  const utils = trpc.useUtils();
 
-const PRO_OPTIONS: ProAffiliation[] = ['ASCAP', 'BMI', 'SESAC', 'GMR', 'NONE'];
-const PRO_COLLECTING_OPTIONS = ['ASCAP', 'BMI', 'SESAC', 'GMR'] as const;
-const TERRITORY_OPTIONS: Publisher['territory'][] = [
-  'Worldwide',
-  'US',
-  'Europe',
-  'Other',
-];
+  const { data, isLoading, error } = trpc.splits.list.useQuery({ trackId }, { enabled: !!trackId });
+  const isOwner = !!data && data.track.userId === session?.user?.id;
 
-export default function SplitSheetEditorPage() {
-  const params = useParams<{ trackId: string }>();
-  const trackId = params?.trackId ?? '';
-  const { data: session, status } = useSession();
+  const [activeTab, setActiveTab] = useState<'master' | 'publishing'>('master');
 
-  // Mock track title (would be fetched from tRPC in production)
-  const trackTitle = useMemo(() => `Track ${trackId.slice(0, 8)}`, [trackId]);
-
-  const [writers, setWriters] = useState<Writer[]>(() => [
-    {
-      id: 'w-1',
-      name: '',
-      ipiNumber: '',
-      proAffiliation: 'NONE',
-      publisher: '',
-      percentage: 100,
-    },
-  ]);
-
-  const [publishers, setPublishers] = useState<Publisher[]>(() => [
-    {
-      id: 'p-1',
-      name: 'Self-Published',
-      percentage: 100,
-      territory: 'Worldwide',
-    },
-  ]);
-
-  const [master, setMaster] = useState<MasterOwnership>({
-    type: 'artist',
-  });
-
-  const [mechRequired, setMechRequired] = useState<'required' | 'not_required'>(
-    'required'
-  );
-  const [mlcRegistered, setMlcRegistered] = useState(false);
-
-  const [proCollecting, setProCollecting] =
-    useState<(typeof PRO_COLLECTING_OPTIONS)[number]>('ASCAP');
-  const [workRegNumber, setWorkRegNumber] = useState('');
-
-  const [showSignerModal, setShowSignerModal] = useState(false);
-  const [signerEmails, setSignerEmails] = useState('');
-
-  const writerValidation = useMemo(() => validateSplits(writers), [writers]);
-  const publisherValidation = useMemo(
-    () => validateSplits(publishers),
-    [publishers]
-  );
-
-  if (status === 'loading') {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-400">Loading…</p>
-      </div>
-    );
-  }
-
-  if (status !== 'authenticated') {
+  if (authStatus !== 'authenticated') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <p className="text-5xl mb-2">🎼</p>
-        <p className="text-gray-400 text-lg">
-          Sign in to manage split sheets
-        </p>
-        <Link
-          href="/auth/login"
-          className="rounded-full bg-red-600 px-6 py-3 font-semibold text-white hover:bg-red-500 transition"
-        >
-          Sign In
-        </Link>
+        <p className="text-gray-400 text-lg">Sign in to manage splits</p>
+        <Link href="/auth/login" className="text-red-400 hover:text-red-300 transition">Sign In →</Link>
       </div>
     );
   }
 
-  // ─── Writer handlers ───
-  const addWriter = () => {
-    setWriters((prev) => [
-      ...prev,
-      {
-        id: `w-${Date.now()}`,
-        name: '',
-        ipiNumber: '',
-        proAffiliation: 'NONE',
-        publisher: '',
-        percentage: 0,
-      },
-    ]);
-  };
-  const removeWriter = (id: string) =>
-    setWriters((prev) => prev.filter((w) => w.id !== id));
-  const updateWriter = (id: string, patch: Partial<Writer>) =>
-    setWriters((prev) =>
-      prev.map((w) => (w.id === id ? { ...w, ...patch } : w))
-    );
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center text-gray-400">Loading…</div>;
+  }
 
-  // ─── Publisher handlers ───
-  const addPublisher = () => {
-    setPublishers((prev) => [
-      ...prev,
-      {
-        id: `p-${Date.now()}`,
-        name: '',
-        percentage: 0,
-        territory: 'Worldwide',
-      },
-    ]);
-  };
-  const removePublisher = (id: string) =>
-    setPublishers((prev) => prev.filter((p) => p.id !== id));
-  const updatePublisher = (id: string, patch: Partial<Publisher>) =>
-    setPublishers((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, ...patch } : p))
+  if (error || !data) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+        <p className="text-gray-400 text-lg">Track not found or you don't have access</p>
+        <Link href="/dashboard" className="text-red-400 hover:text-red-300 transition">← Back to Dashboard</Link>
+      </div>
     );
+  }
+
+  if (!isOwner) {
+    return (
+      <div className="min-h-screen pt-24 pb-16 px-6">
+        <div className="max-w-3xl mx-auto">
+          <Link href="/dashboard/splits/mine" className="text-sm text-gray-400 hover:text-white transition mb-6 inline-block">← My splits</Link>
+          <h1 className="text-2xl font-bold mb-2">Splits for "{data.track.title}"</h1>
+          <p className="text-sm text-gray-500 mb-6">You're a collaborator on this track but not the owner. Manage your acceptance status from <Link href="/dashboard/splits/mine" className="text-red-400 hover:underline">My splits</Link>.</p>
+          <SplitTable splitType="master" rows={data.master} hasSplits={data.masterHasSplits} viewerIsOwner={false} />
+          <SplitTable splitType="publishing" rows={data.publishing} hasSplits={data.publishingHasSplits} viewerIsOwner={false} />
+        </div>
+      </div>
+    );
+  }
+
+  const visibleRows = activeTab === 'master' ? data.master : data.publishing;
+  const hasSplits = activeTab === 'master' ? data.masterHasSplits : data.publishingHasSplits;
 
   return (
-    <div className="min-h-screen bg-brand-950 py-16 px-6">
-      <div className="max-w-6xl mx-auto">
-        {/* Hero */}
-        <div className="mb-10">
-          <Link
-            href="/dashboard"
-            className="text-sm text-red-400 hover:text-red-300 mb-3 inline-block"
-          >
-            ← Back to Dashboard
-          </Link>
-          <h1 className="text-4xl font-black mb-2">Split Sheet Editor</h1>
-          <p className="text-gray-400">
-            <span className="text-white font-semibold">{trackTitle}</span>{' '}
-            — Configure songwriter, publisher, and master rights splits
+    <div className="min-h-screen pt-24 pb-16 px-6">
+      <div className="max-w-3xl mx-auto">
+        <Link href={`/dashboard/track/${trackId}/edit`} className="text-sm text-gray-400 hover:text-white transition mb-6 inline-block">← Back to track</Link>
+        <h1 className="text-2xl font-bold mb-1">Royalty splits</h1>
+        <p className="text-sm text-gray-400 mb-2">{data.track.title}</p>
+
+        <div className="rounded-2xl bg-yellow-950/20 border border-yellow-700/30 p-4 mb-6 text-sm">
+          <p className="font-bold text-yellow-400 mb-1">Splits aren't paying out yet</p>
+          <p className="text-xs text-yellow-200/80">
+            You can configure splits now and they'll be saved + audited. Money routing follows the splits in a separate release (coming soon). Until then you'll receive 100% of payouts on this track regardless of what's configured here.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main column */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Songwriter Splits */}
-            <section className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-xl font-bold">Songwriter Splits</h2>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Must total 100%
-                  </p>
-                </div>
-                <button
-                  onClick={addWriter}
-                  className="rounded-full bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white px-4 py-1.5 text-sm font-semibold transition"
-                >
-                  + Add Writer
-                </button>
-              </div>
+        <div className="flex gap-2 mb-6">
+          {(['master', 'publishing'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setActiveTab(t)}
+              className={`px-4 py-2 rounded-full text-sm font-semibold capitalize transition ${
+                activeTab === t ? 'bg-red-600 text-white' : 'bg-brand-950 text-gray-400 hover:text-white border border-brand-800/40'
+              }`}
+            >
+              {t} split
+            </button>
+          ))}
+        </div>
 
-              <div className="space-y-3 mb-4">
-                {writers.map((w) => (
-                  <div
-                    key={w.id}
-                    className="rounded-xl bg-brand-950/50 border border-brand-800/20 p-4"
-                  >
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                      <input
-                        type="text"
-                        placeholder="Writer name"
-                        value={w.name}
-                        onChange={(e) =>
-                          updateWriter(w.id, { name: e.target.value })
-                        }
-                        className="w-full rounded-lg bg-[#15151f] border border-brand-800/30 px-3 py-2 text-sm focus:border-red-600 focus:outline-none"
-                      />
-                      <input
-                        type="text"
-                        placeholder="IPI / CAE number"
-                        value={w.ipiNumber ?? ''}
-                        onChange={(e) =>
-                          updateWriter(w.id, { ipiNumber: e.target.value })
-                        }
-                        className="w-full rounded-lg bg-[#15151f] border border-brand-800/30 px-3 py-2 text-sm focus:border-red-600 focus:outline-none"
-                      />
-                      <select
-                        value={w.proAffiliation}
-                        onChange={(e) =>
-                          updateWriter(w.id, {
-                            proAffiliation: e.target.value as ProAffiliation,
-                          })
-                        }
-                        className="w-full rounded-lg bg-[#15151f] border border-brand-800/30 px-3 py-2 text-sm focus:border-red-600 focus:outline-none"
-                      >
-                        {PRO_OPTIONS.map((p) => (
-                          <option key={p} value={p}>
-                            {p === 'NONE' ? 'No PRO' : p}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="text"
-                        placeholder="Publisher"
-                        value={w.publisher ?? ''}
-                        onChange={(e) =>
-                          updateWriter(w.id, { publisher: e.target.value })
-                        }
-                        className="w-full rounded-lg bg-[#15151f] border border-brand-800/30 px-3 py-2 text-sm focus:border-red-600 focus:outline-none"
-                      />
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2 flex-1">
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.01"
-                          value={w.percentage}
-                          onChange={(e) =>
-                            updateWriter(w.id, {
-                              percentage: Number(e.target.value) || 0,
-                            })
-                          }
-                          className="w-24 rounded-lg bg-[#15151f] border border-brand-800/30 px-3 py-2 text-sm focus:border-red-600 focus:outline-none"
-                        />
-                        <span className="text-sm text-gray-400">%</span>
-                      </div>
-                      {writers.length > 1 && (
-                        <button
-                          onClick={() => removeWriter(w.id)}
-                          className="text-xs text-gray-500 hover:text-red-400"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+        <SplitTable splitType={activeTab} rows={visibleRows} hasSplits={hasSplits} viewerIsOwner={true} />
+        <InviteForm
+          trackId={trackId}
+          splitType={activeTab}
+          existingRows={visibleRows}
+          onDone={() => utils.splits.list.invalidate({ trackId })}
+        />
+      </div>
+    </div>
+  );
 
-              {/* Visual percentage bar */}
-              <div className="mb-3">
-                <div className="flex h-3 rounded-full overflow-hidden bg-brand-950">
-                  {writers.map((w, idx) => (
-                    <div
-                      key={w.id}
-                      className={`h-full ${BAR_COLORS[idx % BAR_COLORS.length]}`}
-                      style={{ width: `${Math.min(w.percentage, 100)}%` }}
-                      title={`${w.name || 'Writer'}: ${w.percentage}%`}
-                    />
-                  ))}
-                </div>
-              </div>
+  function SplitTable({
+    splitType,
+    rows,
+    hasSplits,
+    viewerIsOwner,
+  }: {
+    splitType: 'master' | 'publishing';
+    rows: NonNullable<typeof data>['master'];
+    hasSplits: boolean;
+    viewerIsOwner: boolean;
+  }) {
+    const revoke = trpc.splits.revoke.useMutation({
+      onSuccess: () => {
+        toast('Split revoked', 'success');
+        utils.splits.list.invalidate({ trackId });
+      },
+      onError: (err) => toast(err.message || 'Revoke failed', 'error'),
+    });
 
-              {writerValidation.valid ? (
-                <p className="text-xs text-green-400 font-semibold">
-                  ✓ Total: 100%
-                </p>
+    if (!hasSplits) {
+      return (
+        <div className="rounded-2xl bg-[#15151f] p-6 mb-6">
+          <p className="text-sm text-gray-300">
+            <span className="font-bold capitalize">{splitType}</span> split: 100% to you. Invite a collaborator below to start splitting this revenue stream.
+          </p>
+        </div>
+      );
+    }
+
+    const sortedRows = [...rows].sort((a, b) => {
+      // Owner row first, then by status (accepted before pending), then by createdAt
+      if (a.role === 'owner') return -1;
+      if (b.role === 'owner') return 1;
+      const statusOrder = { accepted: 0, pending: 1, rejected: 2, revoked: 3 };
+      return statusOrder[a.status] - statusOrder[b.status];
+    });
+
+    return (
+      <div className="rounded-2xl bg-[#15151f] p-6 mb-6">
+        <h2 className="text-lg font-bold mb-1 capitalize">{splitType} split</h2>
+        <p className="text-xs text-gray-500 mb-4">
+          {splitType === 'master'
+            ? 'Sound-recording revenue: tips, purchases, streaming master royalties.'
+            : 'Composition revenue: mechanical royalties (MLC), performance royalties (PROs).'}
+        </p>
+        <div className="space-y-2">
+          {sortedRows.map((row) => (
+            <div key={row.id} className="flex items-center gap-3 rounded-xl bg-brand-950/40 p-3">
+              {row.collaboratorAvatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={row.collaboratorAvatar} alt="" className="w-9 h-9 rounded-full object-cover" />
               ) : (
-                <p className="text-xs text-red-400 font-semibold">
-                  {writerValidation.error}
-                </p>
-              )}
-            </section>
-
-            {/* Publisher Splits */}
-            <section className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-xl font-bold">Publisher Splits</h2>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Must total 100%
-                  </p>
-                </div>
-                <button
-                  onClick={addPublisher}
-                  className="rounded-full bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white px-4 py-1.5 text-sm font-semibold transition"
-                >
-                  + Add Publisher
-                </button>
-              </div>
-
-              <div className="space-y-3 mb-3">
-                {publishers.map((p) => (
-                  <div
-                    key={p.id}
-                    className="rounded-xl bg-brand-950/50 border border-brand-800/20 p-4 grid grid-cols-1 sm:grid-cols-12 gap-3 items-center"
-                  >
-                    <input
-                      type="text"
-                      placeholder="Publisher name"
-                      value={p.name}
-                      onChange={(e) =>
-                        updatePublisher(p.id, { name: e.target.value })
-                      }
-                      className="sm:col-span-5 w-full rounded-lg bg-[#15151f] border border-brand-800/30 px-3 py-2 text-sm focus:border-red-600 focus:outline-none"
-                    />
-                    <select
-                      value={p.territory}
-                      onChange={(e) =>
-                        updatePublisher(p.id, {
-                          territory: e.target.value as Publisher['territory'],
-                        })
-                      }
-                      className="sm:col-span-4 w-full rounded-lg bg-[#15151f] border border-brand-800/30 px-3 py-2 text-sm focus:border-red-600 focus:outline-none"
-                    >
-                      {TERRITORY_OPTIONS.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="sm:col-span-2 flex items-center gap-2">
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        value={p.percentage}
-                        onChange={(e) =>
-                          updatePublisher(p.id, {
-                            percentage: Number(e.target.value) || 0,
-                          })
-                        }
-                        className="w-full rounded-lg bg-[#15151f] border border-brand-800/30 px-3 py-2 text-sm focus:border-red-600 focus:outline-none"
-                      />
-                      <span className="text-sm text-gray-400">%</span>
-                    </div>
-                    {publishers.length > 1 && (
-                      <button
-                        onClick={() => removePublisher(p.id)}
-                        className="sm:col-span-1 text-xs text-gray-500 hover:text-red-400"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {publisherValidation.valid ? (
-                <p className="text-xs text-green-400 font-semibold">
-                  ✓ Total: 100%
-                </p>
-              ) : (
-                <p className="text-xs text-red-400 font-semibold">
-                  {publisherValidation.error}
-                </p>
-              )}
-            </section>
-
-            {/* Master Recording Ownership */}
-            <section className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6">
-              <h2 className="text-xl font-bold mb-4">
-                Master Recording Ownership
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-                {(['artist', 'label', 'coowned'] as const).map((opt) => (
-                  <button
-                    key={opt}
-                    onClick={() => setMaster({ type: opt })}
-                    className={`rounded-xl border px-4 py-3 text-sm font-semibold transition ${
-                      master.type === opt
-                        ? 'border-red-600 bg-red-600/10 text-white'
-                        : 'border-brand-800/30 text-gray-400 hover:border-red-600/40'
-                    }`}
-                  >
-                    {opt === 'artist'
-                      ? 'You'
-                      : opt === 'label'
-                        ? 'Label'
-                        : 'Co-owned'}
-                  </button>
-                ))}
-              </div>
-
-              {(master.type === 'label' || master.type === 'coowned') && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                  <input
-                    type="text"
-                    placeholder="Label name"
-                    value={master.labelName ?? ''}
-                    onChange={(e) =>
-                      setMaster({ ...master, labelName: e.target.value })
-                    }
-                    className="rounded-lg bg-brand-950/50 border border-brand-800/30 px-3 py-2 text-sm focus:border-red-600 focus:outline-none"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Contract reference number"
-                    value={master.contractRef ?? ''}
-                    onChange={(e) =>
-                      setMaster({ ...master, contractRef: e.target.value })
-                    }
-                    className="rounded-lg bg-brand-950/50 border border-brand-800/30 px-3 py-2 text-sm focus:border-red-600 focus:outline-none"
-                  />
+                <div className="w-9 h-9 rounded-full bg-brand-700 flex items-center justify-center text-xs font-bold">
+                  {row.collaboratorName?.charAt(0)?.toUpperCase() ?? '?'}
                 </div>
               )}
-
-              {master.type === 'coowned' && (
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  <label className="text-xs text-gray-400">
-                    Creator share %
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={master.artistShare ?? 50}
-                      onChange={(e) =>
-                        setMaster({
-                          ...master,
-                          artistShare: Number(e.target.value) || 0,
-                        })
-                      }
-                      className="mt-1 w-full rounded-lg bg-brand-950/50 border border-brand-800/30 px-3 py-2 text-sm text-white focus:border-red-600 focus:outline-none"
-                    />
-                  </label>
-                  <label className="text-xs text-gray-400">
-                    Label royalty share %
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={master.labelShare ?? 50}
-                      onChange={(e) =>
-                        setMaster({
-                          ...master,
-                          labelShare: Number(e.target.value) || 0,
-                        })
-                      }
-                      className="mt-1 w-full rounded-lg bg-brand-950/50 border border-brand-800/30 px-3 py-2 text-sm text-white focus:border-red-600 focus:outline-none"
-                    />
-                  </label>
-                </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm truncate">{row.collaboratorName ?? 'Unknown'}</p>
+                <p className="text-xs text-gray-500 capitalize">{row.role.replace('_', ' ')}</p>
+              </div>
+              <div className="text-right">
+                <p className="font-bold">{(row.percentBp / 100).toFixed(2)}%</p>
+                <StatusBadge status={row.status} />
+              </div>
+              {viewerIsOwner && row.role !== 'owner' && row.status !== 'rejected' && row.status !== 'revoked' && (
+                <button
+                  onClick={() => {
+                    if (confirm(`Revoke ${row.collaboratorName ?? 'this collaborator'}'s ${(row.percentBp / 100).toFixed(2)}% ${splitType} split?`)) {
+                      revoke.mutate({ splitId: row.id });
+                    }
+                  }}
+                  disabled={revoke.isPending}
+                  className="text-xs text-gray-500 hover:text-red-400 transition disabled:opacity-50 px-2"
+                >
+                  Revoke
+                </button>
               )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className="text-xs text-gray-400">
-                  Effective date
-                  <input
-                    type="date"
-                    onChange={(e) =>
-                      setMaster({
-                        ...master,
-                        effectiveDate: e.target.value
-                          ? new Date(e.target.value)
-                          : undefined,
-                      })
-                    }
-                    className="mt-1 w-full rounded-lg bg-brand-950/50 border border-brand-800/30 px-3 py-2 text-sm text-white focus:border-red-600 focus:outline-none"
-                  />
-                </label>
-                <label className="text-xs text-gray-400">
-                  Expiration (term ends)
-                  <input
-                    type="date"
-                    onChange={(e) =>
-                      setMaster({
-                        ...master,
-                        termEnds: e.target.value
-                          ? new Date(e.target.value)
-                          : undefined,
-                      })
-                    }
-                    className="mt-1 w-full rounded-lg bg-brand-950/50 border border-brand-800/30 px-3 py-2 text-sm text-white focus:border-red-600 focus:outline-none"
-                  />
-                </label>
-              </div>
-            </section>
-
-            {/* Mechanical Rights */}
-            <section className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6">
-              <h2 className="text-xl font-bold mb-4">Mechanical Rights</h2>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">
-                    Mechanical license
-                  </p>
-                  <div className="flex gap-2">
-                    {(['required', 'not_required'] as const).map((opt) => (
-                      <button
-                        key={opt}
-                        onClick={() => setMechRequired(opt)}
-                        className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-                          mechRequired === opt
-                            ? 'bg-red-600 text-white'
-                            : 'bg-brand-950/50 text-gray-400 hover:bg-brand-950'
-                        }`}
-                      >
-                        {opt === 'required' ? 'Required' : 'Not Required'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">
-                    MLC registered
-                  </p>
-                  <div className="flex gap-2 items-center">
-                    <button
-                      onClick={() => setMlcRegistered(true)}
-                      className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-                        mlcRegistered
-                          ? 'bg-red-600 text-white'
-                          : 'bg-brand-950/50 text-gray-400 hover:bg-brand-950'
-                      }`}
-                    >
-                      Yes
-                    </button>
-                    <button
-                      onClick={() => setMlcRegistered(false)}
-                      className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-                        !mlcRegistered
-                          ? 'bg-red-600 text-white'
-                          : 'bg-brand-950/50 text-gray-400 hover:bg-brand-950'
-                      }`}
-                    >
-                      No
-                    </button>
-                    {!mlcRegistered && (
-                      <a
-                        href="https://www.themlc.com/"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="ml-2 text-xs text-red-400 hover:text-red-300 underline"
-                      >
-                        Register with MLC →
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* Performance Rights */}
-            <section className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6">
-              <h2 className="text-xl font-bold mb-4">Performance Rights</h2>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">
-                    PRO collecting on your behalf
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {PRO_COLLECTING_OPTIONS.map((opt) => (
-                      <button
-                        key={opt}
-                        onClick={() => setProCollecting(opt)}
-                        className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-                          proCollecting === opt
-                            ? 'bg-red-600 text-white'
-                            : 'bg-brand-950/50 text-gray-400 hover:bg-brand-950'
-                        }`}
-                      >
-                        {opt}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Work registration number with PRO"
-                  value={workRegNumber}
-                  onChange={(e) => setWorkRegNumber(e.target.value)}
-                  className="w-full rounded-lg bg-brand-950/50 border border-brand-800/30 px-3 py-2 text-sm focus:border-red-600 focus:outline-none"
-                />
-                <a
-                  href={`https://www.${proCollecting.toLowerCase()}.com/`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block text-sm text-red-400 hover:text-red-300 font-semibold"
-                >
-                  Register with {proCollecting} →
-                </a>
-              </div>
-            </section>
-
-            {/* Generate Documents */}
-            <section className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6">
-              <h2 className="text-xl font-bold mb-4">Generate Documents</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <button
-                  onClick={() =>
-                    alert('Mock: Split sheet PDF would download here.')
-                  }
-                  className="rounded-xl bg-brand-950/50 border border-brand-800/30 hover:border-red-600/40 px-4 py-3 text-sm font-semibold transition"
-                >
-                  📄 Download Split Sheet PDF
-                </button>
-                <button
-                  onClick={() => setShowSignerModal(true)}
-                  className="rounded-xl bg-brand-950/50 border border-brand-800/30 hover:border-red-600/40 px-4 py-3 text-sm font-semibold transition"
-                >
-                  ✍️ Send for E-Signature
-                </button>
-                <button
-                  onClick={() =>
-                    alert(
-                      'Mock: An immutable record would be created on Polygon.'
-                    )
-                  }
-                  className="rounded-xl bg-brand-950/50 border border-brand-800/30 hover:border-red-600/40 px-4 py-3 text-sm font-semibold transition"
-                >
-                  ⛓️ Generate On-Chain Record
-                </button>
-              </div>
-            </section>
-
-            {/* Save */}
-            <div className="flex items-center justify-between gap-4">
-              <p className="text-xs text-gray-500">Last saved: 2 minutes ago</p>
-              <button
-                disabled={
-                  !writerValidation.valid || !publisherValidation.valid
-                }
-                onClick={() => alert('Mock: Saving split sheet…')}
-                className="rounded-full bg-red-600 px-8 py-4 text-base font-bold text-white hover:bg-red-500 disabled:bg-gray-700 disabled:cursor-not-allowed transition"
-              >
-                Save Changes
-              </button>
             </div>
-          </div>
-
-          {/* Sidebar */}
-          <aside className="lg:col-span-1">
-            <div className="sticky top-8 rounded-2xl bg-[#15151f] border border-brand-800/20 p-6">
-              <h3 className="text-lg font-bold mb-3">Why splits matter</h3>
-              <p className="text-sm text-gray-400 leading-relaxed mb-4">
-                A split sheet is the legal foundation for how royalties from
-                streams, syncs, and performance income flow back to everyone
-                involved in your track.
-              </p>
-              <ul className="space-y-3 text-sm text-gray-400">
-                <li className="flex gap-2">
-                  <span className="text-red-500">▸</span>
-                  <span>
-                    <strong className="text-white">Songwriter splits</strong>{' '}
-                    determine how mechanical and performance royalties are
-                    divided.
-                  </span>
-                </li>
-                <li className="flex gap-2">
-                  <span className="text-red-500">▸</span>
-                  <span>
-                    <strong className="text-white">Publisher splits</strong>{' '}
-                    govern the publisher’s share of the writer’s side.
-                  </span>
-                </li>
-                <li className="flex gap-2">
-                  <span className="text-red-500">▸</span>
-                  <span>
-                    <strong className="text-white">Master ownership</strong>{' '}
-                    decides who collects from streaming and licensing.
-                  </span>
-                </li>
-              </ul>
-              <Link
-                href="/education/royalties"
-                className="mt-4 inline-block text-sm text-red-400 hover:text-red-300 font-semibold"
-              >
-                Learn more about royalties →
-              </Link>
-            </div>
-          </aside>
+          ))}
         </div>
       </div>
+    );
+  }
+}
 
-      {/* Signer modal */}
-      {showSignerModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-[#15151f] border border-brand-800/40 p-6">
-            <h3 className="text-xl font-bold mb-3">Send for E-Signature</h3>
-            <p className="text-sm text-gray-400 mb-4">
-              Add signer email addresses (one per line). Each party will
-              receive a secure link to review and sign.
-            </p>
-            <textarea
-              value={signerEmails}
-              onChange={(e) => setSignerEmails(e.target.value)}
-              rows={5}
-              placeholder="writer1@example.com&#10;writer2@example.com"
-              className="w-full rounded-lg bg-brand-950/50 border border-brand-800/30 px-3 py-2 text-sm focus:border-red-600 focus:outline-none mb-4"
-            />
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowSignerModal(false)}
-                className="rounded-full border border-brand-800/40 px-5 py-2 text-sm font-semibold text-gray-400 hover:text-white transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  alert(
-                    `Mock: Sending signature requests to ${signerEmails
-                      .split('\n')
-                      .filter(Boolean)
-                      .length} signer(s).`
-                  );
-                  setShowSignerModal(false);
-                }}
-                className="rounded-full bg-red-600 px-5 py-2 text-sm font-bold text-white hover:bg-red-500 transition"
-              >
-                Send Requests
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+function StatusBadge({ status }: { status: 'pending' | 'accepted' | 'rejected' | 'revoked' }) {
+  const colors = {
+    pending: 'bg-yellow-600/20 text-yellow-400 border-yellow-600/30',
+    accepted: 'bg-green-600/20 text-green-400 border-green-600/30',
+    rejected: 'bg-red-600/20 text-red-400 border-red-600/30',
+    revoked: 'bg-gray-600/20 text-gray-400 border-gray-600/30',
+  };
+  return (
+    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border uppercase tracking-wider ${colors[status]}`}>
+      {status}
+    </span>
   );
 }
 
-const BAR_COLORS = [
-  'bg-red-600',
-  'bg-red-400',
-  'bg-orange-500',
-  'bg-yellow-500',
-  'bg-pink-500',
-  'bg-purple-500',
-];
+function InviteForm({
+  trackId,
+  splitType,
+  existingRows,
+  onDone,
+}: {
+  trackId: string;
+  splitType: 'master' | 'publishing';
+  existingRows: { collaboratorUserId: string; status: string; percentBp: number; role: string }[];
+  onDone: () => void;
+}) {
+  const { toast } = useToast();
+  const [query, setQuery] = useState('');
+  const [collab, setCollab] = useState<{ id: string; name: string } | null>(null);
+  const [role, setRole] = useState<'co_writer' | 'producer' | 'featured_artist' | 'mixer' | 'publisher' | 'other'>('co_writer');
+  const [percent, setPercent] = useState('');
+
+  const searchResults = trpc.users.searchUsers.useQuery(
+    { query: query.trim(), limit: 8 },
+    { enabled: query.trim().length >= 2 && !collab }
+  );
+
+  const invite = trpc.splits.invite.useMutation({
+    onSuccess: () => {
+      toast('Invitation sent', 'success');
+      setQuery('');
+      setCollab(null);
+      setPercent('');
+      onDone();
+    },
+    onError: (err) => toast(err.message || 'Invite failed', 'error'),
+  });
+
+  // Compute available bp: 10000 minus owner's bp (i.e., what's reserved by other non-terminal splits)
+  const ownerRow = existingRows.find((r) => r.role === 'owner');
+  const ownerBp = ownerRow?.percentBp ?? 10000;
+  const availableBp = ownerBp - 1; // owner must keep at least 1 bp
+
+  const handleInvite = () => {
+    if (!collab) {
+      toast('Pick a collaborator first', 'error');
+      return;
+    }
+    const pct = parseFloat(percent);
+    if (!isFinite(pct) || pct <= 0 || pct > availableBp / 100) {
+      toast(`Percent must be between 0 and ${(availableBp / 100).toFixed(2)}%`, 'error');
+      return;
+    }
+    const percentBp = Math.round(pct * 100);
+    invite.mutate({
+      trackId,
+      splitType,
+      collaboratorUserId: collab.id,
+      role,
+      percentBp,
+    });
+  };
+
+  return (
+    <div className="rounded-2xl bg-[#15151f] border border-brand-800/30 p-6">
+      <h2 className="text-lg font-bold mb-1">Invite a collaborator</h2>
+      <p className="text-xs text-gray-500 mb-4">
+        Up to <span className="font-bold text-gray-300">{(availableBp / 100).toFixed(2)}%</span> available on this {splitType} split. Your share auto-adjusts.
+      </p>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-wide text-gray-400 mb-1">Collaborator</label>
+          {collab ? (
+            <div className="flex items-center justify-between rounded-lg bg-brand-950 border border-brand-800/30 px-3 py-2">
+              <span className="text-sm">{collab.name}</span>
+              <button onClick={() => setCollab(null)} className="text-xs text-gray-500 hover:text-red-400">Change</button>
+            </div>
+          ) : (
+            <>
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search creators by name or email…"
+                className="w-full bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:border-red-600 outline-none"
+              />
+              {searchResults.data && searchResults.data.length > 0 && (
+                <div className="mt-2 rounded-lg bg-brand-950/60 border border-brand-800/30 max-h-48 overflow-y-auto">
+                  {searchResults.data
+                    .filter((u) => !existingRows.some((r) => r.collaboratorUserId === u.id && (r.status === 'pending' || r.status === 'accepted')))
+                    .map((u) => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => { setCollab({ id: u.id, name: u.name ?? u.email ?? 'Unknown' }); setQuery(''); }}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-brand-900/50 transition border-b border-brand-800/20 last:border-0"
+                      >
+                        <span className="text-gray-200">{u.name ?? 'Unknown'}</span>
+                        {u.email && <span className="text-xs text-gray-500 ml-2">{u.email}</span>}
+                      </button>
+                    ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wide text-gray-400 mb-1">Role</label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value as typeof role)}
+              className="w-full bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-sm text-white focus:border-red-600 outline-none"
+            >
+              <option value="co_writer">Co-writer</option>
+              <option value="producer">Producer</option>
+              <option value="featured_artist">Featured artist</option>
+              <option value="mixer">Mixer</option>
+              <option value="publisher">Publisher</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wide text-gray-400 mb-1">Percent (%)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              max={availableBp / 100}
+              value={percent}
+              onChange={(e) => setPercent(e.target.value)}
+              placeholder="e.g. 25"
+              className="w-full bg-brand-950 border border-brand-800/30 rounded-lg px-3 py-2 text-sm text-white focus:border-red-600 outline-none font-mono"
+            />
+          </div>
+        </div>
+
+        <button
+          onClick={handleInvite}
+          disabled={invite.isPending || !collab || !percent}
+          className="w-full rounded-full bg-red-600 hover:bg-red-500 px-5 py-2.5 text-sm font-bold text-white transition disabled:opacity-50"
+        >
+          {invite.isPending ? 'Inviting…' : 'Send invitation'}
+        </button>
+      </div>
+    </div>
+  );
+}
