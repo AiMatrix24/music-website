@@ -5,6 +5,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useToast } from '@/app/components/Toast';
 import { useRouter } from 'next/navigation';
+import { trpc } from '@/lib/trpc/client';
 
 const GENRES = ['Rock', 'Electronic', 'Hip Hop', 'Jazz', 'Acoustic', 'R&B', 'Pop', 'Metal', 'Country', 'Latin', 'Multi-Genre'];
 const AMENITIES = ['Sound System', 'Green Room', 'Parking', 'Load-In Access', 'Merch Table', 'Recording Available', 'Bar/Kitchen', 'Outdoor Area', 'VIP Section', 'Wheelchair Access'];
@@ -45,18 +46,37 @@ export default function CreateVenuePage() {
     setAmenities((prev) => prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]);
   };
 
-  const handleSubmit = async () => {
+  const createMutation = trpc.venues.create.useMutation({
+    onSuccess: (venue) => {
+      setSubmitting(false);
+      toast('Venue listed.', 'success');
+      router.push(`/venues/${venue.id}`);
+    },
+    onError: (err) => {
+      setSubmitting(false);
+      toast(err.message || 'Could not list venue', 'error');
+    },
+  });
+
+  const handleSubmit = () => {
     if (!name || !city || !capacity) {
       toast('Please fill in venue name, city, and capacity', 'error');
       return;
     }
     setSubmitting(true);
-    // In production this would call a tRPC mutation to create the venue
-    setTimeout(() => {
-      setSubmitting(false);
-      toast('Venue listed successfully! It will be reviewed within 24 hours.', 'success');
-      router.push('/venues/discover');
-    }, 1500);
+    createMutation.mutate({
+      name,
+      description: description || undefined,
+      address: address || undefined,
+      city,
+      state: state || undefined,
+      capacity: Number(capacity),
+      genres: genres.length > 0 ? genres : undefined,
+      amenities: amenities.length > 0 ? amenities : undefined,
+      contactEmail: contactEmail || undefined,
+      contactPhone: contactPhone || undefined,
+      website: website || undefined,
+    });
   };
 
   return (
@@ -158,7 +178,7 @@ export default function CreateVenuePage() {
           </button>
 
           <p className="text-xs text-gray-500 text-center">
-            Venues are reviewed within 24 hours. Once approved, you can start posting available slots and receiving creator applications.
+            Your venue goes live immediately. You can start posting available slots and receiving creator applications right away.
           </p>
         </div>
       </div>

@@ -4,68 +4,66 @@ import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useState } from 'react';
 import { useToast } from '@/app/components/Toast';
-
-const MY_VENUES = [
-  { id: 1, name: 'The Warehouse - Los Angeles' },
-  { id: 2, name: 'Neon Garden - Nashville' },
-  { id: 3, name: 'Soundstage - Denver' },
-  { id: 4, name: 'The Roxy - Los Angeles' },
-];
-
-const SLOT_TYPES = [
-  'Open Mic Night',
-  'Support Act / Opener',
-  'Headliner',
-  'New Music Test Night',
-  'Showcase / Multi-Creator',
-  'Private Event',
-];
-
-const COMPENSATION_TYPES = [
-  { value: 'free', label: 'Free (Exposure)' },
-  { value: 'revenue_share', label: 'Revenue Share' },
-  { value: 'flat_fee', label: 'Flat Fee' },
-  { value: 'door_split', label: 'Door Split' },
-];
+import { trpc } from '@/lib/trpc/client';
 
 const GENRE_OPTIONS = ['Rock', 'Electronic', 'Hip Hop', 'Jazz', 'Acoustic', 'R&B', 'Pop', 'Country', 'Metal', 'Latin', 'Indie', 'Multi-Genre'];
 
-const EXPERIENCE_LEVELS = [
-  { value: 'any', label: 'Any Level' },
-  { value: 'emerging', label: 'Emerging (0-1K followers)' },
-  { value: 'growing', label: 'Growing (1K-10K)' },
-  { value: 'established', label: 'Established (10K+)' },
-];
+type SlotType = 'open_mic' | 'paid' | 'door_split' | 'showcase';
 
-const ACTIVE_SLOTS = [
-  { id: 1, venue: 'The Warehouse', date: '2026-04-18', time: '7:00 PM - 8:30 PM', type: 'Support Act / Opener', applications: 5 },
-  { id: 2, venue: 'Neon Garden', date: '2026-04-22', time: '9:00 PM - 11:00 PM', type: 'Headliner', applications: 12 },
-  { id: 3, venue: 'Soundstage', date: '2026-04-25', time: '6:00 PM - 10:00 PM', type: 'Open Mic Night', applications: 3 },
-];
+const SLOT_TYPE_LABEL: Record<SlotType, string> = {
+  open_mic: 'Open Mic Night',
+  paid: 'Paid (Flat Fee)',
+  door_split: 'Door Split',
+  showcase: 'Showcase',
+};
+
+function formatSlotTime(start: Date, end: Date) {
+  const d = new Date(start);
+  const e = new Date(end);
+  const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const timeOpts: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
+  return `${datePart} · ${d.toLocaleTimeString('en-US', timeOpts)} – ${e.toLocaleTimeString('en-US', timeOpts)}`;
+}
 
 export default function PostSlotPage() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const { toast } = useToast();
   const isAuth = status === 'authenticated';
 
+  const { data: myVenues, refetch: refetchVenues } = trpc.venues.myVenues.useQuery(undefined, { enabled: isAuth });
+  const { data: mySlots, refetch: refetchSlots } = trpc.venues.mySlots.useQuery(undefined, { enabled: isAuth });
+  const openSlots = (mySlots ?? []).filter((s) => s.status === 'open');
+
   const [form, setForm] = useState({
     venueId: '',
+    title: '',
+    description: '',
     date: '',
     startTime: '',
     endTime: '',
-    slotType: '',
-    compensationType: 'free',
-    revenueSharePct: '20',
-    flatFee: '300',
+    slotType: 'paid' as SlotType,
+    flatFeeDollars: '300',
     doorSplitPct: '60',
     genres: [] as string[],
-    experienceLevel: 'any',
-    requirements: '',
-    artistCount: '1',
-    soundCheckTime: '',
+    capacityHint: '',
   });
 
-  const [activeSlots, setActiveSlots] = useState(ACTIVE_SLOTS);
+  const createSlot = trpc.venues.createSlot.useMutation({
+    onSuccess: () => {
+      toast('Slot posted.', 'success');
+      setForm((p) => ({ ...p, title: '', description: '', date: '', startTime: '', endTime: '' }));
+      void refetchSlots();
+    },
+    onError: (err) => toast(err.message || 'Could not post slot', 'error'),
+  });
+
+  const cancelSlot = trpc.venues.cancelSlot.useMutation({
+    onSuccess: () => {
+      toast('Slot cancelled.', 'info');
+      void refetchSlots();
+    },
+    onError: (err) => toast(err.message || 'Could not cancel', 'error'),
+  });
 
   const toggleGenre = (genre: string) => {
     setForm((prev) => ({
@@ -78,16 +76,25 @@ export default function PostSlotPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.venueId || !form.date || !form.startTime || !form.endTime || !form.slotType) {
-      toast('Please fill in all required fields', 'error');
+    if (!form.venueId || !form.title || !form.date || !form.startTime || !form.endTime) {
+      toast('Fill venue, title, date, start & end times', 'error');
       return;
     }
-    toast('Slot posted successfully! Creators can now apply.', 'success');
-  };
+    const startIso = new Date(`${form.date}T${form.startTime}`).toISOString();
+    const endIso = new Date(`${form.date}T${form.endTime}`).toISOString();
 
-  const handleRemoveSlot = (id: number) => {
-    setActiveSlots((prev) => prev.filter((s) => s.id !== id));
-    toast('Slot removed', 'info');
+    createSlot.mutate({
+      venueId: form.venueId,
+      title: form.title,
+      description: form.description || undefined,
+      slotType: form.slotType,
+      startTime: startIso,
+      endTime: endIso,
+      compensationCents: form.slotType === 'paid' ? Math.round(Number(form.flatFeeDollars) * 100) : undefined,
+      doorSplitBp: form.slotType === 'door_split' ? Math.round(Number(form.doorSplitPct) * 100) : undefined,
+      genres: form.genres.length > 0 ? form.genres : undefined,
+      capacityHint: form.capacityHint ? Number(form.capacityHint) : undefined,
+    });
   };
 
   if (status === 'loading') {
@@ -103,12 +110,23 @@ export default function PostSlotPage() {
       <div className="flex min-h-screen flex-col items-center justify-center bg-brand-950 px-4 text-center text-white">
         <svg className="h-16 w-16 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
         <h1 className="mt-4 text-2xl font-bold">Sign In Required</h1>
-        <p className="mt-2 text-gray-400">You need to be signed in as a venue owner to post available slots.</p>
-        <Link href="/auth/login" className="mt-6 rounded-lg bg-red-600 px-8 py-3 font-semibold text-white transition hover:bg-red-700">
-          Sign In
-        </Link>
-        <Link href="/venues/discover" className="mt-3 text-sm text-gray-400 hover:text-white transition">
-          Browse venues instead
+        <p className="mt-2 text-gray-400">You need to be signed in as a venue owner to post slots.</p>
+        <Link href="/auth/login" className="mt-6 rounded-lg bg-red-600 px-8 py-3 font-semibold text-white transition hover:bg-red-700">Sign In</Link>
+      </div>
+    );
+  }
+
+  if (!myVenues || myVenues.length === 0) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-brand-950 px-4 text-center text-white">
+        <h1 className="text-2xl font-bold">List a venue first</h1>
+        <p className="mt-2 text-gray-400">You need to list at least one venue before you can post slots.</p>
+        <Link
+          href="/venues/create"
+          className="mt-6 rounded-lg bg-red-600 px-8 py-3 font-semibold text-white transition hover:bg-red-700"
+          onClick={() => setTimeout(() => refetchVenues(), 500)}
+        >
+          List a Venue
         </Link>
       </div>
     );
@@ -124,7 +142,7 @@ export default function PostSlotPage() {
             Back to Venues
           </Link>
           <h1 className="mt-2 text-3xl font-bold md:text-4xl">Post an Available Slot</h1>
-          <p className="mt-2 text-gray-300">Let creators know when your stage is available. Fill out the details below and start receiving applications.</p>
+          <p className="mt-2 text-gray-300">Let creators know when your stage is open. Fill out the details below and start receiving applications.</p>
         </div>
       </div>
 
@@ -141,11 +159,21 @@ export default function PostSlotPage() {
                   onChange={(e) => setForm({ ...form, venueId: e.target.value })}
                   className="w-full rounded-lg border border-white/10 bg-brand-950 px-4 py-2.5 text-sm text-white focus:border-red-600 focus:outline-none"
                 >
-                  <option value="">Select a venue...</option>
-                  {MY_VENUES.map((v) => (
-                    <option key={v.id} value={v.id}>{v.name}</option>
+                  <option value="">Select a venue…</option>
+                  {myVenues.map((v) => (
+                    <option key={v.id} value={v.id}>{v.name}{v.city ? ` — ${v.city}` : ''}</option>
                   ))}
                 </select>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="mb-1.5 block text-sm font-medium text-gray-300">Slot Title *</label>
+                <input
+                  type="text"
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  placeholder="e.g. Friday Headliner Slot"
+                  className="w-full rounded-lg border border-white/10 bg-brand-950 px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:border-red-600 focus:outline-none"
+                />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-300">Date *</label>
@@ -158,7 +186,7 @@ export default function PostSlotPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-gray-300">Start Time *</label>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-300">Start *</label>
                   <input
                     type="time"
                     value={form.startTime}
@@ -167,7 +195,7 @@ export default function PostSlotPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-gray-300">End Time *</label>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-300">End *</label>
                   <input
                     type="time"
                     value={form.endTime}
@@ -176,111 +204,44 @@ export default function PostSlotPage() {
                   />
                 </div>
               </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-300">Sound Check Time</label>
-                <input
-                  type="time"
-                  value={form.soundCheckTime}
-                  onChange={(e) => setForm({ ...form, soundCheckTime: e.target.value })}
-                  className="w-full rounded-lg border border-white/10 bg-brand-950 px-4 py-2.5 text-sm text-white focus:border-red-600 focus:outline-none"
-                />
-              </div>
             </div>
           </div>
 
-          {/* Slot Type */}
+          {/* Slot Type & Compensation */}
           <div className="rounded-xl border border-white/10 bg-[#15151f] p-6">
-            <h2 className="text-lg font-bold">Slot Details</h2>
+            <h2 className="text-lg font-bold">Slot Type & Compensation</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <label className="mb-1.5 block text-sm font-medium text-gray-300">Slot Type *</label>
                 <select
                   value={form.slotType}
-                  onChange={(e) => setForm({ ...form, slotType: e.target.value })}
+                  onChange={(e) => setForm({ ...form, slotType: e.target.value as SlotType })}
                   className="w-full rounded-lg border border-white/10 bg-brand-950 px-4 py-2.5 text-sm text-white focus:border-red-600 focus:outline-none"
                 >
-                  <option value="">Select slot type...</option>
-                  {SLOT_TYPES.map((t) => (
-                    <option key={t} value={t}>{t}</option>
+                  {(Object.keys(SLOT_TYPE_LABEL) as SlotType[]).map((k) => (
+                    <option key={k} value={k}>{SLOT_TYPE_LABEL[k]}</option>
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-300">How Many Creators</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="10"
-                  value={form.artistCount}
-                  onChange={(e) => setForm({ ...form, artistCount: e.target.value })}
-                  className="w-full rounded-lg border border-white/10 bg-brand-950 px-4 py-2.5 text-sm text-white focus:border-red-600 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-300">Experience Level</label>
-                <select
-                  value={form.experienceLevel}
-                  onChange={(e) => setForm({ ...form, experienceLevel: e.target.value })}
-                  className="w-full rounded-lg border border-white/10 bg-brand-950 px-4 py-2.5 text-sm text-white focus:border-red-600 focus:outline-none"
-                >
-                  {EXPERIENCE_LEVELS.map((l) => (
-                    <option key={l.value} value={l.value}>{l.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Compensation */}
-          <div className="rounded-xl border border-white/10 bg-[#15151f] p-6">
-            <h2 className="text-lg font-bold">Compensation</h2>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <label className="mb-1.5 block text-sm font-medium text-gray-300">Compensation Type</label>
-                <select
-                  value={form.compensationType}
-                  onChange={(e) => setForm({ ...form, compensationType: e.target.value })}
-                  className="w-full rounded-lg border border-white/10 bg-brand-950 px-4 py-2.5 text-sm text-white focus:border-red-600 focus:outline-none"
-                >
-                  {COMPENSATION_TYPES.map((c) => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
-                  ))}
-                </select>
-              </div>
-              {form.compensationType === 'revenue_share' && (
+              {form.slotType === 'paid' && (
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-gray-300">Revenue Share %</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      min="1"
-                      max="100"
-                      value={form.revenueSharePct}
-                      onChange={(e) => setForm({ ...form, revenueSharePct: e.target.value })}
-                      className="w-full rounded-lg border border-white/10 bg-brand-950 px-4 py-2.5 pr-8 text-sm text-white focus:border-red-600 focus:outline-none"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">%</span>
-                  </div>
-                </div>
-              )}
-              {form.compensationType === 'flat_fee' && (
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-gray-300">Fee Amount</label>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-300">Flat Fee</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">$</span>
                     <input
                       type="number"
                       min="0"
-                      value={form.flatFee}
-                      onChange={(e) => setForm({ ...form, flatFee: e.target.value })}
+                      value={form.flatFeeDollars}
+                      onChange={(e) => setForm({ ...form, flatFeeDollars: e.target.value })}
                       className="w-full rounded-lg border border-white/10 bg-brand-950 py-2.5 pl-7 pr-4 text-sm text-white focus:border-red-600 focus:outline-none"
                     />
                   </div>
+                  <p className="mt-1 text-xs text-gray-500">Trust-based — money moves off-platform.</p>
                 </div>
               )}
-              {form.compensationType === 'door_split' && (
+              {form.slotType === 'door_split' && (
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-gray-300">Creator Door Split %</label>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-300">Creator Door %</label>
                   <div className="relative">
                     <input
                       type="number"
@@ -294,13 +255,24 @@ export default function PostSlotPage() {
                   </div>
                 </div>
               )}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-300">Capacity Hint</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={form.capacityHint}
+                  onChange={(e) => setForm({ ...form, capacityHint: e.target.value })}
+                  placeholder="(optional)"
+                  className="w-full rounded-lg border border-white/10 bg-brand-950 px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:border-red-600 focus:outline-none"
+                />
+              </div>
             </div>
           </div>
 
-          {/* Genre Preferences */}
+          {/* Genres */}
           <div className="rounded-xl border border-white/10 bg-[#15151f] p-6">
-            <h2 className="text-lg font-bold">Genre Preferences</h2>
-            <p className="mt-1 text-sm text-gray-400">Select the genres you&apos;re looking for</p>
+            <h2 className="text-lg font-bold">Preferred Genres</h2>
+            <p className="mt-1 text-sm text-gray-400">Optional — leave blank to accept all</p>
             <div className="mt-4 flex flex-wrap gap-2">
               {GENRE_OPTIONS.map((genre) => (
                 <button
@@ -319,16 +291,15 @@ export default function PostSlotPage() {
             </div>
           </div>
 
-          {/* Requirements */}
+          {/* Description */}
           <div className="rounded-xl border border-white/10 bg-[#15151f] p-6">
-            <h2 className="text-lg font-bold">Requirements</h2>
+            <h2 className="text-lg font-bold">Notes for Applicants</h2>
             <div className="mt-4">
-              <label className="mb-1.5 block text-sm font-medium text-gray-300">Equipment, set length, or other requirements</label>
               <textarea
-                value={form.requirements}
-                onChange={(e) => setForm({ ...form, requirements: e.target.value })}
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
                 rows={4}
-                placeholder="e.g., Must bring own instruments. 30-minute set. No explicit lyrics."
+                placeholder="Equipment provided, set length, vibe, anything an applicant should know."
                 className="w-full rounded-lg border border-white/10 bg-brand-950 px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:border-red-600 focus:outline-none"
               />
             </div>
@@ -336,45 +307,44 @@ export default function PostSlotPage() {
 
           <button
             type="submit"
-            className="w-full rounded-lg bg-red-600 py-3 text-lg font-bold text-white transition hover:bg-red-700"
+            disabled={createSlot.isPending}
+            className="w-full rounded-lg bg-red-600 py-3 text-lg font-bold text-white transition hover:bg-red-700 disabled:opacity-50"
           >
-            Post Slot
+            {createSlot.isPending ? 'Posting…' : 'Post Slot'}
           </button>
         </form>
 
         {/* Your Active Slots */}
         <div className="mt-16">
-          <h2 className="text-2xl font-bold">Your Active Slots</h2>
-          <p className="mt-1 text-sm text-gray-400">Manage your currently posted time slots</p>
+          <h2 className="text-2xl font-bold">Your Open Slots</h2>
           <div className="mt-6 space-y-4">
-            {activeSlots.map((slot) => (
+            {openSlots.map((slot) => (
               <div key={slot.id} className="flex flex-col gap-3 rounded-xl border border-white/10 bg-[#15151f] p-5 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="font-semibold">{slot.venue}</p>
-                  <p className="mt-1 text-sm text-gray-400">{slot.date} &middot; {slot.time}</p>
+                  <p className="font-semibold">{slot.venueName ?? '—'}</p>
+                  <p className="mt-0.5 text-sm">{slot.title}</p>
+                  <p className="mt-1 text-sm text-gray-400">{formatSlotTime(slot.startTime, slot.endTime)}</p>
                   <div className="mt-2 flex items-center gap-2">
-                    <span className="rounded-full bg-red-600/20 px-2.5 py-0.5 text-xs text-red-400">{slot.type}</span>
-                    <span className="text-xs text-gray-500">{slot.applications} application{slot.applications !== 1 ? 's' : ''}</span>
+                    <span className="rounded-full bg-red-600/20 px-2.5 py-0.5 text-xs text-red-400">{SLOT_TYPE_LABEL[slot.slotType as SlotType]}</span>
+                    {slot.compensationCents != null && (
+                      <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs text-gray-300">${(slot.compensationCents / 100).toFixed(2)}</span>
+                    )}
+                    {slot.doorSplitBp != null && (
+                      <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs text-gray-300">{(slot.doorSplitBp / 100).toFixed(0)}% door</span>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => toast('Edit feature coming soon', 'info')}
-                    className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-gray-300 transition hover:bg-white/10"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleRemoveSlot(slot.id)}
-                    className="rounded-lg border border-red-600/30 bg-red-600/10 px-4 py-2 text-sm text-red-400 transition hover:bg-red-600/20"
-                  >
-                    Remove
-                  </button>
-                </div>
+                <button
+                  onClick={() => cancelSlot.mutate({ slotId: slot.id })}
+                  disabled={cancelSlot.isPending}
+                  className="rounded-lg border border-red-600/30 bg-red-600/10 px-4 py-2 text-sm text-red-400 transition hover:bg-red-600/20 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
               </div>
             ))}
-            {activeSlots.length === 0 && (
-              <p className="py-8 text-center text-gray-500">No active slots. Post one above!</p>
+            {openSlots.length === 0 && (
+              <p className="py-8 text-center text-gray-500">No open slots. Post one above.</p>
             )}
           </div>
         </div>

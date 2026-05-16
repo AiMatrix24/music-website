@@ -57,6 +57,8 @@ import {
   trackSplits,
   trackSplitHistory,
   trackSplitPayouts,
+  venueSlots,
+  bookingApplications,
 } from '@opynx/db';
 
 // ─── Auth Router ───
@@ -2359,17 +2361,638 @@ const articlesRouter = createRouter({
     }),
 });
 
-// ─── Bookings Router ───
-const bookingsRouter = createRouter({
-  getMyBookings: protectedProcedure.query(async ({ ctx }) => {
-    // Bookings are derived from events where the user is host or facilitator
-    const hostedEvents = await db
+// ─── Venues Router (Wave 3 marketplace) ───
+/**
+ * Two-sided venues marketplace. Any authenticated user can list a venue and
+ * become its owner. Owners post available time slots (venueSlots) and
+ * creators apply via the bookingsRouter. Money terms are trust-based v1 —
+ * compensationCents on the slot is what the venue promises to pay, not held
+ * or moved by OPYNX.
+ */
+const venuesRouter = createRouter({
+  /** Public: paginated venue search with simple filters. */
+  list: publicProcedure
+    .input(
+      z.object({
+        q: z.string().max(120).optional(),
+        city: z.string().max(120).optional(),
+        genre: z.string().max(60).optional(),
+        minCapacity: z.number().int().min(0).optional(),
+        maxCapacity: z.number().int().min(0).optional(),
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(60).default(24),
+      }).optional()
+    )
+    .query(async ({ input }) => {
+      const i = input ?? { page: 1, pageSize: 24 };
+      const conds = [isNotNull(venues.ownerUserId)];
+      if (i.q) conds.push(or(ilike(venues.name, `%${i.q}%`), ilike(venues.city, `%${i.q}%`), ilike(venues.state, `%${i.q}%`))!);
+      if (i.city) conds.push(ilike(venues.city, `%${i.city}%`));
+      if (i.minCapacity != null) conds.push(gte(venues.capacity, i.minCapacity));
+      if (i.maxCapacity != null) conds.push(sql`${venues.capacity} <= ${i.maxCapacity}`);
+      // genre filter: jsonb @> array containment
+      if (i.genre) conds.push(sql`${venues.genres} @> ${JSON.stringify([i.genre])}::jsonb`);
+
+      const rows = await db
+        .select({
+          id: venues.id,
+          name: venues.name,
+          city: venues.city,
+          state: venues.state,
+          capacity: venues.capacity,
+          genres: venues.genres,
+          coverUrl: venues.coverUrl,
+          description: venues.description,
+          ownerUserId: venues.ownerUserId,
+        })
+        .from(venues)
+        .where(and(...conds))
+        .orderBy(desc(venues.createdAt))
+        .limit(i.pageSize)
+        .offset((i.page - 1) * i.pageSize);
+
+      // Open-slot counts per venue (single query, grouped)
+      const ids = rows.map((r) => r.id);
+      let slotCounts: Record<string, number> = {};
+      if (ids.length > 0) {
+        const counts = await db
+          .select({
+            venueId: venueSlots.venueId,
+            count: sql<number>`COUNT(*)::int`,
+          })
+          .from(venueSlots)
+          .where(and(inArray(venueSlots.venueId, ids), eq(venueSlots.status, 'open')))
+          .groupBy(venueSlots.venueId);
+        slotCounts = Object.fromEntries(counts.map((c) => [c.venueId, c.count]));
+      }
+
+      return rows.map((r) => ({ ...r, openSlotCount: slotCounts[r.id] ?? 0 }));
+    }),
+
+  /** Public: venue detail + open slots. */
+  get: publicProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ input }) => {
+      const venue = await db.query.venues.findFirst({ where: eq(venues.id, input.id) });
+      if (!venue) throw new TRPCError({ code: 'NOT_FOUND', message: 'Venue not found' });
+
+      const slots = await db
+        .select()
+        .from(venueSlots)
+        .where(and(eq(venueSlots.venueId, input.id), eq(venueSlots.status, 'open')))
+        .orderBy(venueSlots.startTime);
+
+      const owner = venue.ownerUserId
+        ? await db.query.users.findFirst({
+            where: eq(users.id, venue.ownerUserId),
+            columns: { id: true, name: true, avatar: true },
+          })
+        : null;
+
+      return { venue, slots, owner };
+    }),
+
+  /** Protected: my venues (as owner). */
+  myVenues: protectedProcedure.query(async ({ ctx }) => {
+    return db
       .select()
-      .from(events)
-      .where(eq(events.hostId, ctx.session.user.id))
-      .orderBy(desc(events.startDate));
-    return hostedEvents;
+      .from(venues)
+      .where(eq(venues.ownerUserId, ctx.session.user.id))
+      .orderBy(desc(venues.createdAt));
   }),
+
+  /** Protected: create a venue. Any auth'd user can list. */
+  create: protectedProcedure
+    .use(rateLimit({ limit: 10, windowSec: 3600 }))
+    .input(
+      z.object({
+        name: z.string().min(1).max(120),
+        description: z.string().max(2000).optional(),
+        address: z.string().max(240).optional(),
+        city: z.string().min(1).max(120),
+        state: z.string().max(60).optional(),
+        capacity: z.number().int().min(1).max(1_000_000),
+        genres: z.array(z.string().max(60)).max(20).optional(),
+        amenities: z.array(z.string().max(60)).max(30).optional(),
+        contactEmail: z.string().email().optional().or(z.literal('')),
+        contactPhone: z.string().max(40).optional(),
+        website: z.string().url().optional().or(z.literal('')),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [row] = await db
+        .insert(venues)
+        .values({
+          ownerUserId: ctx.session.user.id,
+          name: input.name,
+          description: input.description ?? null,
+          address: input.address ?? null,
+          city: input.city,
+          state: input.state ?? null,
+          capacity: input.capacity,
+          genres: input.genres ?? null,
+          amenities: input.amenities ?? null,
+          contactEmail: input.contactEmail || null,
+          contactPhone: input.contactPhone ?? null,
+          website: input.website || null,
+        })
+        .returning();
+      return row;
+    }),
+
+  /** Protected: update venue (owner only). */
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        name: z.string().min(1).max(120).optional(),
+        description: z.string().max(2000).optional(),
+        address: z.string().max(240).optional(),
+        city: z.string().max(120).optional(),
+        state: z.string().max(60).optional(),
+        capacity: z.number().int().min(1).max(1_000_000).optional(),
+        genres: z.array(z.string().max(60)).max(20).optional(),
+        amenities: z.array(z.string().max(60)).max(30).optional(),
+        contactEmail: z.string().email().optional().or(z.literal('')),
+        contactPhone: z.string().max(40).optional(),
+        website: z.string().url().optional().or(z.literal('')),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const v = await db.query.venues.findFirst({ where: eq(venues.id, input.id) });
+      if (!v) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (v.ownerUserId !== ctx.session.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Only the venue owner can update' });
+      }
+      const { id, ...patch } = input;
+      await db.update(venues).set(patch).where(eq(venues.id, id));
+      return { ok: true };
+    }),
+
+  /** Protected: post a new slot. Owner only. */
+  createSlot: protectedProcedure
+    .use(rateLimit({ limit: 30, windowSec: 3600 }))
+    .input(
+      z.object({
+        venueId: z.string().uuid(),
+        title: z.string().min(1).max(160),
+        description: z.string().max(2000).optional(),
+        slotType: z.enum(['open_mic', 'paid', 'door_split', 'showcase']),
+        startTime: z.string().datetime(), // ISO
+        endTime: z.string().datetime(),
+        compensationCents: z.number().int().min(0).max(100_000_000).optional(),
+        doorSplitBp: z.number().int().min(0).max(10000).optional(),
+        genres: z.array(z.string().max(60)).max(20).optional(),
+        capacityHint: z.number().int().min(1).max(1_000_000).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const v = await db.query.venues.findFirst({ where: eq(venues.id, input.venueId) });
+      if (!v) throw new TRPCError({ code: 'NOT_FOUND', message: 'Venue not found' });
+      if (v.ownerUserId !== ctx.session.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Only the venue owner can post slots' });
+      }
+      const start = new Date(input.startTime);
+      const end = new Date(input.endTime);
+      if (end.getTime() <= start.getTime()) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'End time must be after start time' });
+      }
+      const [row] = await db
+        .insert(venueSlots)
+        .values({
+          venueId: input.venueId,
+          ownerUserId: ctx.session.user.id,
+          title: input.title,
+          description: input.description ?? null,
+          slotType: input.slotType,
+          startTime: start,
+          endTime: end,
+          compensationCents: input.compensationCents ?? null,
+          doorSplitBp: input.doorSplitBp ?? null,
+          genres: input.genres ?? null,
+          capacityHint: input.capacityHint ?? null,
+        })
+        .returning();
+      return row;
+    }),
+
+  /** Protected: cancel a slot. Owner only. Withdraws all pending apps. */
+  cancelSlot: protectedProcedure
+    .input(z.object({ slotId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const slot = await db.query.venueSlots.findFirst({ where: eq(venueSlots.id, input.slotId) });
+      if (!slot) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (slot.ownerUserId !== ctx.session.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Only the venue owner can cancel' });
+      }
+      if (slot.status === 'cancelled') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Already cancelled' });
+      }
+
+      // Find pending apps so we can notify their creators
+      const pending = await db
+        .select({ creatorUserId: bookingApplications.creatorUserId })
+        .from(bookingApplications)
+        .where(and(eq(bookingApplications.slotId, input.slotId), eq(bookingApplications.status, 'pending')));
+
+      await db.transaction(async (tx) => {
+        await tx.update(venueSlots).set({ status: 'cancelled', updatedAt: new Date() }).where(eq(venueSlots.id, input.slotId));
+        await tx
+          .update(bookingApplications)
+          .set({ status: 'withdrawn', decidedAt: new Date(), decidedBy: ctx.session.user.id, decisionMessage: 'Slot cancelled by venue', updatedAt: new Date() })
+          .where(and(eq(bookingApplications.slotId, input.slotId), eq(bookingApplications.status, 'pending')));
+      });
+
+      // Notify pending applicants
+      for (const p of pending) {
+        await notify({
+          userId: p.creatorUserId,
+          type: 'system',
+          title: 'Slot cancelled',
+          body: `A slot you applied to has been cancelled by the venue.`,
+          link: '/booking',
+        });
+      }
+
+      return { ok: true, cancelledApps: pending.length };
+    }),
+
+  /** Protected: all slots across venues I own (any status). */
+  mySlots: protectedProcedure.query(async ({ ctx }) => {
+    return db
+      .select({
+        id: venueSlots.id,
+        venueId: venueSlots.venueId,
+        title: venueSlots.title,
+        slotType: venueSlots.slotType,
+        startTime: venueSlots.startTime,
+        endTime: venueSlots.endTime,
+        compensationCents: venueSlots.compensationCents,
+        doorSplitBp: venueSlots.doorSplitBp,
+        status: venueSlots.status,
+        venueName: venues.name,
+      })
+      .from(venueSlots)
+      .leftJoin(venues, eq(venueSlots.venueId, venues.id))
+      .where(eq(venueSlots.ownerUserId, ctx.session.user.id))
+      .orderBy(desc(venueSlots.startTime));
+  }),
+
+  /** Public: list slots, filterable. */
+  listSlots: publicProcedure
+    .input(
+      z.object({
+        venueId: z.string().uuid().optional(),
+        status: z.enum(['open', 'filled', 'cancelled']).optional(),
+        fromDate: z.string().datetime().optional(),
+        genre: z.string().max(60).optional(),
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(60).default(24),
+      }).optional()
+    )
+    .query(async ({ input }) => {
+      const i = input ?? { page: 1, pageSize: 24 };
+      const conds = [];
+      if (i.venueId) conds.push(eq(venueSlots.venueId, i.venueId));
+      conds.push(eq(venueSlots.status, i.status ?? 'open'));
+      if (i.fromDate) conds.push(gte(venueSlots.startTime, new Date(i.fromDate)));
+      if (i.genre) conds.push(sql`${venueSlots.genres} @> ${JSON.stringify([i.genre])}::jsonb`);
+
+      return db
+        .select({
+          id: venueSlots.id,
+          venueId: venueSlots.venueId,
+          title: venueSlots.title,
+          description: venueSlots.description,
+          slotType: venueSlots.slotType,
+          startTime: venueSlots.startTime,
+          endTime: venueSlots.endTime,
+          compensationCents: venueSlots.compensationCents,
+          doorSplitBp: venueSlots.doorSplitBp,
+          genres: venueSlots.genres,
+          status: venueSlots.status,
+          venueName: venues.name,
+          venueCity: venues.city,
+        })
+        .from(venueSlots)
+        .leftJoin(venues, eq(venueSlots.venueId, venues.id))
+        .where(and(...conds))
+        .orderBy(venueSlots.startTime)
+        .limit(i.pageSize)
+        .offset((i.page - 1) * i.pageSize);
+    }),
+});
+
+// ─── Bookings Router (Wave 3 marketplace) ───
+/**
+ * Creator-side: apply to a slot, withdraw an application, see all my apps.
+ * Owner-side: accept/decline applications for slots on venues I own.
+ *
+ * Accepting an application auto-declines the rest for that slot and flips
+ * the slot to 'filled'. No money moves — trust-based v1.
+ */
+const bookingsRouter = createRouter({
+  /** Creator applies to a slot. Re-applying after a withdraw/decline reopens
+   *  the same row as pending. (Named `applyToSlot` because `apply` is a
+   *  reserved word in tRPC v10 routers — collides with Function.prototype.apply.) */
+  applyToSlot: protectedProcedure
+    .use(rateLimit({ limit: 30, windowSec: 3600 }))
+    .input(
+      z.object({
+        slotId: z.string().uuid(),
+        message: z.string().max(2000).optional(),
+        proposedFeeCents: z.number().int().min(0).max(100_000_000).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const slot = await db.query.venueSlots.findFirst({ where: eq(venueSlots.id, input.slotId) });
+      if (!slot) throw new TRPCError({ code: 'NOT_FOUND', message: 'Slot not found' });
+      if (slot.status !== 'open') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: `Slot is ${slot.status}` });
+      }
+      if (slot.ownerUserId === ctx.session.user.id) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: "You can't apply to your own venue's slot" });
+      }
+
+      const existing = await db.query.bookingApplications.findFirst({
+        where: and(
+          eq(bookingApplications.slotId, input.slotId),
+          eq(bookingApplications.creatorUserId, ctx.session.user.id)
+        ),
+      });
+
+      let app;
+      if (existing) {
+        if (existing.status === 'pending' || existing.status === 'accepted') {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: `You've already applied (${existing.status})` });
+        }
+        const [updated] = await db
+          .update(bookingApplications)
+          .set({
+            message: input.message ?? null,
+            proposedFeeCents: input.proposedFeeCents ?? null,
+            status: 'pending',
+            decisionMessage: null,
+            decidedAt: null,
+            decidedBy: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(bookingApplications.id, existing.id))
+          .returning();
+        app = updated;
+      } else {
+        const [inserted] = await db
+          .insert(bookingApplications)
+          .values({
+            slotId: input.slotId,
+            creatorUserId: ctx.session.user.id,
+            message: input.message ?? null,
+            proposedFeeCents: input.proposedFeeCents ?? null,
+            status: 'pending',
+          })
+          .returning();
+        app = inserted;
+      }
+
+      // Notify the venue owner
+      const applicant = await db.query.users.findFirst({
+        where: eq(users.id, ctx.session.user.id),
+        columns: { name: true },
+      });
+      await notify({
+        userId: slot.ownerUserId,
+        type: 'system',
+        title: 'New booking application',
+        body: `${applicant?.name ?? 'A creator'} applied to "${slot.title}".`,
+        link: '/booking',
+      });
+
+      return app;
+    }),
+
+  /** Creator withdraws their own pending application. */
+  withdraw: protectedProcedure
+    .input(z.object({ applicationId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const app = await db.query.bookingApplications.findFirst({
+        where: eq(bookingApplications.id, input.applicationId),
+      });
+      if (!app) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (app.creatorUserId !== ctx.session.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
+      if (app.status !== 'pending') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: `Already ${app.status}` });
+      }
+      await db
+        .update(bookingApplications)
+        .set({ status: 'withdrawn', decidedAt: new Date(), updatedAt: new Date() })
+        .where(eq(bookingApplications.id, input.applicationId));
+      return { ok: true };
+    }),
+
+  /** Venue owner accepts an application. Marks slot 'filled' and auto-declines
+   *  all other pending apps on that slot. */
+  accept: protectedProcedure
+    .input(z.object({ applicationId: z.string().uuid(), decisionMessage: z.string().max(2000).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const app = await db.query.bookingApplications.findFirst({
+        where: eq(bookingApplications.id, input.applicationId),
+      });
+      if (!app) throw new TRPCError({ code: 'NOT_FOUND' });
+      const slot = await db.query.venueSlots.findFirst({ where: eq(venueSlots.id, app.slotId) });
+      if (!slot) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (slot.ownerUserId !== ctx.session.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Only the venue owner can accept' });
+      }
+      if (app.status !== 'pending') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: `Application is ${app.status}` });
+      }
+      if (slot.status !== 'open') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: `Slot is ${slot.status}` });
+      }
+
+      const otherPending = await db
+        .select({ id: bookingApplications.id, creatorUserId: bookingApplications.creatorUserId })
+        .from(bookingApplications)
+        .where(and(
+          eq(bookingApplications.slotId, app.slotId),
+          eq(bookingApplications.status, 'pending'),
+          sql`${bookingApplications.id} <> ${app.id}`
+        ));
+
+      await db.transaction(async (tx) => {
+        await tx
+          .update(bookingApplications)
+          .set({
+            status: 'accepted',
+            decidedAt: new Date(),
+            decidedBy: ctx.session.user.id,
+            decisionMessage: input.decisionMessage ?? null,
+            updatedAt: new Date(),
+          })
+          .where(eq(bookingApplications.id, app.id));
+
+        await tx.update(venueSlots).set({ status: 'filled', updatedAt: new Date() }).where(eq(venueSlots.id, slot.id));
+
+        if (otherPending.length > 0) {
+          await tx
+            .update(bookingApplications)
+            .set({
+              status: 'declined',
+              decidedAt: new Date(),
+              decidedBy: ctx.session.user.id,
+              decisionMessage: 'Slot was filled by another applicant',
+              updatedAt: new Date(),
+            })
+            .where(and(
+              eq(bookingApplications.slotId, app.slotId),
+              eq(bookingApplications.status, 'pending')
+            ));
+        }
+      });
+
+      await notify({
+        userId: app.creatorUserId,
+        type: 'system',
+        title: 'Booking accepted',
+        body: `Your application to "${slot.title}" was accepted.`,
+        link: '/booking',
+      });
+      for (const p of otherPending) {
+        await notify({
+          userId: p.creatorUserId,
+          type: 'system',
+          title: 'Booking declined',
+          body: `The slot "${slot.title}" was filled by another creator.`,
+          link: '/booking',
+        });
+      }
+
+      return { ok: true };
+    }),
+
+  /** Venue owner declines a single application (slot stays open). */
+  decline: protectedProcedure
+    .input(z.object({ applicationId: z.string().uuid(), decisionMessage: z.string().max(2000).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const app = await db.query.bookingApplications.findFirst({
+        where: eq(bookingApplications.id, input.applicationId),
+      });
+      if (!app) throw new TRPCError({ code: 'NOT_FOUND' });
+      const slot = await db.query.venueSlots.findFirst({ where: eq(venueSlots.id, app.slotId) });
+      if (!slot) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (slot.ownerUserId !== ctx.session.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Only the venue owner can decline' });
+      }
+      if (app.status !== 'pending') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: `Application is ${app.status}` });
+      }
+      await db
+        .update(bookingApplications)
+        .set({
+          status: 'declined',
+          decidedAt: new Date(),
+          decidedBy: ctx.session.user.id,
+          decisionMessage: input.decisionMessage ?? null,
+          updatedAt: new Date(),
+        })
+        .where(eq(bookingApplications.id, app.id));
+
+      await notify({
+        userId: app.creatorUserId,
+        type: 'system',
+        title: 'Booking declined',
+        body: `Your application to "${slot.title}" was declined${input.decisionMessage ? `: ${input.decisionMessage}` : '.'}`,
+        link: '/booking',
+      });
+
+      return { ok: true };
+    }),
+
+  /** Creator side: my applications with slot + venue details. */
+  myApplications: protectedProcedure.query(async ({ ctx }) => {
+    return db
+      .select({
+        id: bookingApplications.id,
+        slotId: bookingApplications.slotId,
+        status: bookingApplications.status,
+        message: bookingApplications.message,
+        proposedFeeCents: bookingApplications.proposedFeeCents,
+        decisionMessage: bookingApplications.decisionMessage,
+        decidedAt: bookingApplications.decidedAt,
+        createdAt: bookingApplications.createdAt,
+        slotTitle: venueSlots.title,
+        slotStartTime: venueSlots.startTime,
+        slotEndTime: venueSlots.endTime,
+        slotType: venueSlots.slotType,
+        compensationCents: venueSlots.compensationCents,
+        venueName: venues.name,
+        venueCity: venues.city,
+        venueId: venues.id,
+      })
+      .from(bookingApplications)
+      .leftJoin(venueSlots, eq(bookingApplications.slotId, venueSlots.id))
+      .leftJoin(venues, eq(venueSlots.venueId, venues.id))
+      .where(eq(bookingApplications.creatorUserId, ctx.session.user.id))
+      .orderBy(desc(bookingApplications.createdAt));
+  }),
+
+  /** Owner side: every incoming application across all my venues. */
+  received: protectedProcedure.query(async ({ ctx }) => {
+    return db
+      .select({
+        id: bookingApplications.id,
+        slotId: bookingApplications.slotId,
+        status: bookingApplications.status,
+        message: bookingApplications.message,
+        proposedFeeCents: bookingApplications.proposedFeeCents,
+        createdAt: bookingApplications.createdAt,
+        slotTitle: venueSlots.title,
+        slotStartTime: venueSlots.startTime,
+        slotEndTime: venueSlots.endTime,
+        slotType: venueSlots.slotType,
+        compensationCents: venueSlots.compensationCents,
+        venueName: venues.name,
+        venueId: venues.id,
+        applicantId: bookingApplications.creatorUserId,
+        applicantName: users.name,
+        applicantAvatar: users.avatar,
+      })
+      .from(bookingApplications)
+      .innerJoin(venueSlots, eq(bookingApplications.slotId, venueSlots.id))
+      .innerJoin(venues, eq(venueSlots.venueId, venues.id))
+      .leftJoin(users, eq(bookingApplications.creatorUserId, users.id))
+      .where(eq(venueSlots.ownerUserId, ctx.session.user.id))
+      .orderBy(desc(bookingApplications.createdAt));
+  }),
+
+  /** Owner side: apps for a specific slot. */
+  slotApplications: protectedProcedure
+    .input(z.object({ slotId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const slot = await db.query.venueSlots.findFirst({ where: eq(venueSlots.id, input.slotId) });
+      if (!slot) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (slot.ownerUserId !== ctx.session.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
+      return db
+        .select({
+          id: bookingApplications.id,
+          status: bookingApplications.status,
+          message: bookingApplications.message,
+          proposedFeeCents: bookingApplications.proposedFeeCents,
+          decisionMessage: bookingApplications.decisionMessage,
+          createdAt: bookingApplications.createdAt,
+          applicantId: bookingApplications.creatorUserId,
+          applicantName: users.name,
+          applicantAvatar: users.avatar,
+        })
+        .from(bookingApplications)
+        .leftJoin(users, eq(bookingApplications.creatorUserId, users.id))
+        .where(eq(bookingApplications.slotId, input.slotId))
+        .orderBy(desc(bookingApplications.createdAt));
+    }),
 });
 
 // ─── Upload Router ───
@@ -5538,6 +6161,7 @@ export const appRouter = createRouter({
   marketplace: marketplaceRouter,
   articles: articlesRouter,
   bookings: bookingsRouter,
+  venues: venuesRouter,
   upload: uploadRouter,
   broadcasts: broadcastsRouter,
   comments: commentsRouter,

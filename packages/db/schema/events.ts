@@ -60,20 +60,44 @@ export const eventSeries = pgTable(
   ]
 );
 
-export const venues = pgTable('venues', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  name: text('name').notNull(),
-  address: text('address'),
-  lat: real('lat'),
-  lng: real('lng'),
-  capacity: integer('capacity'),
-  geofenceRadius: integer('geofence_radius').default(50), // meters, small venue default
-  geofenceZones: jsonb('geofence_zones'), // GeoJSON FeatureCollection for large venues
-  gpsAccuracyThreshold: integer('gps_accuracy_threshold').default(100), // meters
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-});
+export const venues = pgTable(
+  'venues',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    // Marketplace owner — the user who can post slots and accept applications.
+    // Nullable because pre-marketplace venues (created as event references
+    // only) have no owner; those can be claimed later via an admin path.
+    ownerUserId: uuid('owner_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    name: text('name').notNull(),
+    description: text('description'),
+    address: text('address'),
+    city: text('city'),
+    state: text('state'),
+    lat: real('lat'),
+    lng: real('lng'),
+    capacity: integer('capacity'),
+    geofenceRadius: integer('geofence_radius').default(50), // meters, small venue default
+    geofenceZones: jsonb('geofence_zones'), // GeoJSON FeatureCollection for large venues
+    gpsAccuracyThreshold: integer('gps_accuracy_threshold').default(100), // meters
+    // Marketplace metadata (Wave 3 venues marketplace). All optional so existing
+    // rows stay valid.
+    genres: jsonb('genres'), // string[]
+    amenities: jsonb('amenities'), // string[]
+    contactEmail: text('contact_email'),
+    contactPhone: text('contact_phone'),
+    website: text('website'),
+    coverUrl: text('cover_url'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index('venues_owner_idx').on(t.ownerUserId),
+    index('venues_city_idx').on(t.city),
+  ]
+);
 
 export const events = pgTable(
   'events',
