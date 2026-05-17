@@ -17,6 +17,10 @@ export default function AlbumDetailPage() {
     { albumId: id },
     { enabled: !!album }
   );
+  const { data: owned } = trpc.albums.hasPurchased.useQuery(
+    { albumId: id },
+    { enabled: !!album && !!session?.user?.id }
+  );
 
   const isOwner = !!album && (album as { userId?: string }).userId === session?.user?.id;
   const [showPicker, setShowPicker] = useState(false);
@@ -102,6 +106,23 @@ export default function AlbumDetailPage() {
                 </>
               )}
             </div>
+            {/* Buy button — visible to non-owners when album has a price */}
+            {album.price !== null && album.price > 0 && !isOwner && (
+              <div className="mt-4">
+                {owned ? (
+                  <span className="inline-flex items-center gap-2 rounded-full bg-green-600/20 px-4 py-2 text-sm font-semibold text-green-400">
+                    ✓ Owned
+                  </span>
+                ) : (
+                  <Link
+                    href={`/album/${id}/buy`}
+                    className="inline-flex items-center gap-2 rounded-full bg-red-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-red-500 transition"
+                  >
+                    Buy Album — ${(album.price / 100).toFixed(2)}
+                  </Link>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

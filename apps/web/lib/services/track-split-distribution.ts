@@ -23,8 +23,14 @@
 import { db, trackSplits, trackSplitPayouts, tracks } from '@opynx/db';
 import { and, eq, sql } from 'drizzle-orm';
 
+// 'album_purchase' fans out per track from a single album buy — the helper
+// is called N times (once per track in the album) with the same sourceId.
+// Idempotency therefore keys on (sourceType, sourceId, trackId), not just
+// (sourceType, sourceId).
+type TrackSplitSource = 'track_purchase' | 'tip' | 'album_purchase';
+
 interface DistributeArgs {
-  sourceType: 'track_purchase' | 'tip';
+  sourceType: TrackSplitSource;
   sourceId: string;
   trackId: string;
   poolCents: number;
@@ -35,14 +41,15 @@ export async function distributeTrackSplitPayouts(args: DistributeArgs): Promise
 
   if (poolCents <= 0) return;
 
-  // Idempotency: bail if rows already exist for this source.
+  // Idempotency: bail if rows already exist for this (source, track).
   const existing = await db
     .select({ id: trackSplitPayouts.id })
     .from(trackSplitPayouts)
     .where(
       and(
         eq(trackSplitPayouts.sourceType, sourceType),
-        eq(trackSplitPayouts.sourceId, sourceId)
+        eq(trackSplitPayouts.sourceId, sourceId),
+        eq(trackSplitPayouts.trackId, trackId)
       )
     )
     .limit(1);
@@ -141,7 +148,7 @@ export async function distributeTrackSplitPayouts(args: DistributeArgs): Promise
  * commission clawback pattern: snapshot at clawback time, no cascade).
  */
 export async function clawBackTrackSplitPayouts(
-  sourceType: 'track_purchase' | 'tip',
+  sourceType: TrackSplitSource,
   sourceId: string
 ): Promise<number> {
   const updated = await db

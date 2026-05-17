@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { db, subscriptions, subEvents } from '@opynx/db';
-import { tickets, ticketTypes, trackPurchases, tips, orders, orderItems, listings, commissions } from '@opynx/db/schema';
+import { tickets, ticketTypes, trackPurchases, tips, orders, orderItems, listings, commissions, albumPurchases, albums, albumTracks } from '@opynx/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { processCommissionWaterfall } from '@/lib/services/commissions';
 import { distributeTrackSplitPayouts, clawBackTrackSplitPayouts } from '@/lib/services/track-split-distribution';
@@ -525,6 +525,153 @@ async function handleTrackPurchase(
   }
 }
 
+/**
+ * Album purchase handler. orderId format: albumbuy_{albumPurchaseId}
+ *
+ * On 'finished': mark the purchase completed, then for each track in the album
+ * (ordered by position) call distributeTrackSplitPayouts with that track's
+ * largest-remainder share of the price. Each cascade is independently
+ * idempotent on (sourceType='album_purchase', sourceId, trackId).
+ */
+async function handleAlbumPurchase(
+  orderId: string,
+  payload: NowPaymentsIPNPayload,
+  status: PaymentStatus
+): Promise<void> {
+  const purchaseId = orderId.replace('albumbuy_', '');
+  if (!/^[0-9a-f-]{36}$/i.test(purchaseId)) {
+    console.error(`[NOWPayments Webhook] Malformed album purchase order_id: ${orderId}`);
+    return;
+  }
+
+  const purchase = await db.query.albumPurchases.findFirst({
+    where: eq(albumPurchases.id, purchaseId),
+  });
+  if (!purchase) {
+    console.warn(`[NOWPayments Webhook] Album purchase ${purchaseId} not found`);
+    return;
+  }
+
+  if (status === 'finished') {
+    if (purchase.status === 'completed') {
+      console.log(`[NOWPayments Webhook] Album purchase ${purchaseId} already completed (idempotent)`);
+      return;
+    }
+    await db
+      .update(albumPurchases)
+      .set({ status: 'completed', updatedAt: new Date() })
+      .where(eq(albumPurchases.id, purchaseId));
+
+    // Cascade: split pricePaid across tracks with largest-remainder rounding,
+    // then run each track through master-split distribution.
+    try {
+      const trackRows = await db
+        .select({ trackId: albumTracks.trackId })
+        .from(albumTracks)
+        .where(eq(albumTracks.albumId, purchase.albumId))
+        .orderBy(albumTracks.position);
+
+      const n = trackRows.length;
+      if (n === 0) {
+        console.warn(
+          `[NOWPayments Webhook] Album purchase ${purchaseId} completed but album has 0 tracks; no distribution`
+        );
+      } else {
+        const floor = Math.floor(purchase.pricePaid / n);
+        const remainder = purchase.pricePaid - floor * n;
+        for (let i = 0; i < n; i++) {
+          const pool = floor + (i < remainder ? 1 : 0);
+          try {
+            await distributeTrackSplitPayouts({
+              sourceType: 'album_purchase',
+              sourceId: purchaseId,
+              trackId: trackRows[i].trackId,
+              poolCents: pool,
+            });
+          } catch (err) {
+            console.error(
+              `[NOWPayments Webhook] Per-track distribution failed for album ${purchaseId} track ${trackRows[i].trackId}:`,
+              err
+            );
+          }
+        }
+        console.log(
+          `[NOWPayments Webhook] Album purchase ${purchaseId} distributed across ${n} tracks`
+        );
+      }
+    } catch (err) {
+      console.error(
+        `[NOWPayments Webhook] Album split distribution failed for ${purchaseId}:`,
+        err
+      );
+    }
+
+    // Receipt + creator notification (fire-and-forget)
+    void (async () => {
+      try {
+        const [buyer, album] = await Promise.all([
+          db.query.users.findFirst({ where: eq(users.id, purchase.userId) }),
+          db.query.albums.findFirst({ where: eq(albums.id, purchase.albumId) }),
+        ]);
+        if (buyer?.email && album) {
+          await sendPaymentReceipt(buyer.email, {
+            type: 'track',
+            buyerName: buyer.name ?? 'Listener',
+            amountCents: purchase.pricePaid,
+            itemDescription: `Album: ${album.title}`,
+            ctaUrl: `https://opynx.com/album/${album.id}`,
+            ctaLabel: 'Listen Now',
+          });
+        }
+        if (album?.userId) {
+          const creator = await db.query.users.findFirst({ where: eq(users.id, album.userId) });
+          if (creator?.email && creator.id !== buyer?.id) {
+            await sendCreatorEarningsNotification(creator.email, {
+              type: 'track',
+              creatorName: creator.name ?? 'Creator',
+              amountCents: purchase.pricePaid,
+              itemDescription: `Album: ${album.title}`,
+              fromName: buyer?.name ?? undefined,
+              ctaUrl: `https://opynx.com/dashboard/earnings`,
+            });
+          }
+          if (creator && creator.id !== buyer?.id) {
+            await notify({
+              userId: creator.id,
+              type: 'track_sale',
+              title: 'Album sold',
+              body: `${fmtCents(purchase.pricePaid)} — ${buyer?.name ?? 'someone'} bought "${album?.title ?? 'your album'}"`,
+              link: '/dashboard/earnings',
+              metadata: { amountCents: purchase.pricePaid, albumId: album?.id, buyerId: buyer?.id },
+            });
+          }
+        }
+      } catch (err) {
+        console.error('[NOWPayments Webhook] Album email error:', err);
+      }
+    })();
+  } else if (status === 'failed' || status === 'expired') {
+    if (purchase.status === 'pending') {
+      await db
+        .update(albumPurchases)
+        .set({ status: 'cancelled', updatedAt: new Date() })
+        .where(eq(albumPurchases.id, purchaseId));
+      console.log(
+        `[NOWPayments Webhook] Album purchase ${purchaseId} cancelled (status=${status})`
+      );
+    }
+  } else if (status === 'refunded') {
+    await db
+      .update(albumPurchases)
+      .set({ status: 'refunded', updatedAt: new Date() })
+      .where(eq(albumPurchases.id, purchaseId));
+    const cleared = await clawBackTrackSplitPayouts('album_purchase', purchaseId);
+    console.log(
+      `[NOWPayments Webhook] Album purchase ${purchaseId} refunded; clawed back ${cleared} payout rows`
+    );
+  }
+}
+
 async function handleTipPayment(
   orderId: string,
   payload: NowPaymentsIPNPayload,
@@ -888,6 +1035,8 @@ export async function POST(request: NextRequest) {
           await handleTicketPurchase(orderId, payload, 'finished');
         } else if (orderId.startsWith('trackbuy_')) {
           await handleTrackPurchase(orderId, payload, 'finished');
+        } else if (orderId.startsWith('albumbuy_')) {
+          await handleAlbumPurchase(orderId, payload, 'finished');
         } else if (orderId.startsWith('tip_')) {
           await handleTipPayment(orderId, payload, 'finished');
         } else if (orderId.startsWith('merch_')) {
@@ -916,6 +1065,8 @@ export async function POST(request: NextRequest) {
           await handleTicketPurchase(payload.order_id, payload, payload.payment_status);
         } else if (payload.order_id.startsWith('trackbuy_')) {
           await handleTrackPurchase(payload.order_id, payload, payload.payment_status);
+        } else if (payload.order_id.startsWith('albumbuy_')) {
+          await handleAlbumPurchase(payload.order_id, payload, payload.payment_status);
         } else if (payload.order_id.startsWith('tip_')) {
           await handleTipPayment(payload.order_id, payload, payload.payment_status);
         } else if (payload.order_id.startsWith('merch_')) {

@@ -28,6 +28,7 @@ import {
   payoutRequests,
   albums,
   albumTracks,
+  albumPurchases,
   playlists,
   playlistTracks,
   comments,
@@ -1237,6 +1238,152 @@ const albumsRouter = createRouter({
         .returning();
       return deleted ?? null;
     }),
+
+  /**
+   * Initiate an album purchase. Mirrors trackPurchases.buy. On webhook
+   * 'finished' the price is fanned out across the album's tracks via the
+   * master-split distribution (per-track largest-remainder share of the
+   * pool, then each track's accepted/pending splits divide that share).
+   */
+  buy: protectedProcedure
+    .use(rateLimit({ limit: 10, windowSec: 60 }))
+    .input(z.object({ albumId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+
+      const album = await db.query.albums.findFirst({ where: eq(albums.id, input.albumId) });
+      if (!album) throw new TRPCError({ code: 'NOT_FOUND', message: 'Album not found' });
+      if (!album.price || album.price <= 0) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'This album is not for sale' });
+      }
+      if (album.userId === userId) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'You already own this album (you created it)' });
+      }
+
+      // Need at least one track to distribute against — otherwise pool has
+      // nowhere to land.
+      const trackCount = await db
+        .select({ count: sql<number>`COUNT(*)::int` })
+        .from(albumTracks)
+        .where(eq(albumTracks.albumId, input.albumId));
+      if ((trackCount[0]?.count ?? 0) === 0) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Album has no tracks yet' });
+      }
+
+      const existingCompleted = await db.query.albumPurchases.findFirst({
+        where: and(
+          eq(albumPurchases.userId, userId),
+          eq(albumPurchases.albumId, input.albumId),
+          eq(albumPurchases.status, 'completed')
+        ),
+      });
+      if (existingCompleted) {
+        throw new TRPCError({ code: 'CONFLICT', message: 'You already own this album' });
+      }
+
+      const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000);
+      const existingPending = await db.query.albumPurchases.findFirst({
+        where: and(
+          eq(albumPurchases.userId, userId),
+          eq(albumPurchases.albumId, input.albumId),
+          eq(albumPurchases.status, 'pending')
+        ),
+      });
+      if (existingPending && existingPending.createdAt > thirtyMinAgo) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'A purchase is already in progress — finish checkout or try again in 30 minutes',
+        });
+      }
+
+      const apiKey = process.env.NOWPAYMENTS_API_KEY;
+      if (!apiKey) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Payment not configured' });
+
+      const [purchase] = await db
+        .insert(albumPurchases)
+        .values({
+          userId,
+          albumId: input.albumId,
+          pricePaid: album.price,
+          status: 'pending',
+        })
+        .returning();
+
+      try {
+        const priceUsd = album.price / 100;
+        const response = await fetch('https://api.nowpayments.io/v1/payment', {
+          method: 'POST',
+          headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            price_amount: priceUsd,
+            price_currency: 'usd',
+            pay_currency: 'usdcmatic',
+            // Order id prefix `albumbuy_` routed by the NOWPayments webhook
+            order_id: `albumbuy_${purchase.id}`,
+            order_description: `OPYNX album: ${album.title} — $${priceUsd.toFixed(2)}`,
+            ipn_callback_url: 'https://opynx.com/api/webhooks/nowpayments',
+            success_url: `https://opynx.com/album/${input.albumId}?purchased=true`,
+            cancel_url: `https://opynx.com/album/${input.albumId}?cancelled=true`,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.payment_id) {
+          await db.delete(albumPurchases).where(eq(albumPurchases.id, purchase.id));
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Payment creation failed' });
+        }
+
+        await db
+          .update(albumPurchases)
+          .set({ paymentId: String(data.payment_id) })
+          .where(eq(albumPurchases.id, purchase.id));
+
+        return {
+          purchase,
+          paymentUrl: `https://nowpayments.io/payment/?iid=${data.payment_id}`,
+        };
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        await db.delete(albumPurchases).where(eq(albumPurchases.id, purchase.id));
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Payment service unavailable' });
+      }
+    }),
+
+  hasPurchased: publicProcedure
+    .input(z.object({ albumId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session?.user?.id;
+      if (!userId) return null;
+      const purchase = await db.query.albumPurchases.findFirst({
+        where: and(
+          eq(albumPurchases.userId, userId),
+          eq(albumPurchases.albumId, input.albumId),
+          eq(albumPurchases.status, 'completed')
+        ),
+      });
+      return purchase ?? null;
+    }),
+
+  myPurchases: protectedProcedure.query(async ({ ctx }) => {
+    return db
+      .select({
+        purchaseId: albumPurchases.id,
+        pricePaid: albumPurchases.pricePaid,
+        purchasedAt: albumPurchases.createdAt,
+        album: {
+          id: albums.id,
+          title: albums.title,
+          slug: albums.slug,
+          coverUrl: albums.coverUrl,
+        },
+      })
+      .from(albumPurchases)
+      .innerJoin(albums, eq(albumPurchases.albumId, albums.id))
+      .where(and(
+        eq(albumPurchases.userId, ctx.session.user.id),
+        eq(albumPurchases.status, 'completed')
+      ))
+      .orderBy(desc(albumPurchases.createdAt));
+  }),
 });
 
 // ─── Playlists Router ───
@@ -4157,9 +4304,19 @@ const earningsRouter = createRouter({
       ))
       .groupBy(trackSplitPayouts.sourceType);
 
-    const trackPurchaseEarnings = trackPayouts.find((r) => r.sourceType === 'track_purchase') ?? {
-      lifetime: 0, recent: 0, count: 0,
-    };
+    // track_purchase + album_purchase both count as "track sales" in the
+    // earnings dashboard — album_purchase rows are per-track shares written
+    // by the album webhook handler cascading through the master-split helper.
+    const trackPurchaseEarnings = trackPayouts
+      .filter((r) => r.sourceType === 'track_purchase' || r.sourceType === 'album_purchase')
+      .reduce(
+        (acc, r) => ({
+          lifetime: acc.lifetime + r.lifetime,
+          recent: acc.recent + r.recent,
+          count: acc.count + r.count,
+        }),
+        { lifetime: 0, recent: 0, count: 0 }
+      );
     const trackedTipEarnings = trackPayouts.find((r) => r.sourceType === 'tip') ?? {
       lifetime: 0, recent: 0, count: 0,
     };
@@ -4335,7 +4492,9 @@ const earningsRouter = createRouter({
         createdAt: r.createdAt,
         label: r.sourceType === 'tip'
           ? `Tip on "${r.trackTitle}"`
-          : `Track sale: ${r.trackTitle}`,
+          : r.sourceType === 'album_purchase'
+            ? `Album sale (track: ${r.trackTitle})`
+            : `Track sale: ${r.trackTitle}`,
       })),
       ...ticketRows.map((r) => ({
         id: r.id,

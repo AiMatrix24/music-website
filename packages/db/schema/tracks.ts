@@ -151,6 +151,44 @@ export const trackPurchases = pgTable(
   ]
 );
 
+export const albumPurchaseStatusEnum = pgEnum('album_purchase_status', [
+  'pending',
+  'completed',
+  'cancelled',
+  'refunded',
+]);
+
+/**
+ * Album purchases — one-time buy of a whole album. Mirrors trackPurchases
+ * pattern (pending → completed via webhook). On completion the payment is
+ * fanned out PER TRACK through the master-split distribution: the price is
+ * divided across the album's tracks (largest-remainder rounding) and each
+ * track's pool runs through its own track_splits to credit collaborators.
+ */
+export const albumPurchases = pgTable(
+  'album_purchases',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    albumId: uuid('album_id')
+      .references(() => albums.id, { onDelete: 'cascade' })
+      .notNull(),
+    pricePaid: integer('price_paid').notNull(), // INTEGER CENTS at purchase time
+    status: albumPurchaseStatusEnum('status').default('pending').notNull(),
+    paymentId: text('payment_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index('album_purchases_user_idx').on(t.userId),
+    index('album_purchases_album_idx').on(t.albumId),
+    index('album_purchases_status_idx').on(t.status),
+    index('album_purchases_user_album_idx').on(t.userId, t.albumId),
+  ]
+);
+
 export const albums = pgTable(
   'albums',
   {
