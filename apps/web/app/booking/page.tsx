@@ -26,9 +26,13 @@ function compensationLabel(slot: { slotType: string; compensationCents: number |
 function statusPillClass(status: string) {
   switch (status) {
     case 'pending': return 'bg-yellow-600/20 text-yellow-400';
-    case 'accepted': return 'bg-green-600/20 text-green-400';
-    case 'declined': return 'bg-red-600/20 text-red-400';
+    case 'accepted':
+    case 'signed':
+    case 'completed': return 'bg-green-600/20 text-green-400';
+    case 'declined':
+    case 'cancelled': return 'bg-red-600/20 text-red-400';
     case 'withdrawn': return 'bg-gray-600/20 text-gray-400';
+    case 'draft': return 'bg-blue-600/20 text-blue-400';
     default: return 'bg-gray-600/20 text-gray-400';
   }
 }
@@ -41,6 +45,7 @@ export default function BookingPage() {
 
   const myApps = trpc.bookings.myApplications.useQuery(undefined, { enabled: isAuth });
   const received = trpc.bookings.received.useQuery(undefined, { enabled: isAuth });
+  const myContracts = trpc.bookings.myContracts.useQuery(undefined, { enabled: isAuth });
 
   const withdraw = trpc.bookings.withdraw.useMutation({
     onSuccess: () => {
@@ -112,6 +117,46 @@ export default function BookingPage() {
             I&apos;m a Venue
           </button>
         </div>
+
+        {/* ========= CONTRACTS (both roles see their own) ========= */}
+        {(myContracts.data ?? []).length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-lg font-bold mb-3">Contracts</h2>
+            <div className="space-y-2">
+              {(myContracts.data ?? []).map((c) => {
+                const isVenue = c.venueOwnerUserId === c.venueOwnerUserId; // always shown; role-agnostic
+                void isVenue;
+                return (
+                  <Link
+                    key={c.id}
+                    href={`/booking/contract/${c.id}`}
+                    className="block rounded-xl border border-white/10 bg-[#15151f] p-4 hover:border-red-600/40 transition"
+                  >
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <div className="min-w-0">
+                        <p className="font-semibold truncate">{c.venueName ?? 'Venue'}{c.venueCity ? ` · ${c.venueCity}` : ''}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {new Date(c.eventStart).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {c.creatorFeeCents != null && (
+                          <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs text-gray-300">${(c.creatorFeeCents / 100).toFixed(0)}</span>
+                        )}
+                        <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusPillClass(c.status)}`}>{c.status}</span>
+                        {c.status === 'draft' && (
+                          <span className="text-[10px] text-gray-500">
+                            {c.venueSignedAt && c.creatorSignedAt ? '' : !c.venueSignedAt && !c.creatorSignedAt ? '0/2 signed' : '1/2 signed'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* ========= CREATOR VIEW ========= */}
         {role === 'creator' && (

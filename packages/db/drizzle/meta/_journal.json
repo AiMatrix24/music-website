@@ -204,6 +204,13 @@
       "when": 1778975912203,
       "tag": "0028_album_purchases",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1778976396237,
+      "tag": "0029_booking_contracts",
+      "breakpoints": true
     }
   ]
 }

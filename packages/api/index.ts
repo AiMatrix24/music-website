@@ -60,6 +60,7 @@ import {
   trackSplitPayouts,
   venueSlots,
   bookingApplications,
+  bookingContracts,
 } from '@opynx/db';
 
 // ─── Auth Router ───
@@ -2997,6 +2998,30 @@ const bookingsRouter = createRouter({
               eq(bookingApplications.status, 'pending')
             ));
         }
+
+        // Auto-create the contract with defaults derived from the slot.
+        // Either party can amend + both must sign for it to become active.
+        // Idempotent: skip if a contract already exists for this app
+        // (e.g. accept called twice via webhook retry).
+        const existingContract = await tx.query.bookingContracts.findFirst({
+          where: eq(bookingContracts.applicationId, app.id),
+        });
+        if (!existingContract) {
+          await tx.insert(bookingContracts).values({
+            applicationId: app.id,
+            slotId: slot.id,
+            venueId: slot.venueId,
+            venueOwnerUserId: slot.ownerUserId,
+            creatorUserId: app.creatorUserId,
+            eventStart: slot.startTime,
+            eventEnd: slot.endTime,
+            creatorFeeCents: slot.compensationCents,
+            ticketSplitBp: null,
+            concessionSplitBp: null,
+            paymentTerms: slot.slotType === 'door_split' ? 'door_split_only' : 'at_event',
+            status: 'draft',
+          });
+        }
       });
 
       await notify({
@@ -3139,6 +3164,237 @@ const bookingsRouter = createRouter({
         .leftJoin(users, eq(bookingApplications.creatorUserId, users.id))
         .where(eq(bookingApplications.slotId, input.slotId))
         .orderBy(desc(bookingApplications.createdAt));
+    }),
+
+  // ── Contract procedures (Wave 4) ──────────────────────────────────
+  // The contract is auto-created on accept (see above). These procedures
+  // let either party view, amend, sign, complete, or cancel it.
+
+  /** Either party (or admin) can read their own contracts. */
+  myContracts: protectedProcedure.query(async ({ ctx }) => {
+    const uid = ctx.session.user.id;
+    return db
+      .select({
+        id: bookingContracts.id,
+        status: bookingContracts.status,
+        eventStart: bookingContracts.eventStart,
+        eventEnd: bookingContracts.eventEnd,
+        creatorFeeCents: bookingContracts.creatorFeeCents,
+        ticketSplitBp: bookingContracts.ticketSplitBp,
+        concessionSplitBp: bookingContracts.concessionSplitBp,
+        paymentTerms: bookingContracts.paymentTerms,
+        venueSignedAt: bookingContracts.venueSignedAt,
+        creatorSignedAt: bookingContracts.creatorSignedAt,
+        venueId: bookingContracts.venueId,
+        venueName: venues.name,
+        venueCity: venues.city,
+        creatorUserId: bookingContracts.creatorUserId,
+        venueOwnerUserId: bookingContracts.venueOwnerUserId,
+        applicationId: bookingContracts.applicationId,
+      })
+      .from(bookingContracts)
+      .leftJoin(venues, eq(bookingContracts.venueId, venues.id))
+      .where(or(
+        eq(bookingContracts.venueOwnerUserId, uid),
+        eq(bookingContracts.creatorUserId, uid)
+      ))
+      .orderBy(desc(bookingContracts.eventStart));
+  }),
+
+  /** Single contract detail. Party-only. */
+  getContract: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const c = await db.query.bookingContracts.findFirst({
+        where: eq(bookingContracts.id, input.id),
+      });
+      if (!c) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (c.venueOwnerUserId !== ctx.session.user.id && c.creatorUserId !== ctx.session.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
+      const venue = await db.query.venues.findFirst({ where: eq(venues.id, c.venueId), columns: { id: true, name: true, city: true, state: true } });
+      const [creator, venueOwner] = await Promise.all([
+        db.query.users.findFirst({ where: eq(users.id, c.creatorUserId), columns: { id: true, name: true, avatar: true } }),
+        db.query.users.findFirst({ where: eq(users.id, c.venueOwnerUserId), columns: { id: true, name: true, avatar: true } }),
+      ]);
+      return { contract: c, venue, creator, venueOwner };
+    }),
+
+  /**
+   * Either party amends the contract while it's still in draft. Each
+   * amendment RESETS both signatures so neither party is locked into
+   * stale terms — they must re-sign after any change.
+   */
+  amendContract: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        eventStart: z.string().datetime().optional(),
+        eventEnd: z.string().datetime().optional(),
+        creatorFeeCents: z.number().int().min(0).max(1_000_000_00).nullable().optional(),
+        ticketSplitBp: z.number().int().min(0).max(10000).nullable().optional(),
+        concessionSplitBp: z.number().int().min(0).max(10000).nullable().optional(),
+        paymentTerms: z.enum(['upfront', 'at_event', 'after_event', 'door_split_only']).optional(),
+        setLengthMinutes: z.number().int().min(0).max(600).nullable().optional(),
+        soundcheckAt: z.string().datetime().nullable().optional(),
+        riderText: z.string().max(10000).nullable().optional(),
+        cancellationPolicy: z.string().max(2000).nullable().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const c = await db.query.bookingContracts.findFirst({ where: eq(bookingContracts.id, input.id) });
+      if (!c) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (c.venueOwnerUserId !== ctx.session.user.id && c.creatorUserId !== ctx.session.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not a party to this contract' });
+      }
+      if (c.status !== 'draft') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: `Contract is ${c.status} — amendments only allowed in draft` });
+      }
+
+      const patch: Record<string, unknown> = { updatedAt: new Date() };
+      if (input.eventStart !== undefined) patch.eventStart = new Date(input.eventStart);
+      if (input.eventEnd !== undefined) patch.eventEnd = new Date(input.eventEnd);
+      if (input.creatorFeeCents !== undefined) patch.creatorFeeCents = input.creatorFeeCents;
+      if (input.ticketSplitBp !== undefined) patch.ticketSplitBp = input.ticketSplitBp;
+      if (input.concessionSplitBp !== undefined) patch.concessionSplitBp = input.concessionSplitBp;
+      if (input.paymentTerms !== undefined) patch.paymentTerms = input.paymentTerms;
+      if (input.setLengthMinutes !== undefined) patch.setLengthMinutes = input.setLengthMinutes;
+      if (input.soundcheckAt !== undefined) patch.soundcheckAt = input.soundcheckAt ? new Date(input.soundcheckAt) : null;
+      if (input.riderText !== undefined) patch.riderText = input.riderText;
+      if (input.cancellationPolicy !== undefined) patch.cancellationPolicy = input.cancellationPolicy;
+
+      // Reset both signatures — every amendment requires fresh consent
+      patch.venueSignedAt = null;
+      patch.creatorSignedAt = null;
+
+      await db.update(bookingContracts).set(patch).where(eq(bookingContracts.id, input.id));
+
+      // Notify the other party
+      const otherUserId = ctx.session.user.id === c.venueOwnerUserId ? c.creatorUserId : c.venueOwnerUserId;
+      await notify({
+        userId: otherUserId,
+        type: 'system',
+        title: 'Contract amended',
+        body: `Your booking contract was updated — please review and re-sign.`,
+        link: `/booking/contract/${c.id}`,
+      });
+
+      return { ok: true };
+    }),
+
+  /**
+   * Either party signs the contract. When both signatures land, status
+   * flips to 'signed'. Signing on top of an existing signature is a no-op.
+   */
+  signContract: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const c = await db.query.bookingContracts.findFirst({ where: eq(bookingContracts.id, input.id) });
+      if (!c) throw new TRPCError({ code: 'NOT_FOUND' });
+      const userId = ctx.session.user.id;
+      const isVenue = c.venueOwnerUserId === userId;
+      const isCreator = c.creatorUserId === userId;
+      if (!isVenue && !isCreator) throw new TRPCError({ code: 'FORBIDDEN' });
+      if (c.status !== 'draft') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: `Contract is ${c.status}` });
+      }
+
+      const now = new Date();
+      const patch: Record<string, unknown> = { updatedAt: now };
+      if (isVenue && !c.venueSignedAt) patch.venueSignedAt = now;
+      if (isCreator && !c.creatorSignedAt) patch.creatorSignedAt = now;
+
+      // Will this signature complete the contract?
+      const venueDone = isVenue || !!c.venueSignedAt;
+      const creatorDone = isCreator || !!c.creatorSignedAt;
+      if (venueDone && creatorDone) {
+        patch.status = 'signed';
+      }
+
+      await db.update(bookingContracts).set(patch).where(eq(bookingContracts.id, input.id));
+
+      if (venueDone && creatorDone) {
+        const otherUserId = isVenue ? c.creatorUserId : c.venueOwnerUserId;
+        await notify({
+          userId: otherUserId,
+          type: 'system',
+          title: 'Contract fully signed',
+          body: `Your booking contract is signed by both parties — it\'s on the books.`,
+          link: `/booking/contract/${c.id}`,
+        });
+      } else {
+        const otherUserId = isVenue ? c.creatorUserId : c.venueOwnerUserId;
+        await notify({
+          userId: otherUserId,
+          type: 'system',
+          title: 'Contract signed by counterparty',
+          body: `Your contract is awaiting your signature.`,
+          link: `/booking/contract/${c.id}`,
+        });
+      }
+
+      return { ok: true };
+    }),
+
+  /** Either party marks the event complete (post-event). */
+  completeContract: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const c = await db.query.bookingContracts.findFirst({ where: eq(bookingContracts.id, input.id) });
+      if (!c) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (c.venueOwnerUserId !== ctx.session.user.id && c.creatorUserId !== ctx.session.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
+      if (c.status !== 'signed') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Contract must be signed before completion' });
+      }
+      const now = new Date();
+      await db
+        .update(bookingContracts)
+        .set({ status: 'completed', completedAt: now, updatedAt: now })
+        .where(eq(bookingContracts.id, input.id));
+      return { ok: true };
+    }),
+
+  /** Either party cancels (works in draft OR signed states, pre-event). */
+  cancelContract: protectedProcedure
+    .input(z.object({ id: z.string().uuid(), reason: z.string().max(2000).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const c = await db.query.bookingContracts.findFirst({ where: eq(bookingContracts.id, input.id) });
+      if (!c) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (c.venueOwnerUserId !== ctx.session.user.id && c.creatorUserId !== ctx.session.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
+      if (c.status === 'cancelled' || c.status === 'completed') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: `Already ${c.status}` });
+      }
+      const now = new Date();
+      await db
+        .update(bookingContracts)
+        .set({
+          status: 'cancelled',
+          cancelledAt: now,
+          cancellationReason: input.reason ?? null,
+          cancelledBy: ctx.session.user.id,
+          updatedAt: now,
+        })
+        .where(eq(bookingContracts.id, input.id));
+
+      // Also reopen the slot if it was filled and the event hasn't happened
+      if (c.eventStart.getTime() > Date.now()) {
+        await db.update(venueSlots).set({ status: 'open', updatedAt: now }).where(eq(venueSlots.id, c.slotId));
+      }
+
+      const otherUserId = ctx.session.user.id === c.venueOwnerUserId ? c.creatorUserId : c.venueOwnerUserId;
+      await notify({
+        userId: otherUserId,
+        type: 'system',
+        title: 'Contract cancelled',
+        body: `Your booking contract was cancelled${input.reason ? `: ${input.reason}` : '.'}`,
+        link: '/booking',
+      });
+
+      return { ok: true };
     }),
 });
 

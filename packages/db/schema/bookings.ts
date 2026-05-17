@@ -40,6 +40,27 @@ export const bookingApplicationStatusEnum = pgEnum('booking_application_status',
   'withdrawn',    // creator pulled their own app before a decision
 ]);
 
+/**
+ * Contract lifecycle. A contract row is auto-created when an application
+ * is accepted (the venue owner clicks Accept). Both parties review + amend
+ * + sign; when both signatures land, status flips to 'signed'. After the
+ * event the contract is marked 'completed' (this is the trigger event for
+ * future concession settlements + ticket-revenue splits).
+ */
+export const bookingContractStatusEnum = pgEnum('booking_contract_status', [
+  'draft',      // auto-created, awaiting both signatures
+  'signed',     // both parties signed; event is on the books
+  'completed', // event happened + settlements done
+  'cancelled', // either party cancelled before the event
+]);
+
+export const bookingPaymentTermsEnum = pgEnum('booking_payment_terms', [
+  'upfront',         // creator paid before the event
+  'at_event',        // paid at the venue on event night
+  'after_event',     // paid N days after event (default 7)
+  'door_split_only', // no flat fee, revenue from door split only
+]);
+
 export const venueSlots = pgTable(
   'venue_slots',
   {
@@ -112,6 +133,101 @@ export const bookingApplications = pgTable(
     index('booking_apps_slot_status_idx').on(t.slotId, t.status),
   ]
 );
+
+/**
+ * Booking contract — the agreement object that sits on top of an accepted
+ * application. Holds the negotiated terms (creator fee, ticket revenue
+ * split, concession revenue split, riders, payment timing) and both
+ * parties' signatures. This is the structured contract that concession
+ * settlements + ticket-revenue splits will key off in subsequent phases.
+ *
+ * Money terms are TRUST-BASED v1 — nothing held in escrow yet. The
+ * contract is the authoritative record of what was agreed.
+ *
+ * Auto-creation: when bookings.accept fires, the procedure inserts a
+ * contract row with defaults derived from the slot (event_start/end from
+ * slot times, creator_fee_cents from slot.compensation_cents,
+ * payment_terms='at_event'). Either party can amend while status='draft';
+ * amendments reset both signatures. Both must re-sign to flip to 'signed'.
+ */
+export const bookingContracts = pgTable(
+  'booking_contracts',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    // One contract per accepted application. Unique enforces 1:1.
+    applicationId: uuid('application_id')
+      .references(() => bookingApplications.id, { onDelete: 'cascade' })
+      .notNull(),
+    // Denormalized for fast lookups by party + venue.
+    slotId: uuid('slot_id')
+      .references(() => venueSlots.id, { onDelete: 'cascade' })
+      .notNull(),
+    venueId: uuid('venue_id')
+      .references(() => venues.id, { onDelete: 'cascade' })
+      .notNull(),
+    venueOwnerUserId: uuid('venue_owner_user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    creatorUserId: uuid('creator_user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    eventStart: timestamp('event_start', { withTimezone: true }).notNull(),
+    eventEnd: timestamp('event_end', { withTimezone: true }).notNull(),
+    // Creator's guaranteed flat fee, if any. Nullable for door-split-only deals.
+    creatorFeeCents: integer('creator_fee_cents'),
+    // Basis points to creator on ticket revenue (0-10000; venue keeps the
+    // remainder). Null = no ticket sharing in this deal.
+    ticketSplitBp: integer('ticket_split_bp'),
+    // Basis points to creator on concession (F&B) revenue. Null = no concession
+    // sharing — venue keeps 100%.
+    concessionSplitBp: integer('concession_split_bp'),
+    paymentTerms: bookingPaymentTermsEnum('payment_terms').default('at_event').notNull(),
+    setLengthMinutes: integer('set_length_minutes'),
+    soundcheckAt: timestamp('soundcheck_at', { withTimezone: true }),
+    riderText: text('rider_text'),
+    cancellationPolicy: text('cancellation_policy'),
+    venueSignedAt: timestamp('venue_signed_at', { withTimezone: true }),
+    creatorSignedAt: timestamp('creator_signed_at', { withTimezone: true }),
+    status: bookingContractStatusEnum('status').default('draft').notNull(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    cancellationReason: text('cancellation_reason'),
+    cancelledBy: uuid('cancelled_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex('contracts_app_unique_idx').on(t.applicationId),
+    index('contracts_venue_idx').on(t.venueOwnerUserId, t.status),
+    index('contracts_creator_idx').on(t.creatorUserId, t.status),
+    index('contracts_status_event_idx').on(t.status, t.eventStart),
+  ]
+);
+
+export const bookingContractsRelations = relations(bookingContracts, ({ one }) => ({
+  application: one(bookingApplications, {
+    fields: [bookingContracts.applicationId],
+    references: [bookingApplications.id],
+  }),
+  slot: one(venueSlots, {
+    fields: [bookingContracts.slotId],
+    references: [venueSlots.id],
+  }),
+  venue: one(venues, {
+    fields: [bookingContracts.venueId],
+    references: [venues.id],
+  }),
+  venueOwner: one(users, {
+    fields: [bookingContracts.venueOwnerUserId],
+    references: [users.id],
+    relationName: 'contractVenueOwner',
+  }),
+  creator: one(users, {
+    fields: [bookingContracts.creatorUserId],
+    references: [users.id],
+    relationName: 'contractCreator',
+  }),
+}));
 
 export const venueSlotsRelations = relations(venueSlots, ({ one, many }) => ({
   venue: one(venues, {
