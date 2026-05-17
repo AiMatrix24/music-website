@@ -61,6 +61,9 @@ import {
   venueSlots,
   bookingApplications,
   bookingContracts,
+  menuItems,
+  concessionOrders,
+  concessionOrderItems,
 } from '@opynx/db';
 
 // ─── Auth Router ───
@@ -6563,6 +6566,267 @@ async function returnEscrowedPayoutsToOwner(
   );
 }
 
+// ─── Concessions Router (Wave 4 — venue POS + contract settlement) ───
+/**
+ * Venue-side F&B / merch sales during a booked event. Orders are tied to
+ * a booking_contract; settlement computes the creator's share of total
+ * revenue per the contract's concession_split_bp.
+ *
+ * Trust-based v1 — orders record what was sold + the payment method
+ * (cash, card, etc.) without OPYNX handling the money. The settlement
+ * view shows the venue what they owe the creator; payment happens
+ * off-platform until escrow lands.
+ */
+const concessionsRouter = createRouter({
+  /** List a venue's menu (owner sees inactive too via includeInactive). */
+  listMenu: publicProcedure
+    .input(z.object({ venueId: z.string().uuid(), includeInactive: z.boolean().default(false) }))
+    .query(async ({ input }) => {
+      const conds = [eq(menuItems.venueId, input.venueId)];
+      if (!input.includeInactive) conds.push(eq(menuItems.active, true));
+      return db
+        .select()
+        .from(menuItems)
+        .where(and(...conds))
+        .orderBy(menuItems.sortOrder, menuItems.name);
+    }),
+
+  /** Owner: add a menu item. */
+  createMenuItem: protectedProcedure
+    .input(
+      z.object({
+        venueId: z.string().uuid(),
+        name: z.string().min(1).max(120),
+        description: z.string().max(500).optional(),
+        category: z.string().max(40).optional(),
+        priceCents: z.number().int().min(0).max(100_000_000),
+        sortOrder: z.number().int().min(0).max(10000).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const v = await db.query.venues.findFirst({ where: eq(venues.id, input.venueId) });
+      if (!v) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (v.ownerUserId !== ctx.session.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Only the venue owner can edit the menu' });
+      }
+      const [row] = await db
+        .insert(menuItems)
+        .values({
+          venueId: input.venueId,
+          name: input.name,
+          description: input.description ?? null,
+          category: input.category ?? null,
+          priceCents: input.priceCents,
+          sortOrder: input.sortOrder ?? 0,
+        })
+        .returning();
+      return row;
+    }),
+
+  /** Owner: edit / soft-delete (set active=false) a menu item. */
+  updateMenuItem: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        name: z.string().min(1).max(120).optional(),
+        description: z.string().max(500).nullable().optional(),
+        category: z.string().max(40).nullable().optional(),
+        priceCents: z.number().int().min(0).max(100_000_000).optional(),
+        sortOrder: z.number().int().min(0).max(10000).optional(),
+        active: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const item = await db.query.menuItems.findFirst({ where: eq(menuItems.id, input.id) });
+      if (!item) throw new TRPCError({ code: 'NOT_FOUND' });
+      const v = await db.query.venues.findFirst({ where: eq(venues.id, item.venueId) });
+      if (v?.ownerUserId !== ctx.session.user.id) throw new TRPCError({ code: 'FORBIDDEN' });
+      const { id, ...patch } = input;
+      await db.update(menuItems).set({ ...patch, updatedAt: new Date() }).where(eq(menuItems.id, id));
+      return { ok: true };
+    }),
+
+  /**
+   * Ring up a sale at the POS. Authz: venue owner only. Each line item
+   * snapshots the menu item's name + price at sale time. totalCents is
+   * computed server-side from the lines, not trusted from the client.
+   */
+  sell: protectedProcedure
+    .use(rateLimit({ limit: 120, windowSec: 60 })) // POS can hit this fast
+    .input(
+      z.object({
+        contractId: z.string().uuid(),
+        items: z.array(
+          z.object({
+            menuItemId: z.string().uuid(),
+            quantity: z.number().int().min(1).max(99),
+          })
+        ).min(1).max(50),
+        buyerName: z.string().max(80).optional(),
+        paymentMethod: z.string().max(20).optional(),
+        notes: z.string().max(500).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const contract = await db.query.bookingContracts.findFirst({ where: eq(bookingContracts.id, input.contractId) });
+      if (!contract) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (contract.venueOwnerUserId !== ctx.session.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Only the venue owner can ring up sales' });
+      }
+      if (contract.status !== 'signed' && contract.status !== 'completed') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Contract must be signed before selling concessions' });
+      }
+
+      const itemIds = input.items.map((i) => i.menuItemId);
+      const items = await db
+        .select()
+        .from(menuItems)
+        .where(and(
+          inArray(menuItems.id, itemIds),
+          eq(menuItems.venueId, contract.venueId)
+        ));
+      if (items.length !== new Set(itemIds).size) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'One or more items are not on this venue\'s menu' });
+      }
+      const byId = Object.fromEntries(items.map((i) => [i.id, i]));
+
+      const lines = input.items.map((req) => {
+        const m = byId[req.menuItemId];
+        return {
+          menuItemId: m.id,
+          itemNameSnapshot: m.name,
+          unitPriceCents: m.priceCents,
+          quantity: req.quantity,
+          lineTotalCents: m.priceCents * req.quantity,
+        };
+      });
+      const totalCents = lines.reduce((sum, l) => sum + l.lineTotalCents, 0);
+
+      const orderId = await db.transaction(async (tx) => {
+        const [order] = await tx
+          .insert(concessionOrders)
+          .values({
+            contractId: input.contractId,
+            venueId: contract.venueId,
+            soldByUserId: ctx.session.user.id,
+            buyerName: input.buyerName ?? null,
+            totalCents,
+            paymentMethod: input.paymentMethod ?? null,
+            notes: input.notes ?? null,
+            status: 'completed',
+          })
+          .returning({ id: concessionOrders.id });
+        await tx.insert(concessionOrderItems).values(
+          lines.map((l) => ({ orderId: order.id, ...l }))
+        );
+        return order.id;
+      });
+
+      return { id: orderId, totalCents, lineCount: lines.length };
+    }),
+
+  /** Owner: void an order (refund/cancel). Excluded from settlement totals. */
+  voidOrder: protectedProcedure
+    .input(z.object({ id: z.string().uuid(), reason: z.string().max(500).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const order = await db.query.concessionOrders.findFirst({ where: eq(concessionOrders.id, input.id) });
+      if (!order) throw new TRPCError({ code: 'NOT_FOUND' });
+      const v = await db.query.venues.findFirst({ where: eq(venues.id, order.venueId) });
+      if (v?.ownerUserId !== ctx.session.user.id) throw new TRPCError({ code: 'FORBIDDEN' });
+      if (order.status === 'voided') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Already voided' });
+      }
+      await db
+        .update(concessionOrders)
+        .set({
+          status: 'voided',
+          voidedAt: new Date(),
+          voidedBy: ctx.session.user.id,
+          notes: input.reason ? `[VOID] ${input.reason}` : order.notes,
+          updatedAt: new Date(),
+        })
+        .where(eq(concessionOrders.id, input.id));
+      return { ok: true };
+    }),
+
+  /** List orders for a contract. Either party can view. Includes line items. */
+  listOrdersByContract: protectedProcedure
+    .input(z.object({ contractId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const contract = await db.query.bookingContracts.findFirst({ where: eq(bookingContracts.id, input.contractId) });
+      if (!contract) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (contract.venueOwnerUserId !== ctx.session.user.id && contract.creatorUserId !== ctx.session.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
+      const orders = await db
+        .select()
+        .from(concessionOrders)
+        .where(eq(concessionOrders.contractId, input.contractId))
+        .orderBy(desc(concessionOrders.createdAt));
+
+      const orderIds = orders.map((o) => o.id);
+      const items = orderIds.length > 0
+        ? await db
+            .select()
+            .from(concessionOrderItems)
+            .where(inArray(concessionOrderItems.orderId, orderIds))
+        : [];
+      const itemsByOrder = items.reduce<Record<string, typeof items>>((acc, i) => {
+        (acc[i.orderId] ||= []).push(i);
+        return acc;
+      }, {});
+      return orders.map((o) => ({ ...o, items: itemsByOrder[o.id] ?? [] }));
+    }),
+
+  /**
+   * Settlement view for a contract — per-source totals + creator share +
+   * venue share. Either party can read. Trust-based v1: nothing held; this
+   * is the authoritative ledger of what's owed.
+   */
+  settlement: protectedProcedure
+    .input(z.object({ contractId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const contract = await db.query.bookingContracts.findFirst({ where: eq(bookingContracts.id, input.contractId) });
+      if (!contract) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (contract.venueOwnerUserId !== ctx.session.user.id && contract.creatorUserId !== ctx.session.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
+
+      const [{ revenue: concessionRevenueCents }] = await db
+        .select({
+          revenue: sql<number>`COALESCE(SUM(${concessionOrders.totalCents}), 0)::int`,
+        })
+        .from(concessionOrders)
+        .where(and(
+          eq(concessionOrders.contractId, input.contractId),
+          eq(concessionOrders.status, 'completed')
+        ));
+
+      const concessionBp = contract.concessionSplitBp ?? 0;
+      const creatorConcessionCents = Math.floor((concessionRevenueCents * concessionBp) / 10000);
+      const venueConcessionCents = concessionRevenueCents - creatorConcessionCents;
+
+      // Creator flat fee (always owed unless cancelled)
+      const creatorFeeOwedCents = contract.status === 'cancelled' ? 0 : (contract.creatorFeeCents ?? 0);
+
+      return {
+        contractStatus: contract.status,
+        creatorFeeOwedCents,
+        concessionRevenueCents,
+        concessionSplitBp: concessionBp,
+        creatorConcessionCents,
+        venueConcessionCents,
+        // Ticket revenue settlement is a forward-looking placeholder until
+        // tickets are wired to the contract. Counted as 0 for now.
+        ticketRevenueCents: 0,
+        ticketSplitBp: contract.ticketSplitBp ?? 0,
+        creatorTicketCents: 0,
+        venueTicketCents: 0,
+        creatorTotalOwedCents: creatorFeeOwedCents + creatorConcessionCents,
+      };
+    }),
+});
+
 export const appRouter = createRouter({
   auth: authRouter,
   users: usersRouter,
@@ -6595,6 +6859,7 @@ export const appRouter = createRouter({
   distribution: distributionRouter,
   dmca: dmcaRouter,
   splits: splitsRouter,
+  concessions: concessionsRouter,
 });
 
 export type AppRouter = typeof appRouter;

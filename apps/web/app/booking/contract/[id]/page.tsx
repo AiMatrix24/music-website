@@ -32,6 +32,10 @@ export default function ContractDetailPage() {
 
   const { data, isLoading } = trpc.bookings.getContract.useQuery({ id }, { enabled: !!id && sessionStatus === 'authenticated' });
   const c = data?.contract;
+  const { data: settlement } = trpc.concessions.settlement.useQuery(
+    { contractId: id },
+    { enabled: !!c && (c.status === 'signed' || c.status === 'completed') }
+  );
   const userId = session?.user?.id;
   const isVenueOwner = !!c && !!userId && c.venueOwnerUserId === userId;
   const isCreator = !!c && !!userId && c.creatorUserId === userId;
@@ -312,6 +316,41 @@ export default function ContractDetailPage() {
             </div>
           )}
         </div>
+
+        {/* Settlement + POS — visible once contract is signed */}
+        {(c.status === 'signed' || c.status === 'completed') && settlement && (
+          <div className="rounded-xl border border-white/10 bg-[#15151f] p-6 mb-6">
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <h2 className="text-lg font-bold">Settlement</h2>
+              {isVenueOwner && (
+                <Link
+                  href={`/booking/contract/${id}/pos`}
+                  className="rounded-full bg-red-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-500 transition"
+                >
+                  Open Concession POS →
+                </Link>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-lg bg-brand-950/50 p-3">
+                <p className="text-xs text-gray-500">Creator flat fee</p>
+                <p className="font-bold mt-1">${(settlement.creatorFeeOwedCents / 100).toFixed(2)}</p>
+              </div>
+              <div className="rounded-lg bg-brand-950/50 p-3">
+                <p className="text-xs text-gray-500">Concession revenue</p>
+                <p className="font-bold mt-1">${(settlement.concessionRevenueCents / 100).toFixed(2)}</p>
+                <p className="text-[10px] text-gray-500 mt-0.5">{settlement.concessionSplitBp / 100}% to creator</p>
+              </div>
+              <div className="rounded-lg bg-green-600/10 border border-green-600/30 p-3 col-span-2">
+                <p className="text-xs text-green-400">Owed to creator</p>
+                <p className="text-2xl font-bold mt-1 text-green-400">${(settlement.creatorTotalOwedCents / 100).toFixed(2)}</p>
+                <p className="text-[10px] text-gray-500 mt-1">
+                  ${(settlement.creatorFeeOwedCents / 100).toFixed(2)} fee + ${(settlement.creatorConcessionCents / 100).toFixed(2)} concessions share. Trust-based v1 — venue pays creator off-platform.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Actions */}
         <div className="rounded-xl border border-white/10 bg-[#15151f] p-6 space-y-3">

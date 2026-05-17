@@ -18,3 +18,4 @@ export * from './dmca';
 export * from './recommendations';
 export * from './splits';
 export * from './bookings';
+export * from './concessions';
