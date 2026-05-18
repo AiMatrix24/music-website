@@ -43,6 +43,12 @@ function loadEnvFile(path: string): Record<string, string> {
 const args = new Set(process.argv.slice(2));
 const yes = args.has('--yes') || args.has('-y');
 const allowProd = args.has('--allow-prod');
+// --keep-data: leave the sim rows in place after the run so the dashboards
+// (/dashboard/venue, /dashboard/gigs, /booking) display real numbers. Pair
+// with `npm run demo:cleanup` (or run the script again with --cleanup-only)
+// when you're done viewing.
+const keepData = args.has('--keep-data');
+const cleanupOnly = args.has('--cleanup-only');
 
 const envLocal = loadEnvFile(resolve(process.cwd(), '.env.local'));
 const databaseUrl = (process.env.DATABASE_URL ?? envLocal.DATABASE_URL ?? '').trim();
@@ -88,6 +94,65 @@ const { distributeTrackSplitPayouts } = await import('../apps/web/lib/services/t
 const sql = postgres(databaseUrl, { max: 1, ssl: 'require' });
 const fmt = (c: number) => `$${(c / 100).toFixed(2)}`;
 const banner = (t: string) => console.log('\n' + '═'.repeat(66) + '\n  ' + t + '\n' + '═'.repeat(66));
+
+// ── Cleanup-only mode: remove ALL sim rows left behind by prior --keep-data runs
+if (cleanupOnly) {
+  banner('CLEANUP — remove all sim rows by email pattern');
+  // Find every sim user we ever created (deterministic email suffix)
+  const simUsers = await sql`SELECT id FROM users WHERE email LIKE '%@example.invalid'`;
+  const simUserIds = simUsers.map((u) => u.id);
+  console.log(`Found ${simUserIds.length} sim users to clean up.`);
+  if (simUserIds.length > 0) {
+    // Find every venue, contract, etc. transitively
+    const simContracts = await sql`SELECT id FROM booking_contracts WHERE creator_user_id IN ${sql(simUserIds)} OR venue_owner_user_id IN ${sql(simUserIds)}`;
+    const simContractIds = simContracts.map((c) => c.id);
+    if (simContractIds.length > 0) {
+      // Concession order items + orders for sim contracts
+      const simOrders = await sql`SELECT id FROM concession_orders WHERE contract_id IN ${sql(simContractIds)}`;
+      const simOrderIds = simOrders.map((o) => o.id);
+      if (simOrderIds.length > 0) {
+        await sql`DELETE FROM concession_order_items WHERE order_id IN ${sql(simOrderIds)}`;
+        await sql`DELETE FROM concession_orders WHERE id IN ${sql(simOrderIds)}`;
+      }
+      await sql`DELETE FROM booking_contracts WHERE id IN ${sql(simContractIds)}`;
+    }
+    // Apps where sim is creator
+    await sql`DELETE FROM booking_applications WHERE creator_user_id IN ${sql(simUserIds)}`;
+    // Slots owned by sims (rare — only if a sim was venue owner)
+    const simSlots = await sql`SELECT id FROM venue_slots WHERE owner_user_id IN ${sql(simUserIds)}`;
+    const simSlotIds = simSlots.map((s) => s.id);
+    if (simSlotIds.length > 0) await sql`DELETE FROM venue_slots WHERE id IN ${sql(simSlotIds)}`;
+    // Venues owned by sims (none in current flow but safe)
+    await sql`DELETE FROM venues WHERE owner_user_id IN ${sql(simUserIds)}`;
+    // Track-split payouts where sim is the recipient
+    await sql`DELETE FROM track_split_payouts WHERE recipient_user_id IN ${sql(simUserIds)}`;
+    // Split rows where sim is collaborator
+    const simSplits = await sql`SELECT id FROM track_splits WHERE collaborator_user_id IN ${sql(simUserIds)}`;
+    const simSplitIds = simSplits.map((s) => s.id);
+    if (simSplitIds.length > 0) {
+      await sql`DELETE FROM track_split_history WHERE track_split_id IN ${sql(simSplitIds)}`;
+      await sql`DELETE FROM track_splits WHERE id IN ${sql(simSplitIds)}`;
+    }
+    // Albums + tracks owned by sims (rare — owner is usually Lee)
+    await sql`DELETE FROM albums WHERE user_id IN ${sql(simUserIds)}`;
+    await sql`DELETE FROM tracks WHERE user_id IN ${sql(simUserIds)}`;
+  }
+  // Also catch sim albums/tracks that Lee owned but were named with the sim slug
+  await sql`DELETE FROM album_purchases WHERE album_id IN (SELECT id FROM albums WHERE slug LIKE 'sim-album-%')`;
+  await sql`DELETE FROM album_tracks WHERE track_id IN (SELECT id FROM tracks WHERE slug LIKE 'sim-%')`;
+  await sql`DELETE FROM track_split_payouts WHERE track_id IN (SELECT id FROM tracks WHERE slug LIKE 'sim-%')`;
+  await sql`DELETE FROM track_splits WHERE track_id IN (SELECT id FROM tracks WHERE slug LIKE 'sim-%')`;
+  await sql`DELETE FROM tracks WHERE slug LIKE 'sim-%'`;
+  await sql`DELETE FROM albums WHERE slug LIKE 'sim-album-%'`;
+  // Menu items + venues with "Sim Hall" or matching name pattern
+  await sql`DELETE FROM menu_items WHERE venue_id IN (SELECT id FROM venues WHERE name = 'Sim Hall')`;
+  await sql`DELETE FROM venues WHERE name = 'Sim Hall'`;
+  // Finally, the users themselves
+  if (simUserIds.length > 0) await sql`DELETE FROM users WHERE id IN ${sql(simUserIds)}`;
+  console.log('Sim rows removed.');
+  await sql.end();
+  process.exit(0);
+}
 
 // ── Pick an owner ──────────────────────────────────────────────────
 let ownerId = (process.env.OWNER_USER_ID ?? '').trim();
@@ -336,6 +401,13 @@ try {
 
   banner('Both scenarios complete — cleaning up sim rows');
 } finally {
+  if (keepData) {
+    console.log('\n--keep-data set: leaving sim rows in place.');
+    console.log('Visit /dashboard/venue and /dashboard/gigs to see them populated.');
+    console.log('Run `npm run demo:seed -- --cleanup-only --yes --allow-prod` to remove them later.');
+    await sql.end();
+    process.exit(0);
+  }
   // ── Cleanup (FK-respecting order) ──────────────────────────────────
   if (cleanup.orderItemOrderIds.length > 0) await sql`DELETE FROM concession_order_items WHERE order_id IN ${sql(cleanup.orderItemOrderIds)}`;
   if (cleanup.orderIds.length > 0) await sql`DELETE FROM concession_orders WHERE id IN ${sql(cleanup.orderIds)}`;
