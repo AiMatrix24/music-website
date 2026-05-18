@@ -3142,6 +3142,160 @@ const bookingsRouter = createRouter({
       .orderBy(desc(bookingApplications.createdAt));
   }),
 
+  /**
+   * Single-call summary powering the /dashboard/venue + /dashboard/gigs
+   * reports. Returns counts + monetary totals for both roles in one query
+   * roundtrip so the dashboards stay snappy. Concession totals are computed
+   * across all contracts the user is party to (as venue or creator).
+   */
+  dashboardSummary: protectedProcedure.query(async ({ ctx }) => {
+    const uid = ctx.session.user.id;
+    const now = new Date();
+
+    // ── Venue-side aggregates ──
+    const [
+      [{ venueCount }],
+      [{ openSlotCount }],
+      [{ pendingAppCount: venuePendingApps }],
+      venueContracts,
+      [{ venueConcessionRevenue }],
+    ] = await Promise.all([
+      db
+        .select({ venueCount: sql<number>`COUNT(*)::int` })
+        .from(venues)
+        .where(eq(venues.ownerUserId, uid)),
+      db
+        .select({ openSlotCount: sql<number>`COUNT(*)::int` })
+        .from(venueSlots)
+        .where(and(eq(venueSlots.ownerUserId, uid), eq(venueSlots.status, 'open'))),
+      db
+        .select({ pendingAppCount: sql<number>`COUNT(*)::int` })
+        .from(bookingApplications)
+        .innerJoin(venueSlots, eq(bookingApplications.slotId, venueSlots.id))
+        .where(and(eq(venueSlots.ownerUserId, uid), eq(bookingApplications.status, 'pending'))),
+      db
+        .select({
+          status: bookingContracts.status,
+          eventStart: bookingContracts.eventStart,
+          creatorFeeCents: bookingContracts.creatorFeeCents,
+        })
+        .from(bookingContracts)
+        .where(eq(bookingContracts.venueOwnerUserId, uid)),
+      db
+        .select({
+          venueConcessionRevenue: sql<number>`COALESCE(SUM(${concessionOrders.totalCents}), 0)::int`,
+        })
+        .from(concessionOrders)
+        .innerJoin(bookingContracts, eq(concessionOrders.contractId, bookingContracts.id))
+        .where(and(
+          eq(bookingContracts.venueOwnerUserId, uid),
+          eq(concessionOrders.status, 'completed')
+        )),
+    ]);
+
+    const venueUpcoming = venueContracts.filter(
+      (c) => c.status === 'signed' && c.eventStart.getTime() > now.getTime()
+    );
+    const venueCompleted = venueContracts.filter((c) => c.status === 'completed');
+    const venueDraft = venueContracts.filter((c) => c.status === 'draft');
+    const venueFeesOwed = [...venueUpcoming, ...venueCompleted].reduce(
+      (sum, c) => sum + (c.creatorFeeCents ?? 0),
+      0
+    );
+
+    // ── Creator-side aggregates ──
+    const [
+      [{ pendingAppCount: creatorPendingApps }],
+      creatorContracts,
+      [{ creatorConcessionRevenue }],
+    ] = await Promise.all([
+      db
+        .select({ pendingAppCount: sql<number>`COUNT(*)::int` })
+        .from(bookingApplications)
+        .where(and(eq(bookingApplications.creatorUserId, uid), eq(bookingApplications.status, 'pending'))),
+      db
+        .select({
+          status: bookingContracts.status,
+          eventStart: bookingContracts.eventStart,
+          creatorFeeCents: bookingContracts.creatorFeeCents,
+          concessionSplitBp: bookingContracts.concessionSplitBp,
+          id: bookingContracts.id,
+        })
+        .from(bookingContracts)
+        .where(eq(bookingContracts.creatorUserId, uid)),
+      db
+        .select({
+          creatorConcessionRevenue: sql<number>`COALESCE(SUM(${concessionOrders.totalCents}), 0)::int`,
+        })
+        .from(concessionOrders)
+        .innerJoin(bookingContracts, eq(concessionOrders.contractId, bookingContracts.id))
+        .where(and(
+          eq(bookingContracts.creatorUserId, uid),
+          eq(concessionOrders.status, 'completed')
+        )),
+    ]);
+
+    const creatorUpcoming = creatorContracts.filter(
+      (c) => c.status === 'signed' && c.eventStart.getTime() > now.getTime()
+    );
+    const creatorCompleted = creatorContracts.filter((c) => c.status === 'completed');
+    const creatorFeesEarned = [...creatorUpcoming, ...creatorCompleted].reduce(
+      (sum, c) => sum + (c.creatorFeeCents ?? 0),
+      0
+    );
+
+    // Concession share: per-contract bp varies, so sum per-contract revenue × that
+    // contract's bp / 10000. Query revenue per contract once, then multiply locally.
+    let creatorConcessionEarned = 0;
+    let venueConcessionRetained = 0;
+    if (creatorContracts.length > 0) {
+      const perContract = await db
+        .select({
+          contractId: concessionOrders.contractId,
+          revenue: sql<number>`COALESCE(SUM(${concessionOrders.totalCents}), 0)::int`,
+        })
+        .from(concessionOrders)
+        .where(and(
+          inArray(concessionOrders.contractId, creatorContracts.map((c) => c.id)),
+          eq(concessionOrders.status, 'completed')
+        ))
+        .groupBy(concessionOrders.contractId);
+      const bpByContract = Object.fromEntries(
+        creatorContracts.map((c) => [c.id, c.concessionSplitBp ?? 0])
+      );
+      for (const r of perContract) {
+        const bp = bpByContract[r.contractId] ?? 0;
+        creatorConcessionEarned += Math.floor((r.revenue * bp) / 10000);
+      }
+    }
+    // For the venue side we know total revenue + can compute retained share as
+    // (revenue − creator share across all contracts). Mirror the loop.
+    venueConcessionRetained = venueConcessionRevenue;
+    // (Venue retained = total − creator share; computed client-side from
+    // venueConcessionRevenue and the contracts list for accuracy.)
+    void creatorConcessionRevenue;
+
+    return {
+      asVenue: {
+        venueCount,
+        openSlotCount,
+        pendingAppCount: venuePendingApps,
+        upcomingContractCount: venueUpcoming.length,
+        completedContractCount: venueCompleted.length,
+        draftContractCount: venueDraft.length,
+        concessionRevenueCents: venueConcessionRevenue,
+        creatorFeesOwedCents: venueFeesOwed,
+      },
+      asCreator: {
+        pendingAppCount: creatorPendingApps,
+        upcomingGigCount: creatorUpcoming.length,
+        completedGigCount: creatorCompleted.length,
+        feesEarnedCents: creatorFeesEarned,
+        concessionEarnedCents: creatorConcessionEarned,
+      },
+    };
+  }),
+
   /** Owner side: apps for a specific slot. */
   slotApplications: protectedProcedure
     .input(z.object({ slotId: z.string().uuid() }))

@@ -2,86 +2,108 @@
 
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { useToast } from '@/app/components/Toast';
+import { trpc } from '@/lib/trpc/client';
 
-/* ── Mock Data ── */
-const VENUE_NAME = 'The Velvet Room';
-
-const STATS = [
-  { label: 'Upcoming Shows', value: '7', icon: '🎶' },
-  { label: 'Total Creators Hosted', value: '142', icon: '🎤' },
-  { label: 'Avg Attendance', value: '284', icon: '👥' },
-  { label: 'Revenue This Month', value: '$12,450', icon: '💰' },
-  { label: 'Open Slots', value: '3', icon: '📅' },
-  { label: 'Applications Pending', value: '5', icon: '📩' },
-];
-
-const PENDING_APPLICATIONS = [
-  { id: 1, creator: 'Maya Chen', avatar: 'M', slot: 'Friday Night Opener (May 8)', genre: 'Indie Pop', followers: 2400, plays: 18200, daysAgo: 1 },
-  { id: 2, creator: 'DJ Flux', avatar: 'D', slot: 'Saturday Electronic Night (May 9)', genre: 'Electronic', followers: 5100, plays: 42000, daysAgo: 2 },
-  { id: 3, creator: 'The Brass Roots', avatar: 'T', slot: 'Sunday Jazz Brunch (May 10)', genre: 'Jazz', followers: 1800, plays: 9500, daysAgo: 3 },
-  { id: 4, creator: 'Pixel Wave', avatar: 'P', slot: 'Friday Night Opener (May 8)', genre: 'Synthwave', followers: 3300, plays: 27600, daysAgo: 3 },
-  { id: 5, creator: 'Rue Dominguez', avatar: 'R', slot: 'Saturday Electronic Night (May 9)', genre: 'Lo-fi', followers: 950, plays: 6800, daysAgo: 5 },
-];
-
-const ACTIVE_SLOTS = [
-  { id: 1, title: 'Friday Night Opener', date: '2026-05-08', applications: 12 },
-  { id: 2, title: 'Saturday Electronic Night', date: '2026-05-09', applications: 8 },
-  { id: 3, title: 'Sunday Jazz Brunch', date: '2026-05-10', applications: 4 },
-];
-
-const UPCOMING_SHOWS = [
-  { id: 1, creator: 'Luna Vega', date: '2026-04-18', ticketsSold: 210, capacity: 300 },
-  { id: 2, creator: 'Echo Chamber', date: '2026-04-25', ticketsSold: 145, capacity: 300 },
-  { id: 3, creator: 'Nadia Rose', date: '2026-05-02', ticketsSold: 85, capacity: 300 },
-];
-
-const REVENUE_BREAKDOWN = [
-  { source: 'Ticket Commissions', amount: '$5,200', percent: 42 },
-  { source: 'Door Splits', amount: '$3,800', percent: 31 },
-  { source: 'Flat Booking Fees', amount: '$2,100', percent: 17 },
-  { source: 'Bar Revenue (Show Nights)', amount: '$1,350', percent: 10 },
-];
-
-/* ── Calendar helpers ── */
-function getCalendarDays(year: number, month: number) {
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const days: (number | null)[] = [];
-  for (let i = 0; i < firstDay; i++) days.push(null);
-  for (let d = 1; d <= daysInMonth; d++) days.push(d);
-  return days;
+function fmt(cents: number) {
+  return `$${(cents / 100).toFixed(2)}`;
 }
 
-const SHOW_DAYS = [8, 9, 10, 18, 25]; // days with shows (red)
-const AVAILABLE_DAYS = [15, 16, 22, 23, 29, 30]; // available slots (green)
+function formatEventTime(start: Date | string, end: Date | string) {
+  const d = new Date(start);
+  const e = new Date(end);
+  const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const timeOpts: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
+  return `${datePart} · ${d.toLocaleTimeString('en-US', timeOpts)} – ${e.toLocaleTimeString('en-US', timeOpts)}`;
+}
 
-const SHOW_DETAILS: Record<number, string> = {
-  8: 'Friday Night Opener — Slot Open',
-  9: 'Saturday Electronic Night — Slot Open',
-  10: 'Sunday Jazz Brunch — Slot Open',
-  18: 'Luna Vega — Confirmed',
-  25: 'Echo Chamber — Confirmed',
-};
+function statusPillClass(status: string) {
+  switch (status) {
+    case 'pending': return 'bg-yellow-600/20 text-yellow-400';
+    case 'accepted':
+    case 'signed':
+    case 'completed': return 'bg-green-600/20 text-green-400';
+    case 'declined':
+    case 'cancelled': return 'bg-red-600/20 text-red-400';
+    case 'draft': return 'bg-blue-600/20 text-blue-400';
+    default: return 'bg-gray-600/20 text-gray-400';
+  }
+}
 
 export default function VenueDashboardPage() {
-  const { data: session, status } = useSession();
+  const { status: sessionStatus } = useSession();
   const { toast } = useToast();
+  const utils = trpc.useUtils();
+  const isAuth = sessionStatus === 'authenticated';
 
-  const [applications, setApplications] = useState(PENDING_APPLICATIONS);
-  const [tooltipDay, setTooltipDay] = useState<number | null>(null);
+  const { data: summary, isLoading: summaryLoading } = trpc.bookings.dashboardSummary.useQuery(undefined, { enabled: isAuth });
+  const { data: myVenues } = trpc.venues.myVenues.useQuery(undefined, { enabled: isAuth });
+  const { data: mySlots } = trpc.venues.mySlots.useQuery(undefined, { enabled: isAuth });
+  const { data: received } = trpc.bookings.received.useQuery(undefined, { enabled: isAuth });
+  const { data: contracts } = trpc.bookings.myContracts.useQuery(undefined, { enabled: isAuth });
 
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const calendarDays = getCalendarDays(year, month);
-  const monthName = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+  const venueContracts = useMemo(
+    () => (contracts ?? []).filter((c) => c.venueOwnerUserId && c.venueOwnerUserId === c.venueOwnerUserId && c.creatorUserId !== c.venueOwnerUserId),
+    [contracts]
+  );
+  // myContracts returns BOTH-role rows; filter to ones where the current user
+  // is the venue owner. The session-id check happens server-side already in
+  // the bookings.myContracts query (it returns rows for either role), so we
+  // separate locally by comparing the venue-side vs creator-side ids.
+  const venueOnly = useMemo(() => {
+    if (!contracts) return [];
+    return contracts.filter((c) => c.venueOwnerUserId !== c.creatorUserId);
+    // The split between "as venue" and "as creator" is decided in the UI
+    // grouping below — myContracts already returned both for our user.
+  }, [contracts]);
+  void venueOnly;
+  void venueContracts;
 
-  /* ── Auth gate ── */
-  if (status !== 'authenticated') {
+  // From the user's POV, contracts where they're the venue owner are
+  // ones where venueOwnerUserId matches their session id. We don't have
+  // session id directly typed here, so we infer from the data: a row is
+  // a "venue contract" if its venue is in myVenues.
+  const myVenueIds = useMemo(() => new Set((myVenues ?? []).map((v) => v.id)), [myVenues]);
+  const asVenueContracts = useMemo(
+    () => (contracts ?? []).filter((c) => myVenueIds.has(c.venueId)),
+    [contracts, myVenueIds]
+  );
+
+  const now = Date.now();
+  const upcomingContracts = asVenueContracts.filter(
+    (c) => c.status === 'signed' && new Date(c.eventStart).getTime() > now
+  );
+  const draftContracts = asVenueContracts.filter((c) => c.status === 'draft');
+  const pastContracts = asVenueContracts
+    .filter((c) => c.status === 'completed')
+    .sort((a, b) => new Date(b.eventStart).getTime() - new Date(a.eventStart).getTime());
+
+  const pendingApps = (received ?? []).filter((r) => r.status === 'pending');
+  const openSlots = (mySlots ?? []).filter((s) => s.status === 'open');
+
+  const accept = trpc.bookings.accept.useMutation({
+    onSuccess: () => {
+      toast('Application accepted.', 'success');
+      void utils.bookings.received.invalidate();
+      void utils.bookings.dashboardSummary.invalidate();
+      void utils.bookings.myContracts.invalidate();
+    },
+    onError: (err) => toast(err.message || 'Accept failed', 'error'),
+  });
+  const decline = trpc.bookings.decline.useMutation({
+    onSuccess: () => {
+      toast('Application declined.', 'info');
+      void utils.bookings.received.invalidate();
+      void utils.bookings.dashboardSummary.invalidate();
+    },
+    onError: (err) => toast(err.message || 'Decline failed', 'error'),
+  });
+
+  if (!isAuth) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-brand-950 text-white text-center px-4">
+        <p className="text-5xl mb-2">🏟️</p>
         <p className="text-gray-400">Sign in to access your venue dashboard</p>
         <Link href="/auth/login" className="rounded-full bg-red-600 px-6 py-2.5 text-sm font-semibold hover:bg-red-700 transition">
           Sign In
@@ -90,246 +112,234 @@ export default function VenueDashboardPage() {
     );
   }
 
-  const handleApplication = (id: number, action: 'accept' | 'decline') => {
-    setApplications((prev) => prev.filter((a) => a.id !== id));
-    toast(
-      action === 'accept' ? 'Creator accepted! Confirmation sent.' : 'Application declined.',
-      action === 'accept' ? 'success' : 'info'
-    );
-  };
-
-  const dayClass = (day: number) => {
-    if (SHOW_DAYS.includes(day)) return 'bg-red-600/20 text-red-400 border-red-600/40 cursor-pointer';
-    if (AVAILABLE_DAYS.includes(day)) return 'bg-green-600/15 text-green-400 border-green-600/30 cursor-pointer';
-    return 'text-gray-500 border-transparent';
-  };
+  const s = summary?.asVenue;
 
   return (
-    <div className="min-h-screen py-16 px-6">
+    <div className="min-h-screen py-16 px-6 bg-brand-950 text-white">
       <div className="max-w-6xl mx-auto">
-        {/* Back nav */}
-        <Link href="/" className="text-sm text-gray-400 hover:text-white transition mb-2 inline-block">
-          &larr; Home
-        </Link>
-
-        {/* Hero */}
         <div className="mb-8">
-          <p className="text-sm text-red-400 font-medium mb-1">{VENUE_NAME}</p>
+          <Link href="/dashboard" className="text-sm text-gray-400 hover:text-white transition mb-2 inline-block">← Dashboard</Link>
           <h1 className="text-3xl font-bold">Venue Dashboard</h1>
-          <p className="text-gray-400 mt-1">Manage bookings, creators, and revenue</p>
+          <p className="text-gray-400 mt-1">Manage your venues, slots, applications, and bookings.</p>
         </div>
 
-        {/* ── Stats Row ── */}
+        {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-10">
-          {STATS.map((s) => (
-            <div key={s.label} className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-4 text-center">
-              <p className="text-xl mb-1">{s.icon}</p>
-              <p className="text-xl font-bold">{s.value}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
-            </div>
-          ))}
+          <StatCard label="My venues" value={s?.venueCount ?? '—'} icon="🏟️" />
+          <StatCard label="Open slots" value={s?.openSlotCount ?? '—'} icon="📅" />
+          <StatCard label="Pending apps" value={s?.pendingAppCount ?? '—'} icon="📩" />
+          <StatCard label="Upcoming" value={s?.upcomingContractCount ?? '—'} icon="🎤" sub="signed" />
+          <StatCard label="Concession revenue" value={s ? fmt(s.concessionRevenueCents) : '—'} icon="💰" sub="all time" />
+          <StatCard label="Creator fees" value={s ? fmt(s.creatorFeesOwedCents) : '—'} icon="📋" sub="committed" />
         </div>
 
-        {/* ── Calendar & Pending Apps ── */}
-        <div className="grid lg:grid-cols-2 gap-6 mb-10">
-          {/* Calendar */}
-          <section className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6">
-            <h2 className="text-lg font-bold mb-4">Calendar &mdash; {monthName}</h2>
-            <div className="grid grid-cols-7 gap-1 text-center text-xs mb-2">
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-                <span key={d} className="text-gray-600 py-1">{d}</span>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-1">
-              {calendarDays.map((day, i) => (
-                <div
-                  key={i}
-                  className={`relative rounded-lg border text-center py-2 text-sm ${
-                    day ? dayClass(day) : 'border-transparent'
-                  }`}
-                  onMouseEnter={() => day && setTooltipDay(day)}
-                  onMouseLeave={() => setTooltipDay(null)}
-                >
-                  {day || ''}
-                  {/* Tooltip */}
-                  {day && tooltipDay === day && (SHOW_DAYS.includes(day) || AVAILABLE_DAYS.includes(day)) && (
-                    <div className="absolute z-10 bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-brand-950 border border-brand-800/30 rounded-xl p-2.5 text-xs text-left shadow-lg">
-                      <p className="font-medium text-white">
-                        {SHOW_DETAILS[day] || 'Available slot'}
-                      </p>
-                      <p className="text-gray-500 mt-0.5">
-                        {SHOW_DAYS.includes(day) ? 'Show scheduled' : 'Open for booking'}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="flex items-center gap-4 mt-4 text-xs text-gray-500">
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-sm bg-red-600/30 border border-red-600/40" /> Shows
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-sm bg-green-600/20 border border-green-600/30" /> Available
-              </span>
-            </div>
-          </section>
-
-          {/* Pending Applications */}
-          <section className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6">
-            <h2 className="text-lg font-bold mb-4">Pending Applications</h2>
-            {applications.length === 0 ? (
-              <p className="text-gray-500 text-sm">No pending applications</p>
-            ) : (
-              <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-                {applications.map((app) => (
-                  <div key={app.id} className="rounded-xl bg-brand-950/50 border border-brand-800/10 p-4">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center font-bold text-sm shrink-0">
-                        {app.avatar}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-sm">{app.creator}</p>
-                        <p className="text-xs text-gray-500 truncate">{app.slot}</p>
-                      </div>
-                      <span className="text-xs text-gray-600 shrink-0">{app.daysAgo}d ago</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2 text-xs mb-3">
-                      <span className="px-2 py-0.5 rounded-full bg-red-600/10 text-red-400">{app.genre}</span>
-                      <span className="text-gray-500">{app.followers.toLocaleString()} followers</span>
-                      <span className="text-gray-500">{app.plays.toLocaleString()} plays</span>
-                    </div>
-                    <div className="flex gap-2">
-                      <Link
-                        href={`/artist/${app.id}`}
-                        className="flex-1 rounded-lg bg-brand-800/20 hover:bg-brand-800/30 py-2 text-xs text-center font-medium transition"
-                      >
-                        Listen Preview
-                      </Link>
-                      <button
-                        onClick={() => handleApplication(app.id, 'accept')}
-                        className="flex-1 rounded-lg bg-green-600/20 hover:bg-green-600/30 text-green-400 py-2 text-xs font-medium transition"
-                      >
-                        Accept
-                      </button>
-                      <button
-                        onClick={() => handleApplication(app.id, 'decline')}
-                        className="flex-1 rounded-lg bg-red-600/20 hover:bg-red-600/30 text-red-400 py-2 text-xs font-medium transition"
-                      >
-                        Decline
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+        {/* Quick links */}
+        <div className="flex flex-wrap gap-3 mb-10">
+          <Link href="/venues/create" className="rounded-full bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-500 transition">+ List a venue</Link>
+          <Link href="/venues/post-slot" className="rounded-full bg-[#15151f] border border-white/10 px-5 py-2 text-sm font-semibold text-white hover:border-red-600/40 transition">+ Post a slot</Link>
+          <Link href="/booking" className="rounded-full bg-[#15151f] border border-white/10 px-5 py-2 text-sm font-semibold text-white hover:border-red-600/40 transition">All bookings →</Link>
         </div>
 
-        {/* ── Active Slots & Upcoming Shows ── */}
-        <div className="grid lg:grid-cols-2 gap-6 mb-10">
-          {/* Active Slots */}
-          <section>
-            <h2 className="text-lg font-bold mb-4">Active Slots</h2>
-            <div className="space-y-3">
-              {ACTIVE_SLOTS.map((slot) => (
-                <div key={slot.id} className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-5 flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-sm">{slot.title}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {new Date(slot.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                    </p>
+        {/* Pending applications */}
+        <Section title={`Pending applications (${pendingApps.length})`}>
+          {pendingApps.length === 0 ? (
+            <Empty text="No pending applications. Post more slots to attract creators." />
+          ) : (
+            <div className="space-y-2">
+              {pendingApps.map((a) => (
+                <div key={a.id} className="rounded-xl border border-white/10 bg-[#15151f] p-4 flex items-start justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-sm font-bold shrink-0">
+                      {a.applicantName?.charAt(0) ?? '?'}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold">{a.applicantName ?? 'Creator'}</p>
+                      <p className="text-xs text-gray-400">{a.venueName} · {a.slotTitle}</p>
+                      {a.slotStartTime && a.slotEndTime && (
+                        <p className="text-[11px] text-gray-500">{formatEventTime(a.slotStartTime, a.slotEndTime)}</p>
+                      )}
+                      {a.message && <p className="mt-1 text-xs text-gray-400">&ldquo;{a.message}&rdquo;</p>}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-gray-400">{slot.applications} applications</span>
+                  <div className="flex gap-2 shrink-0">
                     <button
-                      onClick={() => toast('Managing slot...', 'info')}
-                      className="rounded-lg bg-brand-800/20 hover:bg-brand-800/30 px-4 py-2 text-xs font-medium transition"
+                      onClick={() => accept.mutate({ applicationId: a.id })}
+                      disabled={accept.isPending}
+                      className="rounded-full bg-green-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-green-500 transition disabled:opacity-50"
                     >
-                      Manage
+                      Accept
+                    </button>
+                    <button
+                      onClick={() => decline.mutate({ applicationId: a.id })}
+                      disabled={decline.isPending}
+                      className="rounded-full border border-white/10 bg-brand-950 px-4 py-1.5 text-xs font-semibold text-gray-300 hover:text-white transition disabled:opacity-50"
+                    >
+                      Decline
                     </button>
                   </div>
                 </div>
               ))}
             </div>
-          </section>
+          )}
+        </Section>
 
-          {/* Upcoming Shows */}
-          <section>
-            <h2 className="text-lg font-bold mb-4">Upcoming Shows</h2>
-            <div className="space-y-3">
-              {UPCOMING_SHOWS.map((show) => (
-                <div key={show.id} className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="font-semibold text-sm">{show.creator}</p>
-                      <p className="text-xs text-gray-500">
-                        {new Date(show.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                      </p>
+        {/* Drafts awaiting signature */}
+        {draftContracts.length > 0 && (
+          <Section title={`Contracts in draft (${draftContracts.length})`}>
+            <div className="space-y-2">
+              {draftContracts.map((c) => (
+                <ContractRow key={c.id} c={c} />
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* Upcoming signed contracts */}
+        <Section title={`Upcoming bookings (${upcomingContracts.length})`}>
+          {upcomingContracts.length === 0 ? (
+            <Empty text="No signed bookings on the books yet." />
+          ) : (
+            <div className="space-y-2">
+              {upcomingContracts
+                .sort((a, b) => new Date(a.eventStart).getTime() - new Date(b.eventStart).getTime())
+                .map((c) => (
+                  <ContractRow key={c.id} c={c} showPosLink />
+                ))}
+            </div>
+          )}
+        </Section>
+
+        {/* My venues */}
+        <Section title={`My venues (${(myVenues ?? []).length})`}>
+          {(myVenues ?? []).length === 0 ? (
+            <Empty text={<>You haven&apos;t listed any venues yet. <Link href="/venues/create" className="text-red-400 hover:underline">List one →</Link></>} />
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {(myVenues ?? []).map((v) => (
+                <Link
+                  key={v.id}
+                  href={`/venues/${v.id}`}
+                  className="block rounded-xl border border-white/10 bg-[#15151f] p-4 hover:border-red-600/40 transition"
+                >
+                  <p className="font-semibold">{v.name}</p>
+                  <p className="text-xs text-gray-400 mt-1">{[v.city, v.state].filter(Boolean).join(', ') || '—'}</p>
+                  <p className="text-[11px] text-gray-500 mt-2">Cap: {v.capacity?.toLocaleString() ?? '—'}</p>
+                </Link>
+              ))}
+            </div>
+          )}
+        </Section>
+
+        {/* Open slots */}
+        <Section title={`Open slots (${openSlots.length})`}>
+          {openSlots.length === 0 ? (
+            <Empty text={<>No open slots. <Link href="/venues/post-slot" className="text-red-400 hover:underline">Post one →</Link></>} />
+          ) : (
+            <div className="space-y-2">
+              {openSlots
+                .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+                .map((s) => (
+                  <div key={s.id} className="rounded-xl border border-white/10 bg-[#15151f] p-3 flex items-start justify-between gap-3 flex-wrap">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm">{s.venueName ?? '—'}: {s.title}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{formatEventTime(s.startTime, s.endTime)}</p>
+                      <div className="mt-1 flex items-center gap-2 flex-wrap">
+                        <span className="rounded-full bg-red-600/20 px-2 py-0.5 text-[10px] uppercase text-red-400">{s.slotType.replace('_', ' ')}</span>
+                        {s.compensationCents != null && (
+                          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-gray-300">{fmt(s.compensationCents)}</span>
+                        )}
+                      </div>
                     </div>
-                    <span className="text-xs text-gray-400">{show.ticketsSold}/{show.capacity} tickets</span>
                   </div>
-                  <div className="w-full h-2 rounded-full bg-brand-800/20 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-red-600 transition-all"
-                      style={{ width: `${(show.ticketsSold / show.capacity) * 100}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1.5">{Math.round((show.ticketsSold / show.capacity) * 100)}% sold</p>
-                </div>
-              ))}
+                ))}
             </div>
-          </section>
-        </div>
+          )}
+        </Section>
 
-        {/* ── Quick Actions ── */}
-        <section className="mb-10">
-          <h2 className="text-lg font-bold mb-4">Quick Actions</h2>
-          <div className="flex flex-wrap gap-3">
-            {[
-              { label: 'Post New Slot', href: '/booking', icon: '➕' },
-              { label: 'Browse Creators', href: '/explore', icon: '🔍' },
-              { label: 'View Analytics', href: '/dashboard/analytics', icon: '📊' },
-            ].map((action) => (
-              <Link
-                key={action.label}
-                href={action.href}
-                className="rounded-xl bg-[#15151f] border border-brand-800/20 hover:border-red-600/30 px-5 py-3 text-sm font-medium transition flex items-center gap-2"
-              >
-                <span>{action.icon}</span> {action.label}
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        {/* ── Revenue Breakdown ── */}
-        <section>
-          <h2 className="text-lg font-bold mb-4">Revenue Breakdown</h2>
-          <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-6">
-            <div className="space-y-4">
-              {REVENUE_BREAKDOWN.map((item) => (
-                <div key={item.source}>
-                  <div className="flex items-center justify-between text-sm mb-1.5">
-                    <span>{item.source}</span>
-                    <span className="font-semibold">{item.amount}</span>
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-brand-800/20 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-red-600 transition-all"
-                      style={{ width: `${item.percent}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">{item.percent}% of total</p>
-                </div>
+        {/* Past bookings */}
+        <Section title={`Past bookings (${pastContracts.length})`}>
+          {pastContracts.length === 0 ? (
+            <Empty text="No completed bookings yet." />
+          ) : (
+            <div className="space-y-2">
+              {pastContracts.slice(0, 20).map((c) => (
+                <ContractRow key={c.id} c={c} />
               ))}
+              {pastContracts.length > 20 && (
+                <p className="text-xs text-gray-500 text-center mt-4">Showing 20 most recent of {pastContracts.length}</p>
+              )}
             </div>
-            <div className="mt-6 pt-4 border-t border-brand-800/20 flex items-center justify-between">
-              <span className="text-sm text-gray-400">Total This Month</span>
-              <span className="text-lg font-bold">$12,450</span>
-            </div>
-          </div>
-        </section>
+          )}
+        </Section>
+
+        {summaryLoading && <p className="text-center text-gray-500 text-sm py-8">Loading…</p>}
       </div>
+    </div>
+  );
+}
+
+type ContractListItem = {
+  id: string;
+  status: string;
+  eventStart: Date | string;
+  eventEnd: Date | string;
+  creatorFeeCents: number | null;
+  concessionSplitBp: number | null;
+  venueName: string | null;
+  venueCity: string | null;
+};
+
+function ContractRow({ c, showPosLink }: { c: ContractListItem; showPosLink?: boolean }) {
+  return (
+    <Link
+      href={`/booking/contract/${c.id}`}
+      className="block rounded-xl border border-white/10 bg-[#15151f] p-4 hover:border-red-600/40 transition"
+    >
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <p className="font-semibold">{c.venueName ?? 'Venue'}{c.venueCity ? ` · ${c.venueCity}` : ''}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{formatEventTime(c.eventStart, c.eventEnd)}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {c.creatorFeeCents != null && (
+            <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs text-gray-300">{fmt(c.creatorFeeCents)}</span>
+          )}
+          {c.concessionSplitBp != null && c.concessionSplitBp > 0 && (
+            <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs text-gray-300">{c.concessionSplitBp / 100}% F&B</span>
+          )}
+          <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusPillClass(c.status)}`}>{c.status}</span>
+          {showPosLink && (
+            <span className="text-xs text-red-400">POS →</span>
+          )}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function StatCard({ label, value, icon, sub }: { label: string; value: string | number; icon?: string; sub?: string }) {
+  return (
+    <div className="rounded-2xl bg-[#15151f] border border-brand-800/20 p-4">
+      {icon && <span className="text-lg">{icon}</span>}
+      <p className="text-xl font-bold mt-1.5">{value}</p>
+      <p className="text-[11px] text-gray-500 mt-0.5">{label}{sub ? ` · ${sub}` : ''}</p>
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="mb-10">
+      <h2 className="text-lg font-bold mb-3">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+function Empty({ text }: { text: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-[#15151f] p-6 text-center text-sm text-gray-500">
+      {text}
     </div>
   );
 }
