@@ -94,10 +94,11 @@ export default function DashboardPage() {
           <QuickAction href="/dashboard/tickets" icon="🎟️" label="Ticket Sales" />
           <QuickAction href="/dashboard/broadcast" icon="📢" label="Message Fans" />
           <QuickAction href="/dashboard/podcasts" icon="🎙️" label="Podcasts" />
+          <QuickAction href="/booking" icon="📅" label="Bookings" />
+          <QuickAction href="/dashboard/gigs" icon="🎤" label="My Gigs" />
+          <QuickAction href="/dashboard/venue" icon="📋" label="Venue Dashboard" />
           <QuickAction href="/venues/discover" icon="🏟️" label="Find Venues" />
           <QuickAction href="/creators/discover" icon="⭐" label="Find Creators" />
-          <QuickAction href="/dashboard/venue" icon="📋" label="Venue Dashboard" />
-          <QuickAction href="/dashboard/gigs" icon="🎤" label="My Gigs" />
           <QuickAction href="/showcase" icon="🔦" label="Creator Showcase" />
           <QuickAction href="/dashboard/earnings" icon="💰" label="Earnings" />
           <QuickAction href="/dashboard/qr" icon="📱" label="QR Codes" />
